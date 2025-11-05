@@ -1,6 +1,8 @@
 FROM php:8.2-apache
 
 # Install system dependencies
+# Adding a dummy argument to force cache invalidation for this step
+ARG CACHE_BREAKER=2
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -14,10 +16,11 @@ RUN apt-get update && apt-get install -y \
     nmap \
     curl \
     mariadb-client-compat \
+    libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql zip intl opcache bcmath exif curl
 
 # Enable Apache modules
