@@ -1,8 +1,11 @@
+# syntax=docker/dockerfile:1
+
 FROM php:8.2-apache
 
 # Install system dependencies required for PHP extensions and runtime tooling
-RUN apt-get update \
-    && apt-get install -y \
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y \
         curl \
         git \
         nmap \
@@ -17,12 +20,13 @@ RUN apt-get update \
         libwebp-dev \
         libxml2-dev \
         libzip-dev \
-        pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+        pkg-config; \
+    rm -rf /var/lib/apt/lists/*
 
-# Build the required PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j"$(nproc)" \
+# Compile and enable the required PHP extensions
+RUN set -eux; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
+    docker-php-ext-install -j"$(nproc)" \
         bcmath \
         curl \
         exif \
@@ -35,26 +39,26 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
 # Enable Apache's mod_rewrite for pretty URLs
 RUN a2enmod rewrite
 
-# Copy application code into the image
-COPY . /var/www/html/
+WORKDIR /var/www/html
+
+# Copy application source
+COPY . .
+
+# Ensure the uploads directories exist with writable permissions
+RUN set -eux; \
+    install -d -m 0775 -o www-data -g www-data uploads \
+        uploads/icons \
+        uploads/map_backgrounds \
+        uploads/backups; \
+    chown -R www-data:www-data /var/www/html; \
+    find /var/www/html -type d -exec chmod 0755 {} \;; \
+    find /var/www/html/uploads -type d -exec chmod 0775 {} \;
 
 # Copy entrypoint script and ensure it is executable
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
-# Ensure application files are owned by the Apache user
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
-
-# Prepare writable upload directories
-RUN mkdir -p /var/www/html/uploads/icons \
-    && mkdir -p /var/www/html/uploads/map_backgrounds \
-    && mkdir -p /var/www/html/uploads/backups \
-    && chown -R www-data:www-data /var/www/html/uploads \
-    && chmod -R 775 /var/www/html/uploads
-
-# Expose the application port
 EXPOSE 2266
 
-# Use the custom entrypoint to adjust Apache configuration before start
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["apache2-foreground"]

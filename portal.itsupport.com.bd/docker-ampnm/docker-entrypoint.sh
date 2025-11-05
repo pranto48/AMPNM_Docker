@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Adjust Apache to listen on port 2266 before starting the service.
-echo "Configuring Apache to listen on port 2266..."
-sed -i 's/Listen 80/Listen 2266/g' /etc/apache2/ports.conf
-sed -i 's/<VirtualHost \*:80>/<VirtualHost \*:2266>/g' /etc/apache2/sites-available/000-default.conf
+APACHE_PORT="${APACHE_PORT:-2266}"
 
-# Start Apache in the foreground.
-echo "Starting Apache web server..."
+echo "Configuring Apache to listen on port ${APACHE_PORT}..."
+sed -ri "s/Listen 80/Listen ${APACHE_PORT}/" /etc/apache2/ports.conf || true
+sed -ri "s/<VirtualHost \*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sites-available/000-default.conf || true
+
+echo "Starting Apache web server on port ${APACHE_PORT}..."
 exec apache2-foreground
