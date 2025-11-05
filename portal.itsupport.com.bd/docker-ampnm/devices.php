@@ -11,7 +11,7 @@ include 'header.php';
                 <input type="file" id="importDevicesFile" class="hidden" accept=".amp">
                 <button id="importDevicesBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-import mr-2"></i>Import</button>
                 <button id="exportDevicesBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-export mr-2"></i>Export All</button>
-                <button id="createDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Create New Device</button>
+                <a href="add_device.php" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Create New Device</a>
             </div>
         </div>
 
@@ -64,10 +64,10 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- Add/Edit Device Modal -->
+    <!-- Add/Edit Device Modal (kept for editing existing devices) -->
     <div id="deviceModal" class="modal-backdrop hidden">
         <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] flex flex-col">
-            <h2 id="modalTitle" class="text-xl font-semibold text-white mb-4">Add Device</h2>
+            <h2 id="modalTitle" class="text-xl font-semibold text-white mb-4">Edit Device</h2>
             <form id="deviceForm" class="flex flex-col flex-grow">
                 <input type="hidden" id="deviceId" name="id">
                 <div class="flex-grow overflow-y-auto pr-2 -mr-2 space-y-4">
