@@ -2,7 +2,7 @@ FROM php:8.2-apache
 
 # Install system dependencies
 # Adding a dummy argument to force cache invalidation for this step
-ARG CACHE_BREAKER=2
+ARG CACHE_BREAKER=3
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+# Using explicit /usr paths for gd dependencies
+RUN docker-php-ext-configure gd --with-freetype=/usr --with-jpeg=/usr --with-webp \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql zip intl opcache bcmath exif curl
 
 # Enable Apache modules
