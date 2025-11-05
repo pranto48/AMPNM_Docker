@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = 'Please enter both username and password.';
     } else {
         $pdo = getDbConnection();
-        $stmt = $pdo->prepare("SELECT id, password FROM users WHERE username = ?");
+        $stmt = $pdo->prepare("SELECT id, password, role FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Password is correct, start session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
+            // Set role from DB; if missing, default admin by username or viewer otherwise
+            $_SESSION['role'] = $user['role'] ?? (($username === 'admin') ? 'admin' : 'viewer');
             header('Location: index.php');
             exit;
         } else {

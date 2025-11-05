@@ -10,6 +10,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Ensure a role is set in session (backward compatibility)
+if (!isset($_SESSION['role'])) {
+    $_SESSION['role'] = (isset($_SESSION['username']) && $_SESSION['username'] === 'admin') ? 'admin' : 'viewer';
+}
+
 // --- External License Validation ---
 // This application's license key is now retrieved dynamically from the database.
 // The external verification service URL is defined in config.php (LICENSE_API_URL)

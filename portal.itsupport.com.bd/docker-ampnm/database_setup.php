@@ -50,9 +50,23 @@ try {
         `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         `username` VARCHAR(50) NOT NULL UNIQUE,
         `password` VARCHAR(255) NOT NULL,
+        `role` VARCHAR(20) NOT NULL DEFAULT 'viewer',
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    message("Table 'users' checked/created successfully.");
+    
+    // Add role column if missing (for upgrades)
+    try {
+        $pdo->exec("ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `role` VARCHAR(20) NOT NULL DEFAULT 'viewer' AFTER `password`");
+    } catch (Exception $e) {
+        // Ignore if not supported (older MySQL); attempt safe check
+        try {
+            $colCheck = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'role'")->fetch();
+            if (!$colCheck) {
+                $pdo->exec("ALTER TABLE `users` ADD COLUMN `role` VARCHAR(20) NOT NULL DEFAULT 'viewer' AFTER `password`");
+            }
+        } catch (Exception $ignored) { /* no-op */ }
+    }
+    message("Table 'users' checked/created successfully (with role column).");
 
     // Step 2: Ensure admin user exists and set password from environment variable
     $admin_user = 'admin';
@@ -65,7 +79,7 @@ try {
 
     if (!$admin_data) {
         $admin_pass_hash = password_hash($admin_password, PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO `users` (username, password) VALUES (?, ?)")->execute([$admin_user, $admin_pass_hash]);
+        $pdo->prepare("INSERT INTO `users` (username, password, role) VALUES (?, ?, 'admin')")->execute([$admin_user, $admin_pass_hash]);
         $admin_id = $pdo->lastInsertId();
         message("Created default user 'admin'.");
         if ($is_default_password) {
@@ -82,6 +96,8 @@ try {
             $updateStmt->execute([$new_hash, $admin_id]);
             message("Updated admin password from environment variable.");
         }
+        // Ensure admin has admin role
+        $pdo->prepare("UPDATE `users` SET role = 'admin' WHERE id = ?")->execute([$admin_id]);
     }
 
     // Step 3: Create the rest of the tables

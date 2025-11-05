@@ -64,10 +64,35 @@ MapApp.ui = {
     },
 
     openDeviceModal: (deviceId = null, prefill = {}) => {
+        const isViewer = window.APP_ROLE === 'viewer';
+        if (isViewer && deviceId) { // Allow viewers to open modal for details, but disable fields
+            // Fetch device details and populate fields as readonly
+            // This part is handled by the detailsModal in devices.js, but for map context,
+            // we'll just open the form with disabled fields.
+            window.notyf.info('Viewer role: Device details are read-only.');
+        } else if (isViewer && !deviceId) { // Prevent viewers from adding new devices
+            window.notyf.error('Forbidden: Viewer role cannot add new devices.');
+            return;
+        }
+
         MapApp.ui.els.deviceForm.reset();
         document.getElementById('deviceId').value = '';
         const previewWrapper = document.getElementById('icon_preview_wrapper');
         previewWrapper.classList.add('hidden');
+
+        // Disable all form fields if viewer
+        const formFields = MapApp.ui.els.deviceForm.querySelectorAll('input, select, textarea, button[type="submit"]');
+        formFields.forEach(field => {
+            if (field.id !== 'cancelBtn') { // Keep cancel button enabled
+                field.disabled = isViewer;
+            }
+        });
+        
+        // Hide save button for viewers
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) {
+            saveBtn.style.display = isViewer ? 'none' : '';
+        }
 
         if (deviceId) {
             const node = MapApp.state.nodes.get(deviceId);
@@ -100,6 +125,11 @@ MapApp.ui = {
     },
 
     openEdgeModal: (edgeId) => {
+        const isViewer = window.APP_ROLE === 'viewer';
+        if (isViewer) {
+            window.notyf.error('Forbidden: Viewer role cannot edit connections.');
+            return;
+        }
         const edge = MapApp.state.edges.get(edgeId);
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || 'cat5';

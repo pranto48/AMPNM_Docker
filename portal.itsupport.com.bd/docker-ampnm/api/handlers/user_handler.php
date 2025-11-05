@@ -10,7 +10,7 @@ if ($_SESSION['username'] !== 'admin') {
 
 switch ($action) {
     case 'get_users':
-        $stmt = $pdo->query("SELECT id, username, created_at FROM users ORDER BY username ASC");
+        $stmt = $pdo->query("SELECT id, username, role, created_at FROM users ORDER BY username ASC");
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($users);
         break;
@@ -19,10 +19,19 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $username = $input['username'] ?? '';
             $password = $input['password'] ?? '';
+            $role = $input['role'] ?? 'viewer';
 
             if (empty($username) || empty($password)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Username and password are required.']);
+                exit;
+            }
+
+            // Only allow creating viewer accounts via API (admin is reserved)
+            $allowedRoles = ['viewer'];
+            if (!in_array($role, $allowedRoles, true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid role. Only viewer is allowed.']);
                 exit;
             }
 
@@ -36,8 +45,8 @@ switch ($action) {
             }
 
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
-            $stmt->execute([$username, $hashed_password]);
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+            $stmt->execute([$username, $hashed_password, $role]);
             
             echo json_encode(['success' => true, 'message' => 'User created successfully.']);
         }
