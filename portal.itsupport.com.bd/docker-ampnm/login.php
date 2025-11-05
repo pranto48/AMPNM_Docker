@@ -58,13 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div>
                 <label for="username" class="block text-sm font-medium text-slate-300 mb-2">Username</label>
                 <input type="text" name="username" id="username" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                       class="app-login-input"
                        placeholder="admin">
             </div>
             <div>
                 <label for="password" class="block text-sm font-medium text-slate-300 mb-2">Password</label>
                 <input type="password" name="password" id="password" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                       class="app-login-input"
                        placeholder="password">
             </div>
             <button type="submit"
