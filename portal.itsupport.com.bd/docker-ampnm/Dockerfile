@@ -6,18 +6,19 @@ RUN apt-get update && apt-get install -y \
     unzip \
     libzip-dev \
     libpng-dev \
-    libjpeg-dev \
+    libjpeg62-turbo-dev \
     libfreetype6-dev \
     libicu-dev \
     libonig-dev \
     libxml2-dev \
+    libcurl4-openssl-dev \
     nmap \
     curl \
     mariadb-client-compat \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql zip intl opcache bcmath exif curl
 
 # Enable Apache modules
@@ -44,8 +45,8 @@ RUN echo "Listen 2266" >> /etc/apache2/ports.conf \
 
 # Ensure the uploads directory exists and has correct permissions
 RUN mkdir -p /var/www/html/uploads/icons \
-    mkdir -p /var/www/html/uploads/map_backgrounds \
-    mkdir -p /var/www/html/uploads/backups \
+    && mkdir -p /var/www/html/uploads/map_backgrounds \
+    && mkdir -p /var/www/html/uploads/backups \
     && chown -R www-data:www-data /var/www/html/uploads \
     && chmod -R 775 /var/www/html/uploads
 
