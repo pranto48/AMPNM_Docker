@@ -1,55 +1,60 @@
 FROM php:8.2-apache
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libzip-dev \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libwebp-dev \
-    libicu-dev \
-    libonig-dev \
-    libxml2-dev \
-    libcurl4-openssl-dev \
-    nmap \
-    curl \
-    mariadb-client-compat \
+# Install system dependencies required for PHP extensions and runtime tooling
+RUN apt-get update \
+    && apt-get install -y \
+        curl \
+        git \
+        nmap \
+        unzip \
+        default-mysql-client \
+        libcurl4-openssl-dev \
+        libfreetype6-dev \
+        libicu-dev \
+        libjpeg62-turbo-dev \
+        libonig-dev \
+        libpng-dev \
+        libwebp-dev \
+        libxml2-dev \
+        libzip-dev \
+        pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
+# Build the required PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j$(nproc) gd pdo_mysql zip intl opcache bcmath exif curl
+    && docker-php-ext-install -j"$(nproc)" \
+        bcmath \
+        curl \
+        exif \
+        gd \
+        intl \
+        opcache \
+        pdo_mysql \
+        zip
 
-# Enable Apache modules
+# Enable Apache's mod_rewrite for pretty URLs
 RUN a2enmod rewrite
 
-# Copy application files from the current build context
+# Copy application code into the image
 COPY . /var/www/html/
 
-# Copy the entrypoint script to the root directory and make it executable
+# Copy entrypoint script and ensure it is executable
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Set permissions
+# Ensure application files are owned by the Apache user
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html
 
-# Expose port 2266 (or whatever port your app runs on)
-EXPOSE 2266
-
-# Update Apache configuration to listen on 2266
-RUN echo "Listen 2266" >> /etc/apache2/ports.conf \
-    && sed -i -e 's/VirtualHost \*:80/VirtualHost \*:2266/g' /etc/apache2/sites-available/000-default.conf \
-    && sed -i -e 's/VirtualHost \*:80/VirtualHost \*:2266/g' /etc/apache2/sites-enabled/000-default.conf
-
-# Ensure the uploads directory exists and has correct permissions
+# Prepare writable upload directories
 RUN mkdir -p /var/www/html/uploads/icons \
     && mkdir -p /var/www/html/uploads/map_backgrounds \
     && mkdir -p /var/www/html/uploads/backups \
     && chown -R www-data:www-data /var/www/html/uploads \
     && chmod -R 775 /var/www/html/uploads
 
-# Use the copied entrypoint script from the root
+# Expose the application port
+EXPOSE 2266
+
+# Use the custom entrypoint to adjust Apache configuration before start
 ENTRYPOINT ["/docker-entrypoint.sh"]
