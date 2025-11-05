@@ -1,19 +1,6 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
-$current_user_role = $_SESSION['role'] ?? 'viewer';
-
-// Deny map-modifying operations for viewer role (defense-in-depth; also enforced in api.php)
-$viewerDeniedActions = [
-    'create_map', 'update_map', 'delete_map',
-    'create_edge', 'update_edge', 'delete_edge',
-    'import_map', 'upload_map_background'
-];
-if ($current_user_role === 'viewer' && in_array($action, $viewerDeniedActions, true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Forbidden: Viewer role cannot modify maps or edges.']);
-    exit;
-}
 
 switch ($action) {
     case 'get_maps':

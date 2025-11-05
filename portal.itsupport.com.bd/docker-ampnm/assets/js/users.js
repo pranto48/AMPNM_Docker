@@ -21,7 +21,6 @@ function initUsers() {
             usersTableBody.innerHTML = users.map(user => `
                 <tr class="border-b border-slate-700">
                     <td class="px-6 py-4 whitespace-nowrap text-white">${user.username}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-slate-400">${user.role || (user.username === 'admin' ? 'admin' : 'viewer')}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-slate-400">${new Date(user.created_at).toLocaleString()}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         ${user.username !== 'admin' ? `<button class="delete-user-btn text-red-500 hover:text-red-400" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-trash mr-2"></i>Delete</button>` : '<span class="text-slate-500">Cannot delete admin</span>'}
@@ -39,7 +38,6 @@ function initUsers() {
         e.preventDefault();
         const username = e.target.username.value;
         const password = e.target.password.value;
-        const role = e.target.role ? e.target.role.value : 'viewer';
         if (!username || !password) return;
 
         const button = createUserForm.querySelector('button[type="submit"]');
@@ -47,7 +45,7 @@ function initUsers() {
         button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
 
         try {
-            const result = await api.post('create_user', { username, password, role });
+            const result = await api.post('create_user', { username, password });
             if (result.success) {
                 window.notyf.success('User created successfully.');
                 createUserForm.reset();

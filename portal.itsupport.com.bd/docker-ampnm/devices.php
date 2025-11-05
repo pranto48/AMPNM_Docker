@@ -5,17 +5,15 @@ include 'header.php';
 
 <main id="app">
     <div class="container mx-auto px-4 py-8">
-            <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-                <h1 class="text-3xl font-bold text-white">Device Inventory</h1>
-            <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'viewer'): ?>
-                <div class="flex items-center gap-2">
-                    <input type="file" id="importDevicesFile" class="hidden" accept=".amp">
-                    <button id="importDevicesBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-import mr-2"></i>Import</button>
-                    <button id="exportDevicesBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-export mr-2"></i>Export All</button>
-                    <button id="createDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Create New Device</button>
-                </div>
-            <?php endif; ?>
+        <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+            <h1 class="text-3xl font-bold text-white">Device Inventory</h1>
+            <div class="flex items-center gap-2">
+                <input type="file" id="importDevicesFile" class="hidden" accept=".amp">
+                <button id="importDevicesBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-import mr-2"></i>Import</button>
+                <button id="exportDevicesBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-export mr-2"></i>Export All</button>
+                <button id="createDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Create New Device</button>
             </div>
+        </div>
 
         <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
             <div class="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
@@ -25,11 +23,9 @@ include 'header.php';
                         <input type="search" id="deviceSearchInput" placeholder="Search devices..." class="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500">
                         <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
                     </div>
-                    <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'viewer'): ?>
-                        <button id="bulkCheckBtn" class="px-4 py-2 bg-green-600/50 text-green-300 rounded-lg hover:bg-green-600/80 flex-shrink-0" title="Check All Device Statuses">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    <?php endif; ?>
+                    <button id="bulkCheckBtn" class="px-4 py-2 bg-green-600/50 text-green-300 rounded-lg hover:bg-green-600/80 flex-shrink-0" title="Check All Device Statuses">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
                 </div>
             </div>
             
@@ -116,22 +112,18 @@ include 'header.php';
                             <option value="other">Other</option>
                         </select>
                     </div>
+                    <div>
+                        <label for="deviceMap" class="block text-sm font-medium text-slate-400 mb-1">Map Assignment</label>
+                        <select id="deviceMap" name="map_id" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
                     <fieldset class="border border-slate-600 rounded-lg p-4">
                         <legend class="text-sm font-medium text-slate-400 px-2">Custom Icon</legend>
                         <div class="space-y-3">
                             <div>
                                 <label for="icon_url" class="block text-sm font-medium text-slate-400 mb-1">Icon URL</label>
                                 <input type="text" id="icon_url" name="icon_url" placeholder="Leave blank to use default icon" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            </div>
-                            <div class="text-center text-slate-500 text-sm">OR</div>
-                            <div>
-                                <label for="icon_upload" class="block text-sm font-medium text-slate-400 mb-1">Upload Icon</label>
-                                <input type="file" id="icon_upload" name="icon_upload" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600/20 file:text-cyan-300 hover:file:bg-cyan-600/40">
-                                <div id="icon_upload_loader" class="hidden mt-2"><div class="loader inline-block w-4 h-4"></div><span class="ml-2 text-sm">Uploading...</span></div>
-                                <p class="text-xs text-slate-500 mt-1">Upload requires the item to be saved first.</p>
-                            </div>
-                            <div id="icon_preview_wrapper" class="hidden mt-2 text-center">
-                                <img id="icon_preview" src="" alt="Icon Preview" class="max-w-full h-16 mx-auto bg-slate-700 p-1 rounded">
                             </div>
                         </div>
                     </fieldset>

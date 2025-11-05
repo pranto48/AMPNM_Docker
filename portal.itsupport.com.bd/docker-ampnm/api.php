@@ -7,31 +7,6 @@ $pdo = getDbConnection();
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
-$current_user_role = $_SESSION['role'] ?? 'viewer';
-
-// Define actions allowed for the 'viewer' role
-$viewerAllowedActions = [
-    'health',
-    'get_dashboard_data',
-    'get_devices',
-    'get_device_details',
-    'get_device_uptime',
-    'get_maps',
-    'get_edges',
-    'get_ping_history',
-    'get_status_logs',
-    'get_smtp_settings', // View settings, but not save
-    'get_device_subscriptions', // View subscriptions, but not save/delete
-    'get_all_devices_for_subscriptions', // View devices for subscription setup
-];
-
-// If the current user is a 'viewer' and the action is not in the allowed list, deny access.
-if ($current_user_role === 'viewer' && !in_array($action, $viewerAllowedActions, true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Forbidden: Viewer role has read-only access and cannot perform this action.']);
-    exit;
-}
-
 // Group actions by handler
 $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
 $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'ping_all_devices', 'get_device_uptime', 'upload_device_icon', 'import_devices'];
@@ -40,6 +15,7 @@ $dashboardActions = ['get_dashboard_data'];
 $userActions = ['get_users', 'create_user', 'delete_user'];
 $logActions = ['get_status_logs'];
 $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
+
 
 if (in_array($action, $pingActions)) {
     require __DIR__ . '/api/handlers/ping_handler.php';

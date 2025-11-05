@@ -1,18 +1,6 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
-$current_user_role = $_SESSION['role'] ?? 'viewer';
-
-// Deny write/active operations for viewer role (defense-in-depth; also enforced in api.php)
-$viewerDeniedActions = [
-    'import_devices', 'check_all_devices_globally', 'ping_all_devices', 'check_device',
-    'create_device', 'update_device', 'delete_device', 'upload_device_icon'
-];
-if ($current_user_role === 'viewer' && in_array($action, $viewerDeniedActions, true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Forbidden: Viewer role cannot modify devices or trigger active checks.']);
-    exit;
-}
 
 // Placeholder for email notification function
 function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
