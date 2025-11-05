@@ -16,7 +16,8 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  subscribeToDeviceChanges 
+  subscribeToDeviceChanges,
+  NetworkMapDetails
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,20 +29,42 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentMapId, setCurrentMapId] = useState<string>(''); // State for current map ID
+  const [mapDetails, setMapDetails] = useState<NetworkMapDetails | null>(null); // State for current map details
 
   const fetchDevices = useCallback(async () => {
     try {
-      const dbDevices = await getDevices();
+      const dbDevices = await getDevices(currentMapId); // Fetch devices for the current map
       setDevices(dbDevices as NetworkDevice[]);
     } catch (error) {
       showError("Failed to load devices from database.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentMapId]);
+
+  // Placeholder for fetching map details (you'd integrate this with your map selector logic)
+  const fetchMapDetails = useCallback(async () => {
+    if (!currentMapId) {
+      setMapDetails(null);
+      return;
+    }
+    try {
+      // This is a placeholder. In a real app, you'd fetch map details from your API.
+      // For now, we'll mock it or fetch from a generic endpoint if available.
+      // Assuming getMapDetailsById exists or can be derived from getMaps
+      const { data, error } = await supabase.from('maps').select('*').eq('id', currentMapId).single();
+      if (error) throw new Error(error.message);
+      setMapDetails(data as NetworkMapDetails);
+    } catch (error) {
+      console.error("Failed to fetch map details:", error);
+      setMapDetails(null);
+    }
+  }, [currentMapId]);
 
   useEffect(() => {
     fetchDevices();
+    fetchMapDetails(); // Fetch map details when currentMapId changes
 
     // Subscribe to real-time device changes
     const channel = subscribeToDeviceChanges((payload) => {
@@ -52,7 +75,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchDevices]);
+  }, [fetchDevices, fetchMapDetails]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
@@ -358,7 +381,12 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="map">
-            <NetworkMap devices={devices} onMapUpdate={fetchDevices} />
+            <NetworkMap 
+              devices={devices} 
+              onMapUpdate={fetchDevices} 
+              currentMapId={currentMapId} // Pass currentMapId
+              mapDetails={mapDetails} // Pass mapDetails
+            />
           </TabsContent>
         </Tabs>
 

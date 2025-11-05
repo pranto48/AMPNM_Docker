@@ -21,8 +21,27 @@ export interface MapData {
   edges: { source: string; target: string; connection_type: string }[];
 }
 
-export const getDevices = async () => {
-  const { data, error } = await supabase.from('network_devices').select('*').order('created_at', { ascending: true });
+export interface NetworkMapDetails {
+  id: string;
+  name: string;
+  background_color: string | null;
+  background_image_url: string | null;
+  share_id: string | null;
+  is_public: boolean;
+}
+
+export const getDevices = async (mapId?: string, shareId?: string) => {
+  let query = supabase.from('network_devices').select('*').order('created_at', { ascending: true });
+
+  if (mapId) {
+    query = query.eq('map_id', mapId);
+  } else if (shareId) {
+    // For shared maps, we need to join with maps table to ensure it's public
+    query = query
+      .in('map_id', supabase.from('maps').select('id').eq('share_id', shareId).eq('is_public', true))
+  }
+  
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data;
 };
@@ -68,17 +87,27 @@ export const deleteDevice = async (id: string) => {
   if (error) throw new Error(error.message);
 };
 
-export const getEdges = async () => {
-  const { data, error } = await supabase.from('network_edges').select('id, source:source_id, target:target_id, connection_type');
+export const getEdges = async (mapId?: string, shareId?: string) => {
+  let query = supabase.from('network_edges').select('id, source:source_id, target:target_id, connection_type');
+
+  if (mapId) {
+    query = query.eq('map_id', mapId);
+  } else if (shareId) {
+    // For shared maps, we need to join with maps table to ensure it's public
+    query = query
+      .in('map_id', supabase.from('maps').select('id').eq('share_id', shareId).eq('is_public', true))
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data;
 };
 
-export const addEdgeToDB = async (edge: { source: string; target: string }) => {
+export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string }) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data, error } = await supabase.from('network_edges').insert({ source_id: edge.source, target_id: edge.target, user_id: user.id, connection_type: 'cat5' }).select().single();
+  const { data, error } = await supabase.from('network_edges').insert({ source_id: edge.source, target_id: edge.target, user_id: user.id, map_id: edge.map_id, connection_type: 'cat5' }).select().single();
   if (error) throw new Error(error.message);
   return data;
 };
@@ -94,12 +123,39 @@ export const deleteEdgeFromDB = async (edgeId: string) => {
   if (error) throw new Error(error.message);
 };
 
-export const importMap = async (mapData: MapData) => {
+export const importMap = async (mapData: MapData, mapId: string) => {
   const { error } = await supabase.rpc('import_network_map', {
+    p_map_id: mapId, // Pass mapId to the RPC function
     devices_data: mapData.devices,
     edges_data: mapData.edges,
   });
   if (error) throw new Error(`Import failed: ${error.message}`);
+};
+
+// New functions for map sharing
+export const getMapDetailsByShareId = async (shareId: string): Promise<NetworkMapDetails | null> => {
+  const { data, error } = await supabase
+    .from('maps')
+    .select('id, name, background_color, background_image_url, share_id, is_public')
+    .eq('share_id', shareId)
+    .eq('is_public', true)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+    throw new Error(error.message);
+  }
+  return data;
+};
+
+export const generateMapShareLink = async (mapId: string): Promise<string> => {
+  const { data, error } = await supabase.rpc('generate_map_share_link', { p_map_id: mapId });
+  if (error) throw new Error(error.message);
+  return data; // This should be the share_id
+};
+
+export const disableMapShareLink = async (mapId: string) => {
+  const { error } = await supabase.rpc('disable_map_share_link', { p_map_id: mapId });
+  if (error) throw new Error(error.message);
 };
 
 // Real-time subscription for device changes

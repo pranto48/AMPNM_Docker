@@ -1,27 +1,44 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
-$current_user_id = $_SESSION['user_id'];
+// For public map access, user_id might not be set, so we check for it.
+$current_user_id = $_SESSION['user_id'] ?? null;
 
 switch ($action) {
     case 'get_maps':
-        $stmt = $pdo->prepare("SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m WHERE m.user_id = ? ORDER BY m.created_at ASC");
+        // Only authenticated users can get their list of maps
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, m.share_id, m.is_public, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m WHERE m.user_id = ? ORDER BY m.created_at ASC");
         $stmt->execute([$current_user_id, $current_user_id]);
         $maps = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($maps);
         break;
 
     case 'create_map':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = $input['name'] ?? ''; $type = $input['type'] ?? 'lan';
             if (empty($name)) { http_response_code(400); echo json_encode(['error' => 'Name is required']); exit; }
             $stmt = $pdo->prepare("INSERT INTO maps (user_id, name, type) VALUES (?, ?, ?)"); $stmt->execute([$current_user_id, $name, $type]);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT id, name, type, updated_at as lastModified, 0 as deviceCount FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT id, name, type, updated_at as lastModified, 0 as deviceCount, share_id, is_public FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
             $map = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($map);
         }
         break;
 
     case 'update_map':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $updates = $input['updates'] ?? [];
@@ -47,6 +64,11 @@ switch ($action) {
         break;
 
     case 'delete_map':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
@@ -57,14 +79,38 @@ switch ($action) {
         
     case 'get_edges':
         $map_id = $_GET['map_id'] ?? null;
-        if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
-        $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE map_id = ? AND user_id = ?");
-        $stmt->execute([$map_id, $current_user_id]);
+        $share_id = $_GET['share_id'] ?? null; // NEW: Allow fetching by share_id
+
+        if (!$map_id && !$share_id) { http_response_code(400); echo json_encode(['error' => 'Map ID or Share ID is required']); exit; }
+
+        $sql = "SELECT de.* FROM device_edges de JOIN maps m ON de.map_id = m.id WHERE 1=1";
+        $params = [];
+
+        if ($map_id) {
+            if (!$current_user_id) { // If map_id is used, user must be authenticated
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            $sql .= " AND de.map_id = ? AND de.user_id = ?";
+            $params = [$map_id, $current_user_id];
+        } elseif ($share_id) {
+            $sql .= " AND m.share_id = ? AND m.is_public = TRUE";
+            $params = [$share_id];
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $edges = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($edges);
         break;
 
     case 'create_edge':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
@@ -78,6 +124,11 @@ switch ($action) {
         break;
 
     case 'update_edge':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $connection_type = $input['connection_type'] ?? 'cat5';
@@ -92,6 +143,11 @@ switch ($action) {
         break;
 
     case 'delete_edge':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
@@ -102,6 +158,11 @@ switch ($action) {
         break;
     
     case 'import_map':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $map_id = $input['map_id'] ?? null;
             $devices = $input['devices'] ?? [];
@@ -169,6 +230,11 @@ switch ($action) {
         break;
     
     case 'upload_map_background':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mapId = $_POST['map_id'] ?? null;
             if (!$mapId || !isset($_FILES['backgroundFile'])) {
@@ -223,5 +289,140 @@ switch ($action) {
                 echo json_encode(['error' => 'Failed to save uploaded file.']);
             }
         }
+        break;
+
+    case 'generate_share_link':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $map_id = $input['map_id'] ?? null;
+            if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
+
+            // Check if map belongs to user
+            $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
+            $stmt->execute([$map_id, $current_user_id]);
+            if (!$stmt->fetch()) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Map not found or access denied.']);
+                exit;
+            }
+
+            $share_id = generateUuid(); // Use the helper function from functions.php
+            $stmt = $pdo->prepare("UPDATE maps SET share_id = ?, is_public = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
+            $stmt->execute([$share_id, $map_id, $current_user_id]);
+            echo json_encode(['success' => true, 'share_id' => $share_id, 'message' => 'Share link generated.']);
+        }
+        break;
+
+    case 'disable_share_link':
+        if (!$current_user_id) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Unauthorized access.']);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $map_id = $input['map_id'] ?? null;
+            if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
+
+            // Check if map belongs to user
+            $stmt = $pdo->prepare("SELECT id FROM maps WHERE id = ? AND user_id = ?");
+            $stmt->execute([$map_id, $current_user_id]);
+            if (!$stmt->fetch()) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Map not found or access denied.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("UPDATE maps SET share_id = NULL, is_public = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
+            $stmt->execute([$map_id, $current_user_id]);
+            echo json_encode(['success' => true, 'message' => 'Share link disabled.']);
+        }
+        break;
+
+    case 'get_map_by_share_id':
+        $share_id = $_GET['share_id'] ?? null;
+        if (empty($share_id)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Share ID is required.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("SELECT id, name, background_color, background_image_url, share_id, is_public FROM maps WHERE share_id = ? AND is_public = TRUE");
+        $stmt->execute([$share_id]);
+        $map = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$map) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Public map not found or share link is invalid/disabled.']);
+            exit;
+        }
+        echo json_encode($map);
+        break;
+
+    case 'get_devices':
+        $map_id = $_GET['map_id'] ?? null;
+        $share_id = $_GET['share_id'] ?? null; // NEW: Allow fetching by share_id
+        $unmapped = isset($_GET['unmapped']);
+
+        $sql = "
+            SELECT 
+                d.*, 
+                m.name as map_name,
+                p.output as last_ping_output
+            FROM 
+                devices d
+            LEFT JOIN 
+                maps m ON d.map_id = m.id
+            LEFT JOIN 
+                ping_results p ON p.id = (
+                    SELECT id 
+                    FROM ping_results 
+                    WHERE host = d.ip 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                )
+            WHERE 1=1
+        ";
+        $params = [];
+
+        if ($map_id) {
+            if (!$current_user_id) { // If map_id is used, user must be authenticated
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            $sql .= " AND d.map_id = ? AND d.user_id = ?";
+            $params = [$map_id, $current_user_id];
+        } elseif ($share_id) {
+            $sql .= " AND m.share_id = ? AND m.is_public = TRUE";
+            $params = [$share_id];
+        } else if ($unmapped) {
+            if (!$current_user_id) { // If unmapped is used, user must be authenticated
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            $sql .= " AND d.map_id IS NULL AND d.user_id = ?";
+            $params = [$current_user_id];
+        } else {
+            // If neither map_id nor share_id nor unmapped is provided, and user is not authenticated, deny.
+            if (!$current_user_id) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            // Default to fetching all devices for the authenticated user if no specific map/share is requested
+            $sql .= " AND d.user_id = ?";
+            $params = [$current_user_id];
+        }
+
+        $sql .= " ORDER BY d.created_at ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($devices);
         break;
 }

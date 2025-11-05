@@ -10,7 +10,7 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 // Group actions by handler
 $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
 $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'ping_all_devices', 'get_device_uptime', 'upload_device_icon', 'import_devices'];
-$mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'import_map', 'update_map', 'upload_map_background'];
+$mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'import_map', 'update_map', 'upload_map_background', 'generate_share_link', 'disable_share_link', 'get_map_by_share_id']; // Added new actions
 $dashboardActions = ['get_dashboard_data'];
 $userActions = ['get_users', 'create_user', 'delete_user'];
 $logActions = ['get_status_logs'];
