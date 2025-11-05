@@ -5,9 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # This entrypoint ensures the script is executable and then runs it.
-    # The script configures and starts the Apache server on the correct port.
-    entrypoint: ["/bin/sh", "-c", "chmod +x /var/www/html/docker-entrypoint.sh && /var/www/html/docker-entrypoint.sh"]
     volumes:
       - ./:/var/www/html/
     depends_on:
