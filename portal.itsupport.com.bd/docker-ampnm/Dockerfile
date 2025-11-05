@@ -23,8 +23,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Enable Apache modules
 RUN a2enmod rewrite
 
-# Copy application files from the ampnm-app-source directory
-COPY ampnm-app-source/ /var/www/html/
+# Copy application files from the current build context
+COPY . /var/www/html/
 
 # Copy the entrypoint script to the root directory and make it executable
 COPY docker-entrypoint.sh /docker-entrypoint.sh
