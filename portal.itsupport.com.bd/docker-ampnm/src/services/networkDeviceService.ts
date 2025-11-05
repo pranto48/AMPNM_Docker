@@ -30,6 +30,20 @@ export interface NetworkMapDetails {
   is_public: boolean;
 }
 
+export const getMaps = async (): Promise<NetworkMapDetails[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase
+    .from('maps')
+    .select('id, name, background_color, background_image_url, share_id, is_public')
+    .eq('user_id', user.id)
+    .order('name', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 export const getDevices = async (mapId?: string, shareId?: string) => {
   let query = supabase.from('network_devices').select('*').order('created_at', { ascending: true });
 

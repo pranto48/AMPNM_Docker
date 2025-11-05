@@ -17,11 +17,13 @@ import {
   NetworkDevice, 
   updateDeviceStatusByIp, 
   subscribeToDeviceChanges,
-  NetworkMapDetails
+  NetworkMapDetails,
+  getMaps // Import the new getMaps function
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Index = () => {
   const [networkStatus, setNetworkStatus] = useState<boolean>(true);
@@ -29,42 +31,56 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentMapId, setCurrentMapId] = useState<string>(''); // State for current map ID
+  const [maps, setMaps] = useState<NetworkMapDetails[]>([]); // State for all available maps
+  const [selectedMapId, setSelectedMapId] = useState<string>(''); // State for currently selected map ID
   const [mapDetails, setMapDetails] = useState<NetworkMapDetails | null>(null); // State for current map details
 
-  const fetchDevices = useCallback(async () => {
+  const fetchMaps = useCallback(async () => {
     try {
-      const dbDevices = await getDevices(currentMapId); // Fetch devices for the current map
+      const userMaps = await getMaps();
+      setMaps(userMaps);
+      if (userMaps.length > 0 && !selectedMapId) {
+        setSelectedMapId(userMaps[0].id); // Select the first map by default
+      } else if (userMaps.length === 0) {
+        setSelectedMapId(''); // No maps available
+      }
+    } catch (error) {
+      showError("Failed to load maps.");
+    }
+  }, [selectedMapId]);
+
+  const fetchDevices = useCallback(async () => {
+    if (!selectedMapId) {
+      setDevices([]);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const dbDevices = await getDevices(selectedMapId); // Fetch devices for the selected map
       setDevices(dbDevices as NetworkDevice[]);
     } catch (error) {
       showError("Failed to load devices from database.");
     } finally {
       setIsLoading(false);
     }
-  }, [currentMapId]);
+  }, [selectedMapId]);
 
-  // Placeholder for fetching map details (you'd integrate this with your map selector logic)
   const fetchMapDetails = useCallback(async () => {
-    if (!currentMapId) {
+    if (!selectedMapId) {
       setMapDetails(null);
       return;
     }
-    try {
-      // This is a placeholder. In a real app, you'd fetch map details from your API.
-      // For now, we'll mock it or fetch from a generic endpoint if available.
-      // Assuming getMapDetailsById exists or can be derived from getMaps
-      const { data, error } = await supabase.from('maps').select('*').eq('id', currentMapId).single();
-      if (error) throw new Error(error.message);
-      setMapDetails(data as NetworkMapDetails);
-    } catch (error) {
-      console.error("Failed to fetch map details:", error);
-      setMapDetails(null);
-    }
-  }, [currentMapId]);
+    const currentMap = maps.find(m => m.id === selectedMapId);
+    setMapDetails(currentMap || null);
+  }, [selectedMapId, maps]);
+
+  useEffect(() => {
+    fetchMaps(); // Fetch maps on initial load
+  }, []); // Run only once on mount
 
   useEffect(() => {
     fetchDevices();
-    fetchMapDetails(); // Fetch map details when currentMapId changes
+    fetchMapDetails(); // Fetch map details when selectedMapId or maps change
 
     // Subscribe to real-time device changes
     const channel = subscribeToDeviceChanges((payload) => {
@@ -75,7 +91,7 @@ const Index = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchDevices, fetchMapDetails]);
+  }, [fetchDevices, fetchMapDetails, selectedMapId]); // Re-run when selectedMapId changes
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
@@ -381,12 +397,39 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="map">
-            <NetworkMap 
-              devices={devices} 
-              onMapUpdate={fetchDevices} 
-              currentMapId={currentMapId} // Pass currentMapId
-              mapDetails={mapDetails} // Pass mapDetails
-            />
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Network Map</h2>
+              {maps.length > 0 ? (
+                <Select value={selectedMapId} onValueChange={setSelectedMapId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select a map" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {maps.map(map => (
+                      <SelectItem key={map.id} value={map.id}>
+                        {map.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-muted-foreground">No maps available. Create one!</p>
+              )}
+            </div>
+            {selectedMapId ? (
+              <NetworkMap 
+                devices={devices} 
+                onMapUpdate={fetchDevices} 
+                currentMapId={selectedMapId} 
+                mapDetails={mapDetails} 
+              />
+            ) : (
+              <Card className="h-[70vh] flex items-center justify-center">
+                <CardContent className="text-center">
+                  <p className="text-muted-foreground">Please select a map or create a new one to view the network map.</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 
