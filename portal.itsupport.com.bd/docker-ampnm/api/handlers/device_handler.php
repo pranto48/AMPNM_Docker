@@ -89,7 +89,7 @@ function logStatusChange($pdo, $deviceId, $oldStatus, $newStatus, $details) {
     }
 }
 
-error_log("DEBUG: device_handler.php - Action: {$action}, User ID: {$current_user_id}");
+error_log("DEBUG: device_handler.php - Action: {$action}, Current User ID: {$current_user_id}");
 
 switch ($action) {
     case 'import_devices':
@@ -378,7 +378,7 @@ switch ($action) {
         break;
 
     case 'get_devices':
-        error_log("DEBUG: device_handler.php - get_devices received. Map ID: {$_GET['map_id'] ?? 'N/A'}, Share ID: {$_GET['share_id'] ?? 'N/A'}, Unmapped: {$_GET['unmapped'] ?? 'N/A'}. User ID: {$current_user_id}");
+        error_log("DEBUG: device_handler.php - get_devices received. Map ID: {$_GET['map_id'] ?? 'N/A'}, Share ID: {$_GET['share_id'] ?? 'N/A'}, Unmapped: {$_GET['unmapped'] ?? 'N/A'}. Current User ID: {$current_user_id}");
         $map_id = $_GET['map_id'] ?? null;
         $share_id = $_GET['share_id'] ?? null; // NEW: Allow fetching by share_id
         $unmapped = isset($_GET['unmapped']);
@@ -450,6 +450,8 @@ switch ($action) {
         }
 
         $sql .= " ORDER BY d.created_at ASC";
+        
+        error_log("DEBUG: device_handler.php - get_devices executing SQL: {$sql} with params: " . print_r($params, true));
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -513,6 +515,7 @@ switch ($action) {
             if (empty($fields)) { http_response_code(400); error_log("ERROR: device_handler.php - update_device: No valid fields to update for Device ID {$id}."); echo json_encode(['error' => 'No valid fields to update']); exit; }
             $params[] = $id; $params[] = $current_user_id;
             $sql = "UPDATE devices SET " . implode(', ', $fields) . " WHERE id = ? AND user_id = ?";
+            error_log("DEBUG: device_handler.php - update_device executing SQL: {$sql} with params: " . print_r($params, true));
             $stmt = $pdo->prepare($sql); $stmt->execute($params);
             $stmt = $pdo->prepare("SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id = ?"); $stmt->execute([$id, $current_user_id]);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -526,7 +529,9 @@ switch ($action) {
             error_log("DEBUG: device_handler.php - delete_device received. Input: " . print_r($input, true));
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
-            $stmt = $pdo->prepare("DELETE FROM devices WHERE id = ? AND user_id = ?"); $stmt->execute([$id, $current_user_id]);
+            $sql = "DELETE FROM devices WHERE id = ? AND user_id = ?";
+            error_log("DEBUG: device_handler.php - delete_device executing SQL: {$sql} with params: " . print_r([$id, $current_user_id], true));
+            $stmt = $pdo->prepare($sql); $stmt->execute([$id, $current_user_id]);
             error_log("DEBUG: device_handler.php - delete_device successful. Device ID: {$id}.");
             echo json_encode(['success' => true, 'message' => 'Device deleted successfully']);
         }
