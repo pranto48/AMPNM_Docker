@@ -74,6 +74,11 @@ const Index = () => {
     setMapDetails(currentMap || null);
   }, [selectedMapId, maps]);
 
+  const handleMapUpdate = useCallback(() => {
+    fetchMaps();
+    fetchDevices();
+  }, [fetchMaps, fetchDevices]);
+
   useEffect(() => {
     fetchMaps(); // Fetch maps on initial load
   }, []); // Run only once on mount
@@ -134,7 +139,7 @@ const Index = () => {
       setNetworkStatus(false);
     }
     setLastChecked(new Date());
-  }, []);
+  }, [setNetworkStatus, setLastChecked]);
 
   const handleCheckAllDevices = async () => {
     setIsCheckingDevices(true);
@@ -419,7 +424,7 @@ const Index = () => {
             {selectedMapId ? (
               <NetworkMap 
                 devices={devices} 
-                onMapUpdate={fetchDevices} 
+                onMapUpdate={handleMapUpdate} 
                 currentMapId={selectedMapId} 
                 mapDetails={mapDetails} 
               />

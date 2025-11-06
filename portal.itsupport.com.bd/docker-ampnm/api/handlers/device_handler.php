@@ -363,6 +363,7 @@ switch ($action) {
 
     case 'get_devices':
         $map_id = $_GET['map_id'] ?? null;
+        $share_id = $_GET['share_id'] ?? null; // NEW: Allow fetching by share_id
         $unmapped = isset($_GET['unmapped']);
 
         $sql = "
@@ -382,16 +383,51 @@ switch ($action) {
                     ORDER BY created_at DESC 
                     LIMIT 1
                 )
-            WHERE d.user_id = ?
+            WHERE 1=1
         ";
-        $params = [$current_user_id];
-        if ($map_id) { 
-            $sql .= " AND d.map_id = ?"; 
-            $params[] = $map_id; 
+        $params = [];
+
+        if ($map_id) {
+            // If map_id is used, user must be authenticated
+            if (!$current_user_id) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            $sql .= " AND d.map_id = ? AND d.user_id = ?";
+            $params = [$map_id, $current_user_id];
+        } elseif ($share_id) {
+            // For shared maps, ensure the map is public
+            $stmt_map = $pdo->prepare("SELECT id FROM maps WHERE share_id = ? AND is_public = TRUE");
+            $stmt_map->execute([$share_id]);
+            $shared_map = $stmt_map->fetch(PDO::FETCH_ASSOC);
+            if (!$shared_map) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Public map not found or share link is invalid/disabled.']);
+                exit;
+            }
+            $sql .= " AND d.map_id = ?";
+            $params = [$shared_map['id']];
+        } else if ($unmapped) {
+            // If unmapped is used, user must be authenticated
+            if (!$current_user_id) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            $sql .= " AND d.map_id IS NULL AND d.user_id = ?";
+            $params = [$current_user_id];
+        } else {
+            // Default to fetching all devices for the authenticated user if no specific map/share is requested
+            if (!$current_user_id) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access.']);
+                exit;
+            }
+            $sql .= " AND d.user_id = ?";
+            $params = [$current_user_id];
         }
-        if ($unmapped) {
-            $sql .= " AND d.map_id IS NULL";
-        }
+
         $sql .= " ORDER BY d.created_at ASC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -417,8 +453,10 @@ switch ($action) {
                 $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['type'], $input['description'] ?? null, $input['map_id'] ?? null,
                 $input['x'] ?? null, $input['y'] ?? null,
                 $input['ping_interval'] ?? null, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['icon_url'] ?? null,
-                $input['warning_latency_threshold'] ?? null, $input['warning_packetloss_threshold'] ?? null,
-                $input['critical_latency_threshold'] ?? null, $input['critical_packetloss_threshold'] ?? null,
+                $input['warning_latency_threshold'] ?? null,
+                $input['warning_packetloss_threshold'] ?? null,
+                $input['critical_latency_threshold'] ?? null,
+                $input['critical_packetloss_threshold'] ?? null,
                 ($input['show_live_ping'] ?? false) ? 1 : 0
             ]);
             $lastId = $pdo->lastInsertId();
