@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, Download, Share2, Link, XCircle } from 'lucide-react';
+import { PlusCircle, Upload, Download, Share2, Link, XCircle, Loader2 } from 'lucide-react';
 import {
   addDevice,
   updateDevice,
@@ -46,9 +46,10 @@ interface NetworkMapProps {
   currentMapId: string;
   mapDetails: NetworkMapDetails | null;
   isReadOnly?: boolean;
+  isMapDetailsLoading?: boolean; // New prop for loading state
 }
 
-const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly = false }: NetworkMapProps) => {
+const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly = false, isMapDetailsLoading = false }: NetworkMapProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -535,12 +536,16 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
             accept="application/json" 
             className="hidden" 
           />
-          {mapDetails?.is_public && mapDetails.share_id ? (
+          {isMapDetailsLoading ? (
+            <Button variant="secondary" size="sm" disabled>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading...
+            </Button>
+          ) : mapDetails?.is_public && mapDetails.share_id ? (
             <Button onClick={() => { setShareLink(`${window.location.origin}/shared-map/${mapDetails.share_id}`); setIsShareDialogOpen(true); }} variant="secondary" size="sm">
               <Link className="h-4 w-4 mr-2" />View Share Link
             </Button>
           ) : (
-            <Button onClick={handleGenerateShareLink} variant="secondary" size="sm">
+            <Button onClick={handleGenerateShareLink} variant="secondary" size="sm" disabled={!currentMapId}>
               <Share2 className="h-4 w-4 mr-2" />Share Map
             </Button>
           )}

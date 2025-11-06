@@ -34,6 +34,7 @@ const Index = () => {
   const [maps, setMaps] = useState<NetworkMapDetails[]>([]); // State for all available maps
   const [selectedMapId, setSelectedMapId] = useState<string>(''); // State for currently selected map ID
   const [mapDetails, setMapDetails] = useState<NetworkMapDetails | null>(null); // State for current map details
+  const [isMapDetailsLoading, setIsMapDetailsLoading] = useState(false); // New loading state for map details
 
   const fetchMaps = useCallback(async () => {
     try {
@@ -70,8 +71,13 @@ const Index = () => {
       setMapDetails(null);
       return;
     }
-    const currentMap = maps.find(m => m.id === selectedMapId);
-    setMapDetails(currentMap || null);
+    setIsMapDetailsLoading(true); // Set loading true
+    try {
+      const currentMap = maps.find(m => m.id === selectedMapId);
+      setMapDetails(currentMap || null);
+    } finally {
+      setIsMapDetailsLoading(false); // Set loading false
+    }
   }, [selectedMapId, maps]);
 
   const handleMapUpdate = useCallback(() => {
@@ -426,7 +432,8 @@ const Index = () => {
                 devices={devices} 
                 onMapUpdate={handleMapUpdate} 
                 currentMapId={selectedMapId} 
-                mapDetails={mapDetails} 
+                mapDetails={mapDetails}
+                isMapDetailsLoading={isMapDetailsLoading} // Pass the new loading state
               />
             ) : (
               <Card className="h-[70vh] flex items-center justify-center">
