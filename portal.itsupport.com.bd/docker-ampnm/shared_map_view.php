@@ -82,28 +82,9 @@ $react_props = [
 </head>
 <body class="bg-slate-900 text-slate-300 min-h-screen">
     <div id="root" class="min-h-screen">
-        <?php if ($error_message): ?>
-            <div class="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-                <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-8 w-full max-w-md text-center">
-                    <i class="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
-                    <h1 class="text-2xl font-bold text-white mb-2">Error Loading Map</h1>
-                    <p class="text-slate-400 mb-4"><?php echo htmlspecialchars($error_message); ?></p>
-                    <a href="index.php" class="px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700">Go to Dashboard</a>
-                </div>
-            </div>
-        <?php else: ?>
-            <div class="container mx-auto p-4">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-3">
-                        <i class="fas fa-globe text-cyan-400 text-2xl"></i>
-                        <h1 class="text-3xl font-bold"><?php echo htmlspecialchars($mapDetails['name']); ?> (Shared View)</h1>
-                    </div>
-                </div>
-                <div id="network-map-container">
-                    <!-- React NetworkMap component will be rendered here -->
-                </div>
-            </div>
-        <?php endif; ?>
+        <div id="network-map-container">
+            <!-- React NetworkMap component will be rendered here -->
+        </div>
     </div>
 
     <!-- Include React and ReactFlow dependencies -->
@@ -111,37 +92,28 @@ $react_props = [
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/reactflow@11/dist/umd/reactflow.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/reactflow@11/dist/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css">
 
     <!-- Include your compiled React app bundle -->
     <script src="dist/assets/index.js"></script> 
     <script>
         // This script will initialize the React component
         document.addEventListener('DOMContentLoaded', function() {
-            if (window.SHARED_MAP_PROPS && !window.SHARED_MAP_PROPS.error) {
-                const { mapDetails, devices, edges, isReadOnly } = window.SHARED_MAP_PROPS;
-                const container = document.getElementById('network-map-container');
-                
-                // Assuming your React app exposes NetworkMap globally or you have a way to import it
-                // For a simple setup, you might need to adjust your vite.config.ts to expose NetworkMap
-                // or create a dedicated entry point for this shared view.
-                // For now, we'll assume 'NetworkMap' is available via the main bundle.
-                
-                // This is a placeholder. You'll need to adjust your React build process
-                // to make the NetworkMap component directly accessible or create a specific
-                // entry point for this shared view.
-                // Example: ReactDOM.createRoot(container).render(
-                //   React.createElement(NetworkMap, {
-                //     devices: devices,
-                //     onMapUpdate: () => {}, // Read-only, no updates
-                //     currentMapId: mapDetails.id,
-                //     mapDetails: mapDetails,
-                //     isReadOnly: isReadOnly,
-                //   })
-                // );
-                
-                // For now, we'll just log the data to confirm it's passed.
-                console.log("Shared Map Data:", { mapDetails, devices, edges, isReadOnly });
-                container.innerHTML = '<p class="text-center text-slate-400 py-8">React component rendering placeholder. Check console for data.</p>';
+            // Initialize Notyf for toast notifications (needed for SharedMapView)
+            window.notyf = new Notyf({
+                duration: 3000,
+                position: { x: 'right', y: 'top' },
+                types: [
+                    { type: 'success', backgroundColor: '#22c5e', icon: { className: 'fas fa-check-circle', tagName: 'i', color: 'white' } },
+                    { type: 'error', backgroundColor: '#ef4444', icon: { className: 'fas fa-times-circle', tagName: 'i', color: 'white' } },
+                    { type: 'info', backgroundColor: '#3b82f6', icon: { className: 'fas fa-info-circle', tagName: 'i', color: 'white' } }
+                ]
+            });
+
+            if (window.SHARED_MAP_PROPS) {
+                // Call the global render function from SharedMapView.tsx
+                (window as any).renderSharedMapView(window.SHARED_MAP_PROPS);
             }
         });
     </script>
