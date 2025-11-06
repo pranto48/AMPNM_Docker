@@ -62,27 +62,39 @@ function initDevices() {
     };
 
     const loadDevices = async () => {
+        console.log('DEBUG: devices.js - loadDevices called.');
         tableLoader.classList.remove('hidden');
         noDevicesMessage.classList.add('hidden');
         devicesTableBody.innerHTML = '';
         
         try {
             const devices = await api.get('get_devices');
+            console.log('DEBUG: devices.js - API response for get_devices:', devices);
             if (devices.length > 0) {
                 devicesTableBody.innerHTML = devices.map(renderDeviceRow).join('');
+                console.log(`DEBUG: devices.js - Rendered ${devices.length} devices.`);
             } else {
                 noDevicesMessage.classList.remove('hidden');
+                console.log('DEBUG: devices.js - No devices found, showing message.');
             }
-        } catch (error) { console.error('Failed to load devices:', error); }
+        } catch (error) { 
+            console.error('ERROR: devices.js - Failed to load devices:', error); 
+            window.notyf.error('Failed to load devices.');
+            noDevicesMessage.classList.remove('hidden');
+            noDevicesMessage.textContent = 'Error loading devices. Check console for details.';
+        }
         finally { tableLoader.classList.add('hidden'); }
     };
 
     const populateMapSelector = async (selectElement, selectedMapId) => {
+        console.log('DEBUG: devices.js - populateMapSelector called.');
         if (availableMaps.length === 0) {
             try {
                 availableMaps = await api.get('get_maps');
+                console.log('DEBUG: devices.js - Fetched maps for selector:', availableMaps);
             } catch (e) {
-                console.error("Could not fetch maps for selector", e);
+                console.error("ERROR: devices.js - Could not fetch maps for selector", e);
+                window.notyf.error('Failed to load maps for assignment.');
                 return;
             }
         }
@@ -93,6 +105,7 @@ function initDevices() {
     };
 
     const openDeviceModal = async (device = null) => {
+        console.log('DEBUG: devices.js - openDeviceModal called with device:', device);
         deviceForm.reset();
         document.getElementById('deviceId').value = '';
         const mapSelector = document.getElementById('deviceMap');
@@ -124,6 +137,7 @@ function initDevices() {
 
     deviceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        console.log('DEBUG: devices.js - deviceForm submitted.');
         const formData = new FormData(deviceForm);
         const data = Object.fromEntries(formData.entries());
         data.show_live_ping = document.getElementById('showLivePing').checked;
@@ -134,107 +148,120 @@ function initDevices() {
             if (id) {
                 await api.post('update_device', { id, updates: data });
                 window.notyf.success('Device updated.');
+                console.log('DEBUG: devices.js - Device updated:', id);
             } else {
                 await api.post('create_device', data);
                 window.notyf.success('Device created.');
+                console.log('DEBUG: devices.js - Device created.');
             }
             closeModal('deviceModal');
             loadDevices();
         } catch (error) {
             window.notyf.error('Failed to save device.');
+            console.error('ERROR: devices.js - Failed to save device:', error);
         }
     });
 
     const openDetailsModal = async (deviceId) => {
+        console.log('DEBUG: devices.js - openDetailsModal called for device ID:', deviceId);
         openModal('detailsModal');
         detailsModalContent.classList.add('hidden');
         detailsModalLoader.classList.remove('hidden');
         if (latencyChart) latencyChart.destroy();
 
-        const [details, uptimeData] = await Promise.all([
-            api.get('get_device_details', { id: deviceId }),
-            api.get('get_device_uptime', { id: deviceId })
-        ]);
-        const { device, history } = details;
-        
-        detailsModalTitle.textContent = `${device.name} (${device.ip || 'No IP'})`;
-        
-        const renderThreshold = (label, value, unit) => value ? `<strong>${label}:</strong> <span>${value}${unit}</span>` : '';
-        const uptimeStatsHtml = device.ip
-            ? uptimeData.uptime_24h !== null
-                ? `
-                    <strong class="text-slate-400">Uptime (24h):</strong> <span class="text-white font-semibold">${uptimeData.uptime_24h}%</span>
-                    <strong class="text-slate-400">Uptime (7d):</strong> <span class="text-white font-semibold">${uptimeData.uptime_7d !== null ? uptimeData.uptime_7d + '%' : 'N/A'}</span>
-                    <strong class="text-slate-400">Outages (24h):</strong> <span class="text-white font-semibold">${uptimeData.outages_24h}</span>
-                `
-                : '<span class="text-slate-500 col-span-2">Not enough data to calculate uptime.</span>'
-            : '<span class="text-slate-500 col-span-2">Uptime not applicable (no IP).</span>';
+        try {
+            const [details, uptimeData] = await Promise.all([
+                api.get('get_device_details', { id: deviceId }),
+                api.get('get_device_uptime', { id: deviceId })
+            ]);
+            console.log('DEBUG: devices.js - Device details:', details);
+            console.log('DEBUG: devices.js - Uptime data:', uptimeData);
 
-        detailsModalContent.innerHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div class="md:col-span-2 space-y-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Configuration</h3>
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                            <strong class="text-slate-400">Type:</strong> <span class="text-white capitalize">${device.type}</span>
-                            <strong class="text-slate-400">Map:</strong> <span class="text-white">${device.map_name || 'Unassigned'}</span>
-                            <strong class="text-slate-400">Ping Interval:</strong> <span class="text-white">${device.ping_interval ? `${device.ping_interval}s` : 'Disabled'}</span>
-                            <strong class="text-slate-400">Live Ping:</strong> <span class="text-white">${device.show_live_ping ? 'Enabled' : 'Disabled'}</span>
+            const { device, history } = details;
+            
+            detailsModalTitle.textContent = `${device.name} (${device.ip || 'No IP'})`;
+            
+            const renderThreshold = (label, value, unit) => value ? `<strong>${label}:</strong> <span>${value}${unit}</span>` : '';
+            const uptimeStatsHtml = device.ip
+                ? uptimeData.uptime_24h !== null
+                    ? `
+                        <strong class="text-slate-400">Uptime (24h):</strong> <span class="text-white font-semibold">${uptimeData.uptime_24h}%</span>
+                        <strong class="text-slate-400">Uptime (7d):</strong> <span class="text-white font-semibold">${uptimeData.uptime_7d !== null ? uptimeData.uptime_7d + '%' : 'N/A'}</span>
+                        <strong class="text-slate-400">Outages (24h):</strong> <span class="text-white font-semibold">${uptimeData.outages_24h}</span>
+                    `
+                    : '<span class="text-slate-500 col-span-2">Not enough data to calculate uptime.</span>'
+                : '<span class="text-slate-500 col-span-2">Uptime not applicable (no IP).</span>';
+
+            detailsModalContent.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <div class="md:col-span-2 space-y-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Configuration</h3>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                <strong class="text-slate-400">Type:</strong> <span class="text-white capitalize">${device.type}</span>
+                                <strong class="text-slate-400">Map:</strong> <span class="text-white">${device.map_name || 'Unassigned'}</span>
+                                <strong class="text-slate-400">Ping Interval:</strong> <span class="text-white">${device.ping_interval ? `${device.ping_interval}s` : 'Disabled'}</span>
+                                <strong class="text-slate-400">Live Ping:</strong> <span class="text-white">${device.show_live_ping ? 'Enabled' : 'Disabled'}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Status Thresholds</h3>
+                            <div class="grid grid-cols-1 gap-x-4 gap-y-1 text-sm">
+                                <div class="text-yellow-400">${renderThreshold('Warning Latency', device.warning_latency_threshold, 'ms')}</div>
+                                <div class="text-yellow-400">${renderThreshold('Warning Packet Loss', device.warning_packetloss_threshold, '%')}</div>
+                                <div class="text-red-400">${renderThreshold('Critical Latency', device.critical_latency_threshold, 'ms')}</div>
+                                <div class="text-red-400">${renderThreshold('Critical Packet Loss', device.critical_packetloss_threshold, '%')}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Uptime Statistics</h3>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">${uptimeStatsHtml}</div>
                         </div>
                     </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Status Thresholds</h3>
-                        <div class="grid grid-cols-1 gap-x-4 gap-y-1 text-sm">
-                            <div class="text-yellow-400">${renderThreshold('Warning Latency', device.warning_latency_threshold, 'ms')}</div>
-                            <div class="text-yellow-400">${renderThreshold('Warning Packet Loss', device.warning_packetloss_threshold, '%')}</div>
-                            <div class="text-red-400">${renderThreshold('Critical Latency', device.critical_latency_threshold, 'ms')}</div>
-                            <div class="text-red-400">${renderThreshold('Critical Packet Loss', device.critical_packetloss_threshold, '%')}</div>
+                    <div class="md:col-span-3">
+                        <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Recent Latency (ms)</h3>
+                        <div class="h-48 bg-slate-900/50 p-2 rounded-lg">
+                            ${history.length > 0 ? '<canvas id="latencyChart"></canvas>' : '<div class="flex items-center justify-center h-full text-slate-500">No ping history available.</div>'}
                         </div>
                     </div>
-                     <div>
-                        <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Uptime Statistics</h3>
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">${uptimeStatsHtml}</div>
-                    </div>
                 </div>
-                <div class="md:col-span-3">
-                    <h3 class="text-lg font-semibold text-white mb-2 border-b border-slate-700 pb-1">Recent Latency (ms)</h3>
-                    <div class="h-48 bg-slate-900/50 p-2 rounded-lg">
-                        ${history.length > 0 ? '<canvas id="latencyChart"></canvas>' : '<div class="flex items-center justify-center h-full text-slate-500">No ping history available.</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
+            `;
 
-        if (history.length > 0) {
-            const chartCtx = document.getElementById('latencyChart').getContext('2d');
-            const chartData = history.slice().reverse(); // oldest to newest
-            latencyChart = new Chart(chartCtx, {
-                type: 'line',
-                data: {
-                    labels: chartData.map(h => new Date(h.created_at).toLocaleTimeString()),
-                    datasets: [{
-                        label: 'Avg Time (ms)',
-                        data: chartData.map(h => h.avg_time),
-                        borderColor: '#22d3ee',
-                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 2,
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { 
-                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+            if (history.length > 0) {
+                const chartCtx = document.getElementById('latencyChart').getContext('2d');
+                const chartData = history.slice().reverse(); // oldest to newest
+                latencyChart = new Chart(chartCtx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.map(h => new Date(h.created_at).toLocaleTimeString()),
+                        datasets: [{
+                            label: 'Avg Time (ms)',
+                            data: chartData.map(h => h.avg_time),
+                            borderColor: '#22d3ee',
+                            backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2,
+                        }]
                     },
-                    plugins: { legend: { display: false } }
-                }
-            });
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { 
+                            y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                            x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('ERROR: devices.js - Failed to load device details:', error);
+            window.notyf.error('Failed to load device details.');
+            detailsModalContent.innerHTML = '<p class="text-center text-red-400 py-4">Error loading details. Check console.</p>';
+        } finally {
+            detailsModalLoader.classList.add('hidden');
+            detailsModalContent.classList.remove('hidden');
         }
-
-        detailsModalLoader.classList.add('hidden');
-        detailsModalContent.classList.remove('hidden');
     };
 
     devicesTableBody.addEventListener('click', async (e) => {
@@ -242,6 +269,7 @@ function initDevices() {
         if (!button) return;
         const deviceId = button.dataset.id;
         const row = button.closest('tr');
+        console.log('DEBUG: devices.js - Table button clicked. Device ID:', deviceId, 'Action:', button.classList[0]);
 
         if (button.classList.contains('details-device-btn')) {
             openDetailsModal(deviceId);
@@ -259,21 +287,32 @@ function initDevices() {
             try {
                 await api.post('check_device', { id: deviceId });
                 await loadDevices();
-            } catch (error) { console.error('Failed to check device:', error); }
+                window.notyf.success('Device status checked.');
+            } catch (error) { 
+                console.error('ERROR: devices.js - Failed to check device:', error); 
+                window.notyf.error('Failed to check device.');
+            }
             finally { button.disabled = false; icon.classList.remove('fa-spin'); }
         }
 
         if (button.classList.contains('delete-device-btn')) {
             if (confirm('Are you sure you want to delete this device?')) {
-                await api.post('delete_device', { id: deviceId });
-                window.notyf.success('Device deleted successfully.');
-                row.remove();
-                if (devicesTableBody.children.length === 0) noDevicesMessage.classList.remove('hidden');
+                try {
+                    await api.post('delete_device', { id: deviceId });
+                    window.notyf.success('Device deleted successfully.');
+                    row.remove();
+                    if (devicesTableBody.children.length === 0) noDevicesMessage.classList.remove('hidden');
+                    console.log('DEBUG: devices.js - Device deleted:', deviceId);
+                } catch (error) {
+                    console.error('ERROR: devices.js - Failed to delete device:', error);
+                    window.notyf.error('Failed to delete device.');
+                }
             }
         }
     });
 
     bulkCheckBtn.addEventListener('click', async () => {
+        console.log('DEBUG: devices.js - Bulk check initiated.');
         const icon = bulkCheckBtn.querySelector('i');
         icon.classList.add('fa-spin');
         bulkCheckBtn.disabled = true;
@@ -284,11 +323,12 @@ function initDevices() {
             if (result.success) {
                 window.notyf.success(`${result.message} ${result.status_changes} status changes detected.`);
                 await loadDevices(); // Refresh the table to show new statuses
+                console.log('DEBUG: devices.js - Bulk check completed successfully.');
             } else {
                 throw new Error(result.error || 'Unknown error during bulk check.');
             }
         } catch (error) {
-            console.error('Bulk check failed:', error);
+            console.error('ERROR: devices.js - Bulk check failed:', error);
             window.notyf.error('Global device check failed.');
         } finally {
             icon.classList.remove('fa-spin');
@@ -297,6 +337,7 @@ function initDevices() {
     });
 
     exportDevicesBtn.addEventListener('click', async () => {
+        console.log('DEBUG: devices.js - Export devices initiated.');
         try {
             const devices = await api.get('get_devices');
             if (devices.length === 0) {
@@ -312,15 +353,20 @@ function initDevices() {
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
             window.notyf.success('All devices exported successfully.');
+            console.log('DEBUG: devices.js - Devices exported.');
         } catch (error) {
             window.notyf.error('Failed to export devices.');
-            console.error(error);
+            console.error('ERROR: devices.js - Failed to export devices:', error);
         }
     });
 
-    importDevicesBtn.addEventListener('click', () => importDevicesFile.click());
+    importDevicesBtn.addEventListener('click', () => {
+        console.log('DEBUG: devices.js - Import devices initiated.');
+        importDevicesFile.click();
+    });
 
     importDevicesFile.addEventListener('change', (e) => {
+        console.log('DEBUG: devices.js - Import file selected.');
         const file = e.target.files[0];
         if (!file) return;
 
@@ -335,12 +381,14 @@ function initDevices() {
                     if (result.success) {
                         window.notyf.success(result.message);
                         await loadDevices();
+                        console.log('DEBUG: devices.js - Devices imported successfully.');
                     } else {
                         throw new Error(result.error);
                     }
                 }
             } catch (err) {
                 window.notyf.error('Failed to import devices: ' + err.message);
+                console.error('ERROR: devices.js - Failed to import devices:', err);
             }
         };
         reader.readAsText(file);

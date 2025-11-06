@@ -120,14 +120,17 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   // Update nodes when devices change
   useEffect(() => {
+    console.log('DEBUG: NetworkMap.tsx - Devices prop changed, updating nodes:', devices);
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
   // Load edges and subscribe to edge changes
   useEffect(() => {
     const loadEdges = async () => {
+      console.log('DEBUG: NetworkMap.tsx - Loading edges for map:', currentMapId, 'shareId:', mapDetails?.share_id);
       try {
         const edgesData = await getEdges(currentMapId, mapDetails?.share_id);
+        console.log('DEBUG: NetworkMap.tsx - Fetched edges:', edgesData);
         setEdges(
           edgesData.map((edge: any) => ({
             id: edge.id,
@@ -137,7 +140,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
           }))
         );
       } catch (error) {
-        console.error('Failed to load network edges:', error);
+        console.error('ERROR: NetworkMap.tsx - Failed to load network edges:', error);
         showError('Failed to load network connections.');
       }
     };
@@ -225,6 +228,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   const onConnect = useCallback(
     async (params: Connection) => {
       if (isReadOnly) return;
+      console.log('DEBUG: NetworkMap.tsx - onConnect called:', params);
       // Optimistically add edge to UI
       const newEdge = { 
         id: `reactflow__edge-${params.source}${params.target}`, 
@@ -238,8 +242,9 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         // Save to database
         await addEdgeToDB({ source: params.source!, target: params.target!, map_id: currentMapId });
         showSuccess('Connection saved.');
+        console.log('DEBUG: NetworkMap.tsx - Connection saved to DB.');
       } catch (error) {
-        console.error('Failed to save connection:', error);
+        console.error('ERROR: NetworkMap.tsx - Failed to save connection:', error);
         showError('Failed to save connection.');
         // Revert UI update on failure
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
@@ -250,12 +255,14 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const handleAddDevice = () => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleAddDevice called.');
     setEditingDevice(undefined);
     setIsEditorOpen(true);
   };
 
   const handleEdit = (deviceId: string) => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleEdit called for device ID:', deviceId);
     const nodeToEdit = nodes.find((n) => n.id === deviceId);
     if (nodeToEdit) {
       setEditingDevice({ id: nodeToEdit.id, ...nodeToEdit.data });
@@ -265,6 +272,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const handleDelete = async (deviceId: string) => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleDelete called for device ID:', deviceId);
     if (window.confirm('Are you sure you want to delete this device?')) {
       // Optimistically remove from UI
       const originalNodes = nodes;
@@ -274,8 +282,9 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
+        console.log('DEBUG: NetworkMap.tsx - Device deleted from DB.');
       } catch (error) {
-        console.error('Failed to delete device:', error);
+        console.error('ERROR: NetworkMap.tsx - Failed to delete device:', error);
         showError('Failed to delete device.');
         // Revert UI update on failure
         setNodes(originalNodes);
@@ -285,20 +294,23 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const handleSaveDevice = async (deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleSaveDevice called with data:', deviceData);
     try {
       if (editingDevice?.id) {
         // Update existing device
         await updateDevice(editingDevice.id, deviceData);
         showSuccess('Device updated successfully.');
+        console.log('DEBUG: NetworkMap.tsx - Device updated in DB.');
       } else {
         // Add new device
         await addDevice({ ...deviceData, map_id: currentMapId, position_x: 100, position_y: 100, status: 'unknown' });
         showSuccess('Device added successfully.');
+        console.log('DEBUG: NetworkMap.tsx - Device added to DB.');
       }
       setIsEditorOpen(false);
       onMapUpdate(); // Refresh map to show new/updated device
     } catch (error) {
-      console.error('Failed to save device:', error);
+      console.error('ERROR: NetworkMap.tsx - Failed to save device:', error);
       showError('Failed to save device.');
     }
   };
@@ -306,10 +318,12 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
       if (isReadOnly) return;
+      console.log('DEBUG: NetworkMap.tsx - onNodeDragStop called for node:', node.id, 'position:', node.position);
       try {
         await updateDevice(node.id, { position_x: node.position.x, position_y: node.position.y });
+        console.log('DEBUG: NetworkMap.tsx - Device position updated in DB.');
       } catch (error) {
-        console.error('Failed to save device position:', error);
+        console.error('ERROR: NetworkMap.tsx - Failed to save device position:', error);
         showError('Failed to save device position.');
       }
     },
@@ -319,14 +333,16 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   const onEdgesChangeHandler: OnEdgesChange = useCallback(
     (changes) => {
       if (isReadOnly) return;
+      console.log('DEBUG: NetworkMap.tsx - onEdgesChangeHandler called with changes:', changes);
       onEdgesChange(changes);
       changes.forEach(async (change) => {
         if (change.type === 'remove') {
           try {
             await deleteEdgeFromDB(change.id);
             showSuccess('Connection deleted.');
+            console.log('DEBUG: NetworkMap.tsx - Connection deleted from DB.');
           } catch (error) {
-            console.error('Failed to delete connection:', error);
+            console.error('ERROR: NetworkMap.tsx - Failed to delete connection:', error);
             showError('Failed to delete connection.');
           }
         }
@@ -337,12 +353,14 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - onEdgeClick called for edge:', edge.id);
     setEditingEdge(edge);
     setIsEdgeEditorOpen(true);
   };
 
   const handleSaveEdge = async (edgeId: string, connectionType: string) => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleSaveEdge called for edge:', edgeId, 'type:', connectionType);
     // Optimistically update UI
     const originalEdges = edges;
     setEdges((eds) => eds.map(e => e.id === edgeId ? { ...e, data: { connection_type } } : e));
@@ -351,8 +369,9 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
       // Update in database
       await updateEdgeInDB(edgeId, { connection_type });
       showSuccess('Connection updated.');
+      console.log('DEBUG: NetworkMap.tsx - Connection updated in DB.');
     } catch (error) {
-      console.error('Failed to update connection:', error);
+      console.error('ERROR: NetworkMap.tsx - Failed to update connection:', error);
       showError('Failed to update connection.');
       // Revert UI update on failure
       setEdges(originalEdges);
@@ -361,6 +380,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const handleExport = async () => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleExport called.');
     const exportData: MapData = {
       devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => rest),
       edges: edges.map(({ id, source, target, data }) => ({ 
@@ -380,15 +400,18 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showSuccess('Map exported successfully!');
+    console.log('DEBUG: NetworkMap.tsx - Map exported.');
   };
 
   const handleImportClick = () => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleImportClick called.');
     importInputRef.current?.click();
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleFileChange called.');
     const file = event.target.files?.[0];
     if (!file) return;
     if (!window.confirm('Are you sure you want to import this map? This will overwrite your current map.')) return;
@@ -403,9 +426,10 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data
+        console.log('DEBUG: NetworkMap.tsx - Map imported.');
       } catch (error: any) {
         dismissToast(toastId);
-        console.error('Failed to import map:', error);
+        console.error('ERROR: NetworkMap.tsx - Failed to import map:', error);
         showError(error.message || 'Failed to import map.');
       } finally {
         if (importInputRef.current) importInputRef.current.value = '';
@@ -416,6 +440,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const handleGenerateShareLink = async () => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleGenerateShareLink called. currentMapId:', currentMapId);
     if (!currentMapId) {
       showError('Please select a map to share.');
       return;
@@ -424,21 +449,23 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
     try {
       const newShareId = await generateMapShareLink(currentMapId);
       // Construct the local PHP URL for sharing
-      const fullShareLink = `${window.location.origin}/shared_map_view.php?share_id=${newShareId}`;
+      const fullShareLink = `${window.location.origin}/docker-ampnm/shared_map_view.php?share_id=${newShareId}`;
       setShareLink(fullShareLink);
       setIsShareDialogOpen(true);
       dismissToast(toastId);
       showSuccess('Share link generated!');
       onMapUpdate(); // Refresh map details to show share_id
+      console.log('DEBUG: NetworkMap.tsx - Share link generated:', fullShareLink);
     } catch (error: any) {
       dismissToast(toastId);
-      console.error('Failed to generate share link:', error);
+      console.error('ERROR: NetworkMap.tsx - Failed to generate share link:', error);
       showError(error.message || 'Failed to generate share link.');
     }
   };
 
   const handleDisableShareLink = async () => {
     if (isReadOnly) return;
+    console.log('DEBUG: NetworkMap.tsx - handleDisableShareLink called. currentMapId:', currentMapId);
     if (!currentMapId) {
       showError('No map selected.');
       return;
@@ -454,9 +481,10 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
       dismissToast(toastId);
       showSuccess('Share link disabled successfully.');
       onMapUpdate(); // Refresh map details to remove share_id
+      console.log('DEBUG: NetworkMap.tsx - Share link disabled.');
     } catch (error: any) {
       dismissToast(toastId);
-      console.error('Failed to disable share link:', error);
+      console.error('ERROR: NetworkMap.tsx - Failed to disable share link:', error);
       showError(error.message || 'Failed to disable share link.');
     }
   };
@@ -464,9 +492,11 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   const handleCopyShareLink = () => {
     navigator.clipboard.writeText(shareLink);
     showSuccess('Share link copied to clipboard!');
+    console.log('DEBUG: NetworkMap.tsx - Share link copied.');
   };
 
   const backgroundStyle: React.CSSProperties = useMemo(() => {
+    console.log('DEBUG: NetworkMap.tsx - Recalculating background style. mapDetails:', mapDetails);
     if (mapDetails?.background_image_url) {
       return {
         backgroundImage: `url(${mapDetails.background_image_url})`,
@@ -483,6 +513,8 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
       backgroundColor: '#1e293b', // Default dark background
     };
   }, [mapDetails]);
+
+  console.log('DEBUG: NetworkMap.tsx - Rendering. mapDetails:', mapDetails, 'isMapDetailsLoading:', isMapDetailsLoading);
 
   return (
     <div style={{ height: '70vh', width: '100%', ...backgroundStyle }} className="relative border rounded-lg">
@@ -543,7 +575,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading...
             </Button>
           ) : mapDetails?.is_public && mapDetails.share_id ? (
-            <Button onClick={() => { setShareLink(`${window.location.origin}/shared_map_view.php?share_id=${mapDetails.share_id}`); setIsShareDialogOpen(true); }} variant="secondary" size="sm">
+            <Button onClick={() => { setShareLink(`${window.location.origin}/docker-ampnm/shared_map_view.php?share_id=${mapDetails.share_id}`); setIsShareDialogOpen(true); }} variant="secondary" size="sm">
               <Link className="h-4 w-4 mr-2" />View Share Link
             </Button>
           ) : (
