@@ -16,12 +16,12 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  subscribeToDeviceChanges,
+  // subscribeToDeviceChanges, // Removed Supabase subscription
   NetworkMapDetails,
   getMaps // Import the new getMaps function
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // Removed Supabase import
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -93,15 +93,15 @@ const Index = () => {
     fetchDevices();
     fetchMapDetails(); // Fetch map details when selectedMapId or maps change
 
-    // Subscribe to real-time device changes
-    const channel = subscribeToDeviceChanges((payload) => {
-      console.log('Device change received:', payload);
-      fetchDevices();
-    });
+    // Removed Supabase real-time subscription
+    // const channel = subscribeToDeviceChanges((payload) => {
+    //   console.log('Device change received:', payload);
+    //   fetchDevices();
+    // });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // return () => {
+    //   supabase.removeChannel(channel);
+    // };
   }, [fetchDevices, fetchMapDetails, selectedMapId]); // Re-run when selectedMapId changes
 
   // Auto-ping devices based on their ping interval

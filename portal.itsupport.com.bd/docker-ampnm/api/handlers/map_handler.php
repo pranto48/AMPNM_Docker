@@ -11,8 +11,8 @@ switch ($action) {
             echo json_encode(['error' => 'Unauthorized access.']);
             exit;
         }
-        $stmt = $pdo->prepare("SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, m.share_id, m.is_public, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m WHERE m.user_id = ? ORDER BY m.created_at ASC");
-        $stmt->execute([$current_user_id, $current_user_id]);
+        $stmt = $pdo->prepare("SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, m.share_id, m.is_public FROM maps m WHERE m.user_id = ? ORDER BY m.created_at ASC");
+        $stmt->execute([$current_user_id]);
         $maps = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($maps);
         break;
@@ -28,7 +28,7 @@ switch ($action) {
             if (empty($name)) { http_response_code(400); echo json_encode(['error' => 'Name is required']); exit; }
             $stmt = $pdo->prepare("INSERT INTO maps (user_id, name, type) VALUES (?, ?, ?)"); $stmt->execute([$current_user_id, $name, $type]);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT id, name, type, updated_at as lastModified, 0 as deviceCount, share_id, is_public FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT id, name, type, background_color, background_image_url, updated_at as lastModified, share_id, is_public FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
             $map = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($map);
         }
         break;
@@ -56,7 +56,7 @@ switch ($action) {
             if (empty($fields)) { http_response_code(400); echo json_encode(['error' => 'No valid fields to update']); exit; }
             
             $params[] = $id; $params[] = $current_user_id;
-            $sql = "UPDATE maps SET " . implode(', ', $fields) . " WHERE id = ? AND user_id = ?";
+            $sql = "UPDATE maps SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
             $stmt = $pdo->prepare($sql); $stmt->execute($params);
             
             echo json_encode(['success' => true, 'message' => 'Map updated successfully.']);
@@ -83,7 +83,7 @@ switch ($action) {
 
         if (!$map_id && !$share_id) { http_response_code(400); echo json_encode(['error' => 'Map ID or Share ID is required']); exit; }
 
-        $sql = "SELECT de.* FROM device_edges de JOIN maps m ON de.map_id = m.id WHERE 1=1";
+        $sql = "SELECT de.id, de.source_id, de.target_id, de.connection_type FROM device_edges de JOIN maps m ON de.map_id = m.id WHERE 1=1";
         $params = [];
 
         if ($map_id) {
@@ -116,7 +116,7 @@ switch ($action) {
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$current_user_id, $input['source_id'], $input['target_id'], $input['map_id'], $input['connection_type'] ?? 'cat5']);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
+            $stmt = $pdo->prepare("SELECT id, source_id, target_id, connection_type FROM device_edges WHERE id = ? AND user_id = ?");
             $stmt->execute([$lastId, $current_user_id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($edge);
@@ -131,11 +131,11 @@ switch ($action) {
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
-            $connection_type = $input['connection_type'] ?? 'cat5';
+            $connection_type = $input['updates']['connection_type'] ?? 'cat5'; // Adjusted for frontend structure
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
             $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ? WHERE id = ? AND user_id = ?");
             $stmt->execute([$connection_type, $id, $current_user_id]);
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
+            $stmt = $pdo->prepare("SELECT id, source_id, target_id, connection_type FROM device_edges WHERE id = ? AND user_id = ?");
             $stmt->execute([$id, $current_user_id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($edge);
@@ -165,8 +165,8 @@ switch ($action) {
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $map_id = $input['map_id'] ?? null;
-            $devices = $input['devices'] ?? [];
-            $edges = $input['edges'] ?? [];
+            $devices_data = $input['devices'] ?? [];
+            $edges_data = $input['edges'] ?? [];
             if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
 
             try {
@@ -185,15 +185,15 @@ switch ($action) {
                     show_live_ping
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                foreach ($devices as $device) {
+                foreach ($devices_data as $device) { // Changed from $devices to $devices_data
                     $stmt->execute([
                         $current_user_id,
                         $device['name'] ?? 'Unnamed Device',
-                        $device['ip'] ?? null,
+                        $device['ip_address'] ?? null, // Changed from 'ip' to 'ip_address'
                         $device['check_port'] ?? null,
-                        $device['type'] ?? 'other',
-                        $device['x'] ?? null,
-                        $device['y'] ?? null,
+                        $device['icon'] ?? 'other', // Changed from 'type' to 'icon'
+                        $device['position_x'] ?? null, // Changed from 'x' to 'position_x'
+                        $device['position_y'] ?? null, // Changed from 'y' to 'position_y'
                         $map_id,
                         $device['ping_interval'] ?? null,
                         $device['icon_size'] ?? 50,
@@ -212,9 +212,9 @@ switch ($action) {
                 // Insert new edges
                 $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
-                foreach ($edges as $edge) {
-                    $new_source_id = $device_id_map[$edge['from']] ?? null;
-                    $new_target_id = $device_id_map[$edge['to']] ?? null;
+                foreach ($edges_data as $edge) { // Changed from $edges to $edges_data
+                    $new_source_id = $device_id_map[$edge['source']] ?? null; // Changed from 'from' to 'source'
+                    $new_target_id = $device_id_map[$edge['target']] ?? null; // Changed from 'to' to 'target'
                     if ($new_source_id && $new_target_id) {
                         $stmt->execute([$current_user_id, $new_source_id, $new_target_id, $map_id, $edge['connection_type'] ?? 'cat5']);
                     }
@@ -310,7 +310,10 @@ switch ($action) {
                 exit;
             }
 
-            $share_id = generateUuid(); // Use the helper function from functions.php
+            // Generate a UUID for the share_id
+            // Assuming generateUuid() is available from includes/functions.php or similar
+            require_once __DIR__ . '/../includes/functions.php'; // Ensure generateUuid is available
+            $share_id = generateUuid(); 
             $stmt = $pdo->prepare("UPDATE maps SET share_id = ?, is_public = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?");
             $stmt->execute([$share_id, $map_id, $current_user_id]);
             echo json_encode(['success' => true, 'share_id' => $share_id, 'message' => 'Share link generated.']);
@@ -369,7 +372,8 @@ switch ($action) {
 
         $sql = "
             SELECT 
-                d.*, 
+                d.id, d.name, d.ip as ip_address, d.x as position_x, d.y as position_y, d.type as icon, d.status,
+                d.ping_interval, d.icon_size, d.name_text_size, d.last_seen as last_ping, d.status = 'online' as last_ping_result,
                 m.name as map_name,
                 p.output as last_ping_output
             FROM 
@@ -389,7 +393,8 @@ switch ($action) {
         $params = [];
 
         if ($map_id) {
-            if (!$current_user_id) { // If map_id is used, user must be authenticated
+            // If map_id is used, user must be authenticated
+            if (!$current_user_id) {
                 http_response_code(403);
                 echo json_encode(['error' => 'Unauthorized access.']);
                 exit;
@@ -397,10 +402,20 @@ switch ($action) {
             $sql .= " AND d.map_id = ? AND d.user_id = ?";
             $params = [$map_id, $current_user_id];
         } elseif ($share_id) {
-            $sql .= " AND m.share_id = ? AND m.is_public = TRUE";
-            $params = [$share_id];
+            // For shared maps, ensure the map is public
+            $stmt_map = $pdo->prepare("SELECT id FROM maps WHERE share_id = ? AND is_public = TRUE");
+            $stmt_map->execute([$share_id]);
+            $shared_map = $stmt_map->fetch(PDO::FETCH_ASSOC);
+            if (!$shared_map) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Public map not found or share link is invalid/disabled.']);
+                exit;
+            }
+            $sql .= " AND d.map_id = ?";
+            $params = [$shared_map['id']];
         } else if ($unmapped) {
-            if (!$current_user_id) { // If unmapped is used, user must be authenticated
+            // If unmapped is used, user must be authenticated
+            if (!$current_user_id) {
                 http_response_code(403);
                 echo json_encode(['error' => 'Unauthorized access.']);
                 exit;
@@ -408,13 +423,12 @@ switch ($action) {
             $sql .= " AND d.map_id IS NULL AND d.user_id = ?";
             $params = [$current_user_id];
         } else {
-            // If neither map_id nor share_id nor unmapped is provided, and user is not authenticated, deny.
+            // Default to fetching all devices for the authenticated user if no specific map/share is requested
             if (!$current_user_id) {
                 http_response_code(403);
                 echo json_encode(['error' => 'Unauthorized access.']);
                 exit;
             }
-            // Default to fetching all devices for the authenticated user if no specific map/share is requested
             $sql .= " AND d.user_id = ?";
             $params = [$current_user_id];
         }
@@ -424,5 +438,33 @@ switch ($action) {
         $stmt->execute($params);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($devices);
+        break;
+    
+    case 'update_device_status_by_ip': // New action for updating status by IP
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $ip_address = $input['ip_address'] ?? null;
+            $status = $input['status'] ?? null;
+
+            if (empty($ip_address) || empty($status)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'IP address and status are required.']);
+                exit;
+            }
+
+            // Find the device by IP and user_id
+            $stmt = $pdo->prepare("SELECT id FROM devices WHERE ip = ? AND user_id = ?");
+            $stmt->execute([$ip_address, $current_user_id]);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$device) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Device not found for this IP and user.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("UPDATE devices SET status = ?, last_seen = NOW() WHERE id = ? AND user_id = ?");
+            $stmt->execute([$status, $device['id'], $current_user_id]);
+            echo json_encode(['success' => true, 'message' => 'Device status updated.']);
+        }
         break;
 }

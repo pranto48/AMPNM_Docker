@@ -1,8 +1,10 @@
-import { supabase } from '@/integrations/supabase/client';
+// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
+
+const API_BASE_URL = 'http://localhost:2266/api.php'; // Your local PHP API endpoint
 
 export interface NetworkDevice {
   id?: string;
-  user_id?: string;
+  user_id?: string; // This will be handled by PHP session
   name: string;
   ip_address: string;
   position_x: number;
@@ -30,158 +32,115 @@ export interface NetworkMapDetails {
   is_public: boolean;
 }
 
+const fetchApi = async (action: string, method: 'GET' | 'POST' = 'GET', body?: any) => {
+  const url = `${API_BASE_URL}?action=${action}`;
+  const options: RequestInit = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(errorData.error || `API request failed with status ${response.status}`);
+  }
+  return response.json();
+};
+
 export const getMaps = async (): Promise<NetworkMapDetails[]> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('maps')
-    .select('id, name, background_color, background_image_url, share_id, is_public')
-    .eq('user_id', user.id)
-    .order('name', { ascending: true });
-
-  if (error) throw new Error(error.message);
+  // User ID is handled by PHP session on the server side
+  const data = await fetchApi('get_maps');
   return data;
 };
 
 export const getDevices = async (mapId?: string, shareId?: string) => {
-  let query = supabase.from('network_devices').select('*').order('created_at', { ascending: true });
+  const params = new URLSearchParams();
+  if (mapId) params.append('map_id', mapId);
+  if (shareId) params.append('share_id', shareId);
 
-  if (mapId) {
-    query = query.eq('map_id', mapId);
-  } else if (shareId) {
-    // For shared maps, we need to join with maps table to ensure it's public
-    query = query
-      .in('map_id', supabase.from('maps').select('id').eq('share_id', shareId).eq('is_public', true))
-  }
-  
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = await fetchApi(`get_devices&${params.toString()}`);
   return data;
 };
 
 export const addDevice = async (device: Omit<NetworkDevice, 'user_id'>) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
-  
-  const deviceWithUser = { ...device, user_id: user.id };
-  const { data, error } = await supabase.from('network_devices').insert(deviceWithUser).select().single();
-  if (error) throw new Error(error.message);
+  const data = await fetchApi('create_device', 'POST', device);
   return data;
 };
 
 export const updateDevice = async (id: string, updates: Partial<NetworkDevice>) => {
-  const { data, error } = await supabase.from('network_devices').update(updates).eq('id', id).select().single();
-  if (error) throw new Error(error.message);
+  const data = await fetchApi('update_device', 'POST', { id, updates });
   return data;
 };
 
 export const updateDeviceStatusByIp = async (ip_address: string, status: 'online' | 'offline') => {
-  const { data, error } = await supabase
-    .from('network_devices')
-    .update({ 
-      status, 
-      last_ping: new Date().toISOString(),
-      last_ping_result: status === 'online'
-    })
-    .eq('ip_address', ip_address)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating device status:', error);
-    throw new Error(error.message);
-  }
-  
+  // This action needs to be implemented in your PHP API
+  // For now, we'll simulate it or call a generic update if available
+  console.warn('updateDeviceStatusByIp is not fully implemented in PHP API yet. Simulating update.');
+  // You might need a specific API endpoint for this or handle it via a generic device update
+  const data = await fetchApi('update_device_status_by_ip', 'POST', { ip_address, status });
   return data;
 };
 
 export const deleteDevice = async (id: string) => {
-  const { error } = await supabase.from('network_devices').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  await fetchApi('delete_device', 'POST', { id });
 };
 
 export const getEdges = async (mapId?: string, shareId?: string) => {
-  let query = supabase.from('network_edges').select('id, source:source_id, target:target_id, connection_type');
+  const params = new URLSearchParams();
+  if (mapId) params.append('map_id', mapId);
+  if (shareId) params.append('share_id', shareId);
 
-  if (mapId) {
-    query = query.eq('map_id', mapId);
-  } else if (shareId) {
-    // For shared maps, we need to join with maps table to ensure it's public
-    query = query
-      .in('map_id', supabase.from('maps').select('id').eq('share_id', shareId).eq('is_public', true))
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const data = await fetchApi(`get_edges&${params.toString()}`);
   return data;
 };
 
 export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string }) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase.from('network_edges').insert({ source_id: edge.source, target_id: edge.target, user_id: user.id, map_id: edge.map_id, connection_type: 'cat5' }).select().single();
-  if (error) throw new Error(error.message);
+  const data = await fetchApi('create_edge', 'POST', edge);
   return data;
 };
 
 export const updateEdgeInDB = async (id: string, updates: { connection_type: string }) => {
-  const { data, error } = await supabase.from('network_edges').update(updates).eq('id', id).select().single();
-  if (error) throw new Error(error.message);
+  const data = await fetchApi('update_edge', 'POST', { id, updates });
   return data;
 };
 
 export const deleteEdgeFromDB = async (edgeId: string) => {
-  const { error } = await supabase.from('network_edges').delete().eq('id', edgeId);
-  if (error) throw new Error(error.message);
+  await fetchApi('delete_edge', 'POST', { id: edgeId });
 };
 
 export const importMap = async (mapData: MapData, mapId: string) => {
-  const { error } = await supabase.rpc('import_network_map', {
-    p_map_id: mapId, // Pass mapId to the RPC function
-    devices_data: mapData.devices,
-    edges_data: mapData.edges,
-  });
-  if (error) throw new Error(`Import failed: ${error.message}`);
+  await fetchApi('import_map', 'POST', { map_id: mapId, devices: mapData.devices, edges: mapData.edges });
 };
 
-// New functions for map sharing
+// New functions for map sharing (now using local PHP API)
 export const getMapDetailsByShareId = async (shareId: string): Promise<NetworkMapDetails | null> => {
-  const { data, error } = await supabase
-    .from('maps')
-    .select('id, name, background_color, background_image_url, share_id, is_public')
-    .eq('share_id', shareId)
-    .eq('is_public', true)
-    .single();
-
-  if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-    throw new Error(error.message);
-  }
+  const data = await fetchApi(`get_map_by_share_id&share_id=${shareId}`);
   return data;
 };
 
 export const generateMapShareLink = async (mapId: string): Promise<string> => {
-  const { data, error } = await supabase.rpc('generate_map_share_link', { p_map_id: mapId });
-  if (error) throw new Error(error.message);
-  return data; // This should be the share_id
+  const data = await fetchApi('generate_share_link', 'POST', { map_id: mapId });
+  return data.share_id; // PHP API should return { success: true, share_id: '...' }
 };
 
 export const disableMapShareLink = async (mapId: string) => {
-  const { error } = await supabase.rpc('disable_map_share_link', { p_map_id: mapId });
-  if (error) throw new Error(error.message);
+  await fetchApi('disable_share_link', 'POST', { map_id: mapId });
 };
 
-// Real-time subscription for device changes
+// Real-time subscription is not directly supported by PHP/MySQL without additional tech (e.g., WebSockets server)
+// We'll remove this for now and rely on periodic refreshes or manual updates.
 export const subscribeToDeviceChanges = (callback: (payload: any) => void) => {
-  const channel = supabase
-    .channel('network-devices-changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'network_devices' },
-      callback
-    )
-    .subscribe();
-
-  return channel;
+  console.warn('Real-time device change subscription is not available with PHP/MySQL backend.');
+  // Return a dummy object that can be unsubscribed
+  return {
+    unsubscribe: () => console.log('Dummy unsubscribe for device changes.'),
+    channel: {
+      on: () => ({ subscribe: () => {} }) // Mock the on and subscribe methods
+    }
+  };
 };

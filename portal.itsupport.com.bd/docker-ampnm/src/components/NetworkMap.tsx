@@ -30,12 +30,13 @@ import {
   generateMapShareLink,
   disableMapShareLink,
   NetworkMapDetails,
+  // subscribeToDeviceChanges, // Removed Supabase subscription
 } from '@/services/networkDeviceService';
 import { DeviceEditorDialog } from './DeviceEditorDialog';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { supabase } from '@/integrations/supabase/client';
+// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -142,39 +143,39 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
     };
     loadEdges();
 
-    if (!isReadOnly) {
-      // Subscribe to edge changes only if not read-only
-      const handleEdgeInsert = (payload: any) => {
-        const newEdge = { 
-          id: payload.new.id, 
-          source: payload.new.source_id, 
-          target: payload.new.target_id, 
-          data: { connection_type: payload.new.connection_type } 
-        };
-        setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
-      };
+    // Removed Supabase real-time subscription for edges
+    // if (!isReadOnly) {
+    //   const handleEdgeInsert = (payload: any) => {
+    //     const newEdge = { 
+    //       id: payload.new.id, 
+    //       source: payload.new.source_id, 
+    //       target: payload.new.target_id, 
+    //       data: { connection_type: payload.new.connection_type } 
+    //     };
+    //     setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+    //   };
       
-      const handleEdgeUpdate = (payload: any) => {
-        setEdges((eds) => 
-          eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
-        );
-      };
+    //   const handleEdgeUpdate = (payload: any) => {
+    //     setEdges((eds) => 
+    //       eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
+    //     );
+    //   };
       
-      const handleEdgeDelete = (payload: any) => {
-        setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
-      };
+    //   const handleEdgeDelete = (payload: any) => {
+    //     setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
+    //   };
 
-      const edgeChannel = supabase.channel('network-map-edge-changes');
-      edgeChannel
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
-        .subscribe();
+    //   const edgeChannel = supabase.channel('network-map-edge-changes');
+    //   edgeChannel
+    //     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
+    //     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
+    //     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
+    //     .subscribe();
 
-      return () => {
-        supabase.removeChannel(edgeChannel);
-      };
-    }
+    //   return () => {
+    //     supabase.removeChannel(edgeChannel);
+    //   };
+    // }
   }, [setEdges, currentMapId, mapDetails?.share_id, isReadOnly]);
 
   // Style edges based on connection type and device status
@@ -422,7 +423,8 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
     const toastId = showLoading('Generating share link...');
     try {
       const newShareId = await generateMapShareLink(currentMapId);
-      const fullShareLink = `${window.location.origin}/shared-map/${newShareId}`;
+      // Construct the local PHP URL for sharing
+      const fullShareLink = `${window.location.origin}/shared_map_view.php?share_id=${newShareId}`;
       setShareLink(fullShareLink);
       setIsShareDialogOpen(true);
       dismissToast(toastId);
@@ -541,7 +543,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading...
             </Button>
           ) : mapDetails?.is_public && mapDetails.share_id ? (
-            <Button onClick={() => { setShareLink(`${window.location.origin}/shared-map/${mapDetails.share_id}`); setIsShareDialogOpen(true); }} variant="secondary" size="sm">
+            <Button onClick={() => { setShareLink(`${window.location.origin}/shared_map_view.php?share_id=${mapDetails.share_id}`); setIsShareDialogOpen(true); }} variant="secondary" size="sm">
               <Link className="h-4 w-4 mr-2" />View Share Link
             </Button>
           ) : (

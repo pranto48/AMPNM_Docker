@@ -225,6 +225,13 @@ try {
         return $stmt->fetchColumn() > 0;
     }
 
+    // Helper to check if index exists
+    function indexExists($pdo, $db, $table, $indexName) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?");
+        $stmt->execute([$db, $table, $indexName]);
+        return $stmt->fetchColumn() > 0;
+    }
+
     message("Applying database indexes for performance...");
     $indexes = [
         'ping_results' => ['idx_host_created_at' => '(`host`, `created_at` DESC)'],
