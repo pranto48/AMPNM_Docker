@@ -190,6 +190,12 @@ const Index = () => {
     }, {} as Record<string, number>);
   }, [devices]);
 
+  // Debugging logs
+  console.log('Index.tsx - maps:', maps);
+  console.log('Index.tsx - selectedMapId:', selectedMapId);
+  console.log('Index.tsx - mapDetails:', mapDetails);
+  console.log('Index.tsx - isMapDetailsLoading:', isMapDetailsLoading);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4">
