@@ -151,7 +151,7 @@ MapApp.mapManager = {
                 label: createdDevice.name,
                 title: MapApp.utils.buildNodeTitle(createdDevice),
                 x: createdDevice.x,
-                y: createdCreatedDevice.y,
+                y: createdDevice.y, // Corrected variable name
                 shape: 'icon',
                 icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown },
                 font: { color: 'white', size: parseInt(createdDevice.name_text_size) || 14, multi: true },

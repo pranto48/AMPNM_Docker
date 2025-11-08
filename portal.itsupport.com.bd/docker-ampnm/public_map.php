@@ -7,9 +7,18 @@ if (!$map_id) {
     die("Error: Map ID is required.");
 }
 
+// Construct the full HTTP URL for the API endpoint
+// Using the hardcoded IP and port as requested
+$api_url = "http://192.168.20.5:2266/api.php?action=get_public_map_data&map_id=" . urlencode($map_id);
+
 // Fetch map data using the public API endpoint
-$api_url = "api.php?action=get_public_map_data&map_id=" . urlencode($map_id);
-$response = file_get_contents($api_url);
+$response = @file_get_contents($api_url); // Suppress warnings for file_get_contents
+
+if ($response === false) {
+    $error = error_get_last();
+    die("Error loading map data from API: " . ($error['message'] ?? "Unknown error. Ensure the Docker app is running and accessible at http://192.168.20.5:2266."));
+}
+
 $data = json_decode($response, true);
 
 if (!$data || isset($data['error'])) {
