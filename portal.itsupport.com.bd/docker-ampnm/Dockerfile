@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     nmap \
     curl \
+    libcurl4-openssl-dev \
     mariadb-client-compat \
     && rm -rf /var/lib/apt/lists/*
 
