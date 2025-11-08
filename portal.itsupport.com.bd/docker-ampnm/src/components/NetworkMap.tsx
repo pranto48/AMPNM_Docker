@@ -35,7 +35,13 @@ import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
-const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
+interface NetworkMapProps {
+  devices: NetworkDevice[];
+  onMapUpdate: () => void;
+  currentMapId: string;
+}
+
+const NetworkMap = ({ devices, onMapUpdate, currentMapId }: NetworkMapProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
@@ -104,16 +110,23 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   // Load edges and subscribe to edge changes
   useEffect(() => {
+    if (!currentMapId) {
+      setEdges([]);
+      return;
+    }
+
     const loadEdges = async () => {
       try {
-        const edgesData = await getEdges();
+        const edgesData = await getEdges(); // Assuming getEdges can filter by mapId
         setEdges(
-          edgesData.map((edge: any) => ({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            data: { connection_type: edge.connection_type || 'cat5' },
-          }))
+          edgesData
+            .filter((edge: any) => edge.map_id === currentMapId) // Filter edges by currentMapId
+            .map((edge: any) => ({
+              id: edge.id,
+              source: edge.source,
+              target: edge.target,
+              data: { connection_type: edge.connection_type || 'cat5' },
+            }))
         );
       } catch (error) {
         console.error('Failed to load network edges:', error);
@@ -124,19 +137,23 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
     // Subscribe to edge changes
     const handleEdgeInsert = (payload: any) => {
-      const newEdge = { 
-        id: payload.new.id, 
-        source: payload.new.source_id, 
-        target: payload.new.target_id, 
-        data: { connection_type: payload.new.connection_type } 
-      };
-      setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+      if (payload.new.map_id === currentMapId) { // Only add if it belongs to the current map
+        const newEdge = { 
+          id: payload.new.id, 
+          source: payload.new.source_id, 
+          target: payload.new.target_id, 
+          data: { connection_type: payload.new.connection_type } 
+        };
+        setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+      }
     };
     
     const handleEdgeUpdate = (payload: any) => {
-      setEdges((eds) => 
-        eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
-      );
+      if (payload.new.map_id === currentMapId) { // Only update if it belongs to the current map
+        setEdges((eds) => 
+          eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
+        );
+      }
     };
     
     const handleEdgeDelete = (payload: any) => {
@@ -153,7 +170,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     return () => {
       supabase.removeChannel(edgeChannel);
     };
-  }, [setEdges]);
+  }, [setEdges, currentMapId]);
 
   // Style edges based on connection type and device status
   const styledEdges = useMemo(() => {
@@ -201,6 +218,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onConnect = useCallback(
     async (params: Connection) => {
+      if (!currentMapId) {
+        showError("Please select a map first.");
+        return;
+      }
       // Optimistically add edge to UI
       const newEdge = { 
         id: `reactflow__edge-${params.source}${params.target}`, 
@@ -212,7 +233,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       
       try {
         // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target! });
+        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: currentMapId });
         showSuccess('Connection saved.');
       } catch (error) {
         console.error('Failed to save connection:', error);
@@ -221,7 +242,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges]
+    [setEdges, currentMapId]
   );
 
   const handleDelete = async (deviceId: string) => {
@@ -296,6 +317,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleExport = async () => {
+    if (!currentMapId) {
+      showError("No map selected to export.");
+      return;
+    }
     const exportData: MapData = {
       devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => rest),
       edges: edges.map(({ id, source, target, data }) => ({ 
@@ -309,7 +334,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'network-map.json';
+    a.download = `network-map-${currentMapId}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -322,7 +347,15 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!window.confirm('Are you sure you want to import this map? This will overwrite your current map.')) return;
+    if (!currentMapId) {
+      showError("Please select a map to import into.");
+      if (importInputRef.current) importInputRef.current.value = '';
+      return;
+    }
+    if (!window.confirm('Are you sure you want to import this map? This will overwrite the devices and connections on your currently selected map.')) {
+      if (importInputRef.current) importInputRef.current.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -330,7 +363,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(mapData);
+        await importMap(currentMapId, mapData); // Pass currentMapId to importMap
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data
@@ -346,10 +379,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleShareMap = async () => {
-    // Assuming the current map ID is available from the devices prop or a context
-    // For simplicity, let's assume the first device's map_id is the current map_id
-    const currentMapId = devices.length > 0 ? devices[0].map_id : null;
-
     if (!currentMapId) {
       showError('No map selected to share.');
       return;
@@ -397,13 +426,13 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         <Background gap={16} size={1} color="#444" />
       </ReactFlow>
       <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-        <Button onClick={() => navigate('/add-device')} size="sm"> {/* Navigate to Add Device page */}
+        <Button onClick={() => navigate('/add-device')} size="sm" disabled={!currentMapId}>
           <PlusCircle className="h-4 w-4 mr-2" />Add Device
         </Button>
-        <Button onClick={handleExport} variant="outline" size="sm">
+        <Button onClick={handleExport} variant="outline" size="sm" disabled={!currentMapId}>
           <Download className="h-4 w-4 mr-2" />Export
         </Button>
-        <Button onClick={handleImportClick} variant="outline" size="sm">
+        <Button onClick={handleImportClick} variant="outline" size="sm" disabled={!currentMapId}>
           <Upload className="h-4 w-4 mr-2" />Import
         </Button>
         <input 
@@ -413,7 +442,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           accept="application/json" 
           className="hidden" 
         />
-        <Button onClick={handleShareMap} variant="outline" size="sm">
+        <Button onClick={handleShareMap} variant="outline" size="sm" disabled={!currentMapId}>
           <Share2 className="h-4 w-4 mr-2" />Share Map
         </Button>
       </div>

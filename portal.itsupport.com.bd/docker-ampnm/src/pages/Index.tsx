@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, Wifi, Server, Clock, RefreshCw, Monitor, Network, WifiOff } from "lucide-react";
+import { Activity, Wifi, Server, Clock, RefreshCw, Monitor, Network, WifiOff, PlusCircle, Edit, Trash2 } from "lucide-react";
 import { showSuccess, showError, showLoading, dismissToast } from "@/utils/toast";
 import PingTest from "@/components/PingTest";
 import NetworkStatus from "@/components/NetworkStatus";
@@ -21,6 +21,8 @@ import {
 import { performServerPing } from "@/services/pingService";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getMaps, createMap, deleteMap, updateMap, Map } from "@/services/mapService";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Index = () => {
   const [networkStatus, setNetworkStatus] = useState<boolean>(true);
@@ -28,6 +30,8 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [maps, setMaps] = useState<Map[]>([]);
+  const [currentMapId, setCurrentMapId] = useState<string | undefined>(undefined);
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -40,19 +44,34 @@ const Index = () => {
     }
   }, []);
 
+  const fetchMaps = useCallback(async () => {
+    try {
+      const fetchedMaps = await getMaps();
+      setMaps(fetchedMaps);
+      if (fetchedMaps.length > 0 && !currentMapId) {
+        setCurrentMapId(fetchedMaps[0].id);
+      } else if (fetchedMaps.length === 0) {
+        setCurrentMapId(undefined);
+      }
+    } catch (error) {
+      showError("Failed to load maps.");
+    }
+  }, [currentMapId]);
+
   useEffect(() => {
     fetchDevices();
+    fetchMaps();
 
     // Subscribe to real-time device changes
-    const channel = subscribeToDeviceChanges((payload) => {
+    const deviceChannel = subscribeToDeviceChanges((payload) => {
       console.log('Device change received:', payload);
       fetchDevices();
     });
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(deviceChannel);
     };
-  }, [fetchDevices]);
+  }, [fetchDevices, fetchMaps]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
@@ -139,6 +158,71 @@ const Index = () => {
       return acc;
     }, {} as Record<string, number>);
   }, [devices]);
+
+  const handleCreateMap = async () => {
+    const mapName = prompt("Enter a name for the new map:");
+    if (mapName && mapName.trim() !== '') {
+      try {
+        const newMap = await createMap({ name: mapName, type: 'lan' }); // Default type to 'lan'
+        showSuccess(`Map '${newMap.name}' created successfully!`);
+        await fetchMaps();
+        setCurrentMapId(newMap.id);
+      } catch (error) {
+        console.error("Failed to create map:", error);
+        showError("Failed to create map.");
+      }
+    } else if (mapName !== null) {
+      showError("Map name cannot be empty.");
+    }
+  };
+
+  const handleRenameMap = async () => {
+    if (!currentMapId) {
+      showError("No map selected to rename.");
+      return;
+    }
+    const currentMap = maps.find(m => m.id === currentMapId);
+    if (!currentMap) return;
+
+    const newName = prompt("Enter a new name for the map:", currentMap.name);
+    if (newName && newName.trim() !== '' && newName !== currentMap.name) {
+      try {
+        await updateMap(currentMapId, { name: newName });
+        showSuccess(`Map renamed to '${newName}'!`);
+        await fetchMaps();
+      } catch (error) {
+        console.error("Failed to rename map:", error);
+        showError("Failed to rename map.");
+      }
+    } else if (newName !== null && newName.trim() === '') {
+      showError("Map name cannot be empty.");
+    }
+  };
+
+  const handleDeleteMap = async () => {
+    if (!currentMapId) {
+      showError("No map selected to delete.");
+      return;
+    }
+    const currentMap = maps.find(m => m.id === currentMapId);
+    if (!currentMap) return;
+
+    if (window.confirm(`Are you sure you want to delete the map '${currentMap.name}'? This action cannot be undone.`)) {
+      try {
+        await deleteMap(currentMapId);
+        showSuccess(`Map '${currentMap.name}' deleted successfully.`);
+        setCurrentMapId(undefined); // Clear selected map
+        await fetchMaps(); // Re-fetch maps to update list
+      } catch (error) {
+        console.error("Failed to delete map:", error);
+        showError("Failed to delete map.");
+      }
+    }
+  };
+
+  const filteredDevicesForMap = useMemo(() => {
+    return devices.filter(device => device.map_id === currentMapId);
+  }, [devices, currentMapId]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -358,7 +442,53 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="map">
-            <NetworkMap devices={devices} onMapUpdate={fetchDevices} />
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Network Map</h2>
+              <div className="flex gap-2">
+                <Select value={currentMapId || ''} onValueChange={setCurrentMapId}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select a map" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {maps.length === 0 ? (
+                      <SelectItem value="no-maps" disabled>No maps available</SelectItem>
+                    ) : (
+                      maps.map((map) => (
+                        <SelectItem key={map.id} value={map.id}>
+                          {map.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleCreateMap} size="sm" variant="outline">
+                  <PlusCircle className="h-4 w-4 mr-2" />New Map
+                </Button>
+                <Button onClick={handleRenameMap} size="sm" variant="outline" disabled={!currentMapId}>
+                  <Edit className="h-4 w-4 mr-2" />Rename
+                </Button>
+                <Button onClick={handleDeleteMap} size="sm" variant="destructive" disabled={!currentMapId}>
+                  <Trash2 className="h-4 w-4 mr-2" />Delete
+                </Button>
+              </div>
+            </div>
+            {currentMapId ? (
+              <NetworkMap 
+                devices={filteredDevicesForMap} 
+                onMapUpdate={fetchDevices} 
+                currentMapId={currentMapId}
+              />
+            ) : (
+              <Card className="h-[70vh] flex items-center justify-center">
+                <CardContent className="text-center">
+                  <Network className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-lg text-muted-foreground">No map selected or available.</p>
+                  <Button onClick={handleCreateMap} className="mt-4">
+                    <PlusCircle className="h-4 w-4 mr-2" />Create Your First Map
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 

@@ -66,9 +66,12 @@ switch ($action) {
 
     case 'create_edge':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $map_id = $input['map_id'] ?? null;
+            if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required for edge creation']); exit; }
+
             $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$current_user_id, $input['source_id'], $input['target_id'], $input['map_id'], $input['connection_type'] ?? 'cat5']);
+            $stmt->execute([$current_user_id, $input['source_id'], $input['target_id'], $map_id, $input['connection_type'] ?? 'cat5']);
             $lastId = $pdo->lastInsertId();
             $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
             $stmt->execute([$lastId, $current_user_id]);
@@ -103,9 +106,9 @@ switch ($action) {
     
     case 'import_map':
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $map_id = $input['map_id'] ?? null;
-            $devices = $input['devices'] ?? [];
-            $edges = $input['edges'] ?? [];
+            $map_id = $input['map_id_param'] ?? null; // Use map_id_param to avoid conflict
+            $devices = $input['devices_data'] ?? [];
+            $edges = $input['edges_data'] ?? [];
             if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
 
             try {
@@ -133,7 +136,7 @@ switch ($action) {
                         $device['type'] ?? 'other',
                         $device['x'] ?? null,
                         $device['y'] ?? null,
-                        $map_id,
+                        $map_id, // Assign to the current map_id
                         $device['ping_interval'] ?? null,
                         $device['icon_size'] ?? 50,
                         $device['name_text_size'] ?? 14,
@@ -152,8 +155,8 @@ switch ($action) {
                 $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
                 foreach ($edges as $edge) {
-                    $new_source_id = $device_id_map[$edge['from']] ?? null;
-                    $new_target_id = $device_id_map[$edge['to']] ?? null;
+                    $new_source_id = $device_id_map[$edge['source']] ?? null; // Use 'source' from import data
+                    $new_target_id = $device_id_map[$edge['target']] ?? null; // Use 'target' from import data
                     if ($new_source_id && $new_target_id) {
                         $stmt->execute([$current_user_id, $new_source_id, $new_target_id, $map_id, $edge['connection_type'] ?? 'cat5']);
                     }
