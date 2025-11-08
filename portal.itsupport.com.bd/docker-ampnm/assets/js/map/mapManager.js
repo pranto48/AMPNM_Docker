@@ -4,12 +4,12 @@ MapApp.mapManager = {
     createMap: async () => {
         const name = prompt("Enter a name for the new map:");
         if (name === null) { // User clicked cancel
-            return;
+            return; // Stop execution if prompt is cancelled
         }
         const trimmedName = name.trim();
         if (trimmedName === '') {
             window.notyf.error("Map name cannot be empty.");
-            return;
+            return; // Stop execution if name is empty
         }
         
         try {
