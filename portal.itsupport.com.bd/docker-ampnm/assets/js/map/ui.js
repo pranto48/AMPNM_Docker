@@ -19,15 +19,15 @@ MapApp.ui = {
             scanNetworkBtn: document.getElementById('scanNetworkBtn'),
             refreshStatusBtn: document.getElementById('refreshStatusBtn'),
             liveRefreshToggle: document.getElementById('liveRefreshToggle'),
-            addDeviceBtn: document.getElementById('addDeviceBtn'),
+            // addDeviceBtn: document.getElementById('addDeviceBtn'), // Removed
             addEdgeBtn: document.getElementById('addEdgeBtn'),
             fullscreenBtn: document.getElementById('fullscreenBtn'),
             exportBtn: document.getElementById('exportBtn'),
             importBtn: document.getElementById('importBtn'),
             importFile: document.getElementById('importFile'),
-            deviceModal: document.getElementById('deviceModal'),
-            deviceForm: document.getElementById('deviceForm'),
-            cancelBtn: document.getElementById('cancelBtn'),
+            // deviceModal: document.getElementById('deviceModal'), // Removed
+            // deviceForm: document.getElementById('deviceForm'), // Removed
+            // cancelBtn: document.getElementById('cancelBtn'), // Removed
             edgeModal: document.getElementById('edgeModal'),
             edgeForm: document.getElementById('edgeForm'),
             cancelEdgeBtn: document.getElementById('cancelEdgeBtn'),
@@ -51,53 +51,53 @@ MapApp.ui = {
         }).join('');
     },
 
-    toggleDeviceModalFields: (type) => {
-        const isAnnotation = type === 'box';
-        const isPingable = !isAnnotation;
-        document.getElementById('deviceIpWrapper').style.display = isPingable ? 'block' : 'none';
-        document.getElementById('devicePortWrapper').style.display = isPingable ? 'block' : 'none';
-        document.getElementById('pingIntervalWrapper').style.display = isPingable ? 'block' : 'none';
-        document.getElementById('thresholdsWrapper').style.display = isPingable ? 'block' : 'none';
-        document.getElementById('deviceIp').required = isPingable;
-        document.getElementById('iconSizeLabel').textContent = isAnnotation ? 'Width' : 'Icon Size';
-        document.getElementById('nameTextSizeLabel').textContent = isAnnotation ? 'Height' : 'Name Text Size';
-    },
+    // toggleDeviceModalFields: (type) => { // Removed
+    //     const isAnnotation = type === 'box';
+    //     const isPingable = !isAnnotation;
+    //     document.getElementById('deviceIpWrapper').style.display = isPingable ? 'block' : 'none';
+    //     document.getElementById('devicePortWrapper').style.display = isPingable ? 'block' : 'none';
+    //     document.getElementById('pingIntervalWrapper').style.display = isPingable ? 'block' : 'none';
+    //     document.getElementById('thresholdsWrapper').style.display = isPingable ? 'block' : 'none';
+    //     document.getElementById('deviceIp').required = isPingable;
+    //     document.getElementById('iconSizeLabel').textContent = isAnnotation ? 'Width' : 'Icon Size';
+    //     document.getElementById('nameTextSizeLabel').textContent = isAnnotation ? 'Height' : 'Name Text Size';
+    // },
 
-    openDeviceModal: (deviceId = null, prefill = {}) => {
-        MapApp.ui.els.deviceForm.reset();
-        document.getElementById('deviceId').value = '';
-        const previewWrapper = document.getElementById('icon_preview_wrapper');
-        previewWrapper.classList.add('hidden');
+    // openDeviceModal: (deviceId = null, prefill = {}) => { // Removed
+    //     MapApp.ui.els.deviceForm.reset();
+    //     document.getElementById('deviceId').value = '';
+    //     const previewWrapper = document.getElementById('icon_preview_wrapper');
+    //     previewWrapper.classList.add('hidden');
 
-        if (deviceId) {
-            const node = MapApp.state.nodes.get(deviceId);
-            document.getElementById('modalTitle').textContent = 'Edit Item';
-            document.getElementById('deviceId').value = node.id;
-            document.getElementById('deviceName').value = node.deviceData.name;
-            document.getElementById('deviceIp').value = node.deviceData.ip;
-            document.getElementById('checkPort').value = node.deviceData.check_port;
-            document.getElementById('deviceType').value = node.deviceData.type;
-            document.getElementById('icon_url').value = node.deviceData.icon_url || '';
-            if (node.deviceData.icon_url) {
-                document.getElementById('icon_preview').src = node.deviceData.icon_url;
-                previewWrapper.classList.remove('hidden');
-            }
-            document.getElementById('pingInterval').value = node.deviceData.ping_interval;
-            document.getElementById('iconSize').value = node.deviceData.icon_size;
-            document.getElementById('nameTextSize').value = node.deviceData.name_text_size;
-            document.getElementById('warning_latency_threshold').value = node.deviceData.warning_latency_threshold;
-            document.getElementById('warning_packetloss_threshold').value = node.deviceData.warning_packetloss_threshold;
-            document.getElementById('critical_latency_threshold').value = node.deviceData.critical_latency_threshold;
-            document.getElementById('critical_packetloss_threshold').value = node.deviceData.critical_packetloss_threshold;
-            document.getElementById('showLivePing').checked = node.deviceData.show_live_ping;
-        } else {
-            document.getElementById('modalTitle').textContent = 'Add Item';
-            document.getElementById('deviceName').value = prefill.name || '';
-            document.getElementById('deviceIp').value = prefill.ip || '';
-        }
-        MapApp.ui.toggleDeviceModalFields(document.getElementById('deviceType').value);
-        MapApp.ui.els.deviceModal.classList.remove('hidden');
-    },
+    //     if (deviceId) {
+    //         const node = MapApp.state.nodes.get(deviceId);
+    //         document.getElementById('modalTitle').textContent = 'Edit Item';
+    //         document.getElementById('deviceId').value = node.id;
+    //         document.getElementById('deviceName').value = node.deviceData.name;
+    //         document.getElementById('deviceIp').value = node.deviceData.ip;
+    //         document.getElementById('checkPort').value = node.deviceData.check_port;
+    //         document.getElementById('deviceType').value = node.deviceData.type;
+    //         document.getElementById('icon_url').value = node.deviceData.icon_url || '';
+    //         if (node.deviceData.icon_url) {
+    //             document.getElementById('icon_preview').src = node.deviceData.icon_url;
+    //             previewWrapper.classList.remove('hidden');
+    //         }
+    //         document.getElementById('pingInterval').value = node.deviceData.ping_interval;
+    //         document.getElementById('iconSize').value = node.deviceData.icon_size;
+    //         document.getElementById('nameTextSize').value = node.deviceData.name_text_size;
+    //         document.getElementById('warning_latency_threshold').value = node.deviceData.warning_latency_threshold;
+    //         document.getElementById('warning_packetloss_threshold').value = node.deviceData.warning_packetloss_threshold;
+    //         document.getElementById('critical_latency_threshold').value = node.deviceData.critical_latency_threshold;
+    //         document.getElementById('critical_packetloss_threshold').value = node.deviceData.critical_packetloss_threshold;
+    //         document.getElementById('showLivePing').checked = node.deviceData.show_live_ping;
+    //     } else {
+    //         document.getElementById('modalTitle').textContent = 'Add Item';
+    //         document.getElementById('deviceName').value = prefill.name || '';
+    //         document.getElementById('deviceIp').value = prefill.ip || '';
+    //     }
+    //     MapApp.ui.toggleDeviceModalFields(document.getElementById('deviceType').value);
+    //     MapApp.ui.els.deviceModal.classList.remove('hidden');
+    // },
 
     openEdgeModal: (edgeId) => {
         const edge = MapApp.state.edges.get(edgeId);
