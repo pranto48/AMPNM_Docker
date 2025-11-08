@@ -4,15 +4,9 @@
 /usr/local/bin/wait-for-it.sh db:3306 --timeout=60 --strict -- echo "MySQL is up and running!"
 
 # Run database setup script if not already done
-php /var/www/html/database_setup.php
+php /var/www/html/license_setup.php # Changed to license_setup.php as it's the main setup for the portal
 
-# Apache configuration is now handled in the Dockerfile,
-# so these lines are removed from the entrypoint to prevent conflicts.
-# echo "Listen 2266" >> /etc/apache2/ports.conf
-# sed -i -e 's/VirtualHost \*:80/VirtualHost \*:2266/g' /etc/apache2/sites-available/000-default.conf
-# sed -i -e 's/VirtualHost \*:80/VirtualHost \*:2266/g' /etc/apache2/sites-enabled/000-default.conf
-
-# Set permissions for uploads directory
+# Set permissions for uploads directory (now that the volume is mounted)
 chown -R www-data:www-data /var/www/html/uploads
 chmod -R 775 /var/www/html/uploads
 
