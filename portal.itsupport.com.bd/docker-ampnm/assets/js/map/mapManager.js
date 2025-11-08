@@ -3,12 +3,24 @@ window.MapApp = window.MapApp || {};
 MapApp.mapManager = {
     createMap: async () => {
         const name = prompt("Enter a name for the new map:");
-        if (name) { 
-            const newMap = await MapApp.api.post('create_map', { name }); 
+        if (name === null) { // User clicked cancel
+            return;
+        }
+        const trimmedName = name.trim();
+        if (trimmedName === '') {
+            window.notyf.error("Map name cannot be empty.");
+            return;
+        }
+        
+        try {
+            const newMap = await MapApp.api.post('create_map', { name: trimmedName }); 
             await MapApp.mapManager.loadMaps(); 
             MapApp.ui.els.mapSelector.value = newMap.id; 
             await MapApp.mapManager.switchMap(newMap.id); 
-            window.notyf.success(`Map "${name}" created.`);
+            window.notyf.success(`Map "${trimmedName}" created.`);
+        } catch (error) {
+            console.error("Failed to create map:", error);
+            window.notyf.error(error.message || "Failed to create map.");
         }
     },
 
@@ -139,7 +151,7 @@ MapApp.mapManager = {
                 label: createdDevice.name,
                 title: MapApp.utils.buildNodeTitle(createdDevice),
                 x: createdDevice.x,
-                y: createdDevice.y,
+                y: createdCreatedDevice.y,
                 shape: 'icon',
                 icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown },
                 font: { color: 'white', size: parseInt(createdDevice.name_text_size) || 14, multi: true },

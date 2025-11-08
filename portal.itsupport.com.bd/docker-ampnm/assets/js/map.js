@@ -30,6 +30,7 @@ function initMap() {
     els.closePlaceDeviceModal = document.getElementById('closePlaceDeviceModal');
     els.placeDeviceList = document.getElementById('placeDeviceList');
     els.placeDeviceLoader = document.getElementById('placeDeviceLoader');
+    els.shareMapBtn = document.getElementById('shareMapBtn'); // Cache the new share button
 
     // Cleanup function for SPA navigation
     window.cleanup = () => {
@@ -81,7 +82,7 @@ function initMap() {
                         Object.assign(nodeUpdate, {
                             shape: 'image',
                             image: updatedDevice.icon_url,
-                            size: (parseInt(updatedDevice.icon_size) || 50) / 2,
+                            size: (parseInt(updatedDevice.icon_size) || 50) / 2, // vis.js size is radius
                             color: { border: MapApp.config.statusColorMap[updatedDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
                             borderWidth: 3
                         });
@@ -479,6 +480,23 @@ function initMap() {
         } finally {
             loader.classList.add('hidden');
             e.target.value = '';
+        }
+    });
+
+    // Share Map Logic for map.php
+    els.shareMapBtn.addEventListener('click', async () => {
+        if (!state.currentMapId) {
+            window.notyf.error('No map selected to share.');
+            return;
+        }
+        // Construct the shareable URL using the hardcoded IP and port
+        const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${state.currentMapId}`;
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            window.notyf.success('Share link copied to clipboard!');
+        } catch (err) {
+            console.error('Failed to copy share link:', err);
+            window.notyf.error('Failed to copy share link. Please copy manually: ' + shareUrl);
         }
     });
 
