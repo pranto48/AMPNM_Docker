@@ -15,7 +15,18 @@ import {
   Edit, 
   Activity,
   WifiOff,
-  Clock
+  Clock,
+  Cloud,
+  HardDrive,
+  Camera,
+  Shield,
+  Phone,
+  Tablet,
+  Smartphone,
+  Radio,
+  Cable,
+  Box,
+  Gauge
 } from 'lucide-react';
 import { performServerPing, parsePingOutput } from '@/services/pingService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -28,6 +39,20 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   laptop: Laptop,
   wifi: Wifi,
   database: Database,
+  box: Box,
+  camera: Camera,
+  cloud: Cloud,
+  firewall: Shield,
+  ipphone: Phone,
+  mobile: Smartphone,
+  nas: HardDrive,
+  rack: Gauge, // Using Gauge as a placeholder for rack
+  punchdevice: Cable, // Using Cable as a placeholder for punchdevice
+  'radio-tower': Radio,
+  switch: Cable, // Using Cable as a placeholder for switch
+  tablet: Tablet,
+  'wifi-router': Wifi,
+  other: Server, // Default to server if not found
 };
 
 const DeviceNode = ({ data }: { data: any }) => {

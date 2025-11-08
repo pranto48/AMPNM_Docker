@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, Download, Wifi, WifiOff } from 'lucide-react';
+import { PlusCircle, Upload, Download, Edit, Trash2 } from 'lucide-react';
 import {
   addDevice,
   updateDevice,
@@ -29,20 +29,19 @@ import {
   MapData,
   subscribeToDeviceChanges
 } from '@/services/networkDeviceService';
-import { DeviceEditorDialog } from './DeviceEditorDialog';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Partial<NetworkDevice> | undefined>(undefined);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
   const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
@@ -90,12 +89,12 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         name_text_size: device.name_text_size,
         last_ping: device.last_ping,
         last_ping_result: device.last_ping_result,
-        onEdit: (id: string) => handleEdit(id),
+        onEdit: (id: string) => navigate(`/edit-device/${id}`), // Navigate to edit page
         onDelete: (id: string) => handleDelete(id),
         onStatusChange: handleStatusChange,
       },
     }),
-    [handleStatusChange]
+    [handleStatusChange, navigate]
   );
 
   // Update nodes when devices change
@@ -225,19 +224,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     [setEdges]
   );
 
-  const handleAddDevice = () => {
-    setEditingDevice(undefined);
-    setIsEditorOpen(true);
-  };
-
-  const handleEdit = (deviceId: string) => {
-    const nodeToEdit = nodes.find((n) => n.id === deviceId);
-    if (nodeToEdit) {
-      setEditingDevice({ id: nodeToEdit.id, ...nodeToEdit.data });
-      setIsEditorOpen(true);
-    }
-  };
-
   const handleDelete = async (deviceId: string) => {
     if (window.confirm('Are you sure you want to delete this device?')) {
       // Optimistically remove from UI
@@ -254,24 +240,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         // Revert UI update on failure
         setNodes(originalNodes);
       }
-    }
-  };
-
-  const handleSaveDevice = async (deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => {
-    try {
-      if (editingDevice?.id) {
-        // Update existing device
-        await updateDevice(editingDevice.id, deviceData);
-        showSuccess('Device updated successfully.');
-      } else {
-        // Add new device
-        await addDevice({ ...deviceData, position_x: 100, position_y: 100, status: 'unknown' });
-        showSuccess('Device added successfully.');
-      }
-      setIsEditorOpen(false);
-    } catch (error) {
-      console.error('Failed to save device:', error);
-      showError('Failed to save device.');
     }
   };
 
@@ -406,7 +374,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         <Background gap={16} size={1} color="#444" />
       </ReactFlow>
       <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-        <Button onClick={handleAddDevice} size="sm">
+        <Button onClick={() => navigate('/add-device')} size="sm"> {/* Navigate to Add Device page */}
           <PlusCircle className="h-4 w-4 mr-2" />Add Device
         </Button>
         <Button onClick={handleExport} variant="outline" size="sm">
@@ -423,14 +391,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           className="hidden" 
         />
       </div>
-      {isEditorOpen && (
-        <DeviceEditorDialog 
-          isOpen={isEditorOpen} 
-          onClose={() => setIsEditorOpen(false)} 
-          onSave={handleSaveDevice} 
-          device={editingDevice} 
-        />
-      )}
       {isEdgeEditorOpen && (
         <EdgeEditorDialog 
           isOpen={isEdgeEditorOpen} 
