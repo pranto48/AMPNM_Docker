@@ -76,7 +76,7 @@ include 'header.php';
                     </div>
                     <div id="deviceIpWrapper">
                         <label for="deviceIp" class="block text-sm font-medium text-slate-400 mb-1">IP Address</label>
-                        <input type="text" id="deviceIp" name="ip" placeholder="IP Address" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        <input type="text" id="deviceIp" name="ip" placeholder="IP Address" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" required>
                     </div>
                     <div>
                         <label for="deviceDescription" class="block text-sm font-medium text-slate-400 mb-1">Description</label>
@@ -109,12 +109,6 @@ include 'header.php';
                             <option value="tablet">Tablet</option>
                             <option value="wifi-router">WiFi Router</option>
                             <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="deviceMap" class="block text-sm font-medium text-slate-400 mb-1">Map Assignment</label>
-                        <select id="deviceMap" name="map_id" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                            <!-- Populated by JS -->
                         </select>
                     </div>
                     <fieldset class="border border-slate-600 rounded-lg p-4">

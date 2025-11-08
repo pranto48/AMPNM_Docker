@@ -63,12 +63,11 @@ MapApp.ui = {
         document.getElementById('nameTextSizeLabel').textContent = isAnnotation ? 'Height' : 'Name Text Size';
     },
 
-    openDeviceModal: async (deviceId = null, prefill = {}) => {
+    openDeviceModal: (deviceId = null, prefill = {}) => {
         MapApp.ui.els.deviceForm.reset();
         document.getElementById('deviceId').value = '';
         const previewWrapper = document.getElementById('icon_preview_wrapper');
         previewWrapper.classList.add('hidden');
-        const deviceMapSelect = document.getElementById('deviceMap'); // Get the map selector
 
         if (deviceId) {
             const node = MapApp.state.nodes.get(deviceId);
@@ -91,14 +90,10 @@ MapApp.ui = {
             document.getElementById('critical_latency_threshold').value = node.deviceData.critical_latency_threshold;
             document.getElementById('critical_packetloss_threshold').value = node.deviceData.critical_packetloss_threshold;
             document.getElementById('showLivePing').checked = node.deviceData.show_live_ping;
-            // Populate map selector for editing, pre-selecting the device's current map
-            await MapApp.ui.populateMapSelector(deviceMapSelect, node.deviceData.map_id);
         } else {
             document.getElementById('modalTitle').textContent = 'Add Item';
             document.getElementById('deviceName').value = prefill.name || '';
             document.getElementById('deviceIp').value = prefill.ip || '';
-            // For new devices, pre-select the current map
-            await MapApp.ui.populateMapSelector(deviceMapSelect, MapApp.state.currentMapId);
         }
         MapApp.ui.toggleDeviceModalFields(document.getElementById('deviceType').value);
         MapApp.ui.els.deviceModal.classList.remove('hidden');
@@ -132,19 +127,5 @@ MapApp.ui = {
         }
         if (updates.length > 0) MapApp.state.edges.update(updates);
         MapApp.state.animationFrameId = requestAnimationFrame(MapApp.ui.updateAndAnimateEdges);
-    },
-
-    // New helper function to populate map selector (moved from devices.js)
-    populateMapSelector: async (selectElement, selectedMapId = null) => {
-        try {
-            const maps = await MapApp.api.get('get_maps');
-            selectElement.innerHTML = `
-                <option value="">Unassigned</option>
-                ${maps.map(map => `<option value="${map.id}" ${map.id == selectedMapId ? 'selected' : ''}>${map.name}</option>`).join('')}
-            `;
-        } catch (e) {
-            console.error("Could not fetch maps for selector", e);
-            window.notyf.error('Failed to load maps for assignment.');
-        }
     }
 };

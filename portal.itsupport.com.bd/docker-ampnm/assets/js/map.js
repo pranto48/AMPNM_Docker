@@ -121,15 +121,14 @@ function initMap() {
                     if (numericFields.includes(key) && data[key] === '') data[key] = null;
                 }
                 if (data.ip === '') data.ip = null;
-                if (data.map_id === '') data.map_id = null; // Ensure map_id is null if empty string
-
+                
                 // Get current map center for new device placement
                 const viewPosition = state.network.getViewPosition();
                 const canvasPosition = state.network.canvas.DOMtoCanvas(viewPosition);
 
                 const newDevice = await api.post('create_device', { 
                     ...data, 
-                    map_id: state.currentMapId, // Explicitly set map_id to current map
+                    map_id: state.currentMapId,
                     x: canvasPosition.x, // Add default X
                     y: canvasPosition.y  // Add default Y
                 });

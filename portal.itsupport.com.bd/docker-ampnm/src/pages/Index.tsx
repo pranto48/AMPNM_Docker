@@ -16,14 +16,11 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  // subscribeToDeviceChanges, // Removed Supabase subscription
-  NetworkMapDetails,
-  getMaps // Import the new getMaps function
+  subscribeToDeviceChanges 
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
-// import { supabase } from "@/integrations/supabase/client"; // Removed Supabase import
+import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Index = () => {
   const [networkStatus, setNetworkStatus] = useState<boolean>(true);
@@ -31,78 +28,31 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [maps, setMaps] = useState<NetworkMapDetails[]>([]); // State for all available maps
-  const [selectedMapId, setSelectedMapId] = useState<string>(''); // State for currently selected map ID
-  const [mapDetails, setMapDetails] = useState<NetworkMapDetails | null>(null); // State for current map details
-  const [isMapDetailsLoading, setIsMapDetailsLoading] = useState(false); // New loading state for map details
-
-  const fetchMaps = useCallback(async () => {
-    try {
-      const userMaps = await getMaps();
-      setMaps(userMaps);
-      if (userMaps.length > 0 && !selectedMapId) {
-        setSelectedMapId(userMaps[0].id); // Select the first map by default
-      } else if (userMaps.length === 0) {
-        setSelectedMapId(''); // No maps available
-      }
-    } catch (error) {
-      showError("Failed to load maps.");
-    }
-  }, [selectedMapId]);
 
   const fetchDevices = useCallback(async () => {
-    if (!selectedMapId) {
-      setDevices([]);
-      setIsLoading(false);
-      return;
-    }
     try {
-      const dbDevices = await getDevices(selectedMapId); // Fetch devices for the selected map
+      const dbDevices = await getDevices();
       setDevices(dbDevices as NetworkDevice[]);
     } catch (error) {
       showError("Failed to load devices from database.");
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMapId]);
-
-  const fetchMapDetails = useCallback(async () => {
-    if (!selectedMapId) {
-      setMapDetails(null);
-      return;
-    }
-    setIsMapDetailsLoading(true); // Set loading true
-    try {
-      const currentMap = maps.find(m => m.id === selectedMapId);
-      setMapDetails(currentMap || null);
-    } finally {
-      setIsMapDetailsLoading(false); // Set loading false
-    }
-  }, [selectedMapId, maps]);
-
-  const handleMapUpdate = useCallback(() => {
-    fetchMaps();
-    fetchDevices();
-  }, [fetchMaps, fetchDevices]);
-
-  useEffect(() => {
-    fetchMaps(); // Fetch maps on initial load
-  }, []); // Run only once on mount
+  }, []);
 
   useEffect(() => {
     fetchDevices();
-    fetchMapDetails(); // Fetch map details when selectedMapId or maps change
 
-    // Removed Supabase real-time subscription
-    // const channel = subscribeToDeviceChanges((payload) => {
-    //   console.log('Device change received:', payload);
-    //   fetchDevices();
-    // });
+    // Subscribe to real-time device changes
+    const channel = subscribeToDeviceChanges((payload) => {
+      console.log('Device change received:', payload);
+      fetchDevices();
+    });
 
-    // return () => {
-    //   supabase.removeChannel(channel);
-    // };
-  }, [fetchDevices, fetchMapDetails, selectedMapId]); // Re-run when selectedMapId changes
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchDevices]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
@@ -145,7 +95,7 @@ const Index = () => {
       setNetworkStatus(false);
     }
     setLastChecked(new Date());
-  }, [setNetworkStatus, setLastChecked]);
+  }, []);
 
   const handleCheckAllDevices = async () => {
     setIsCheckingDevices(true);
@@ -189,12 +139,6 @@ const Index = () => {
       return acc;
     }, {} as Record<string, number>);
   }, [devices]);
-
-  // Debugging logs
-  console.log('Index.tsx - maps:', maps);
-  console.log('Index.tsx - selectedMapId:', selectedMapId);
-  console.log('Index.tsx - mapDetails:', mapDetails);
-  console.log('Index.tsx - isMapDetailsLoading:', isMapDetailsLoading);
 
   return (
     <div className="min-h-screen bg-background">
@@ -414,40 +358,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="map">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Network Map</h2>
-              {maps.length > 0 ? (
-                <Select value={selectedMapId} onValueChange={setSelectedMapId}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select a map" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {maps.map(map => (
-                      <SelectItem key={map.id} value={map.id}>
-                        {map.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-muted-foreground">No maps available. Create one!</p>
-              )}
-            </div>
-            {selectedMapId ? (
-              <NetworkMap 
-                devices={devices} 
-                onMapUpdate={handleMapUpdate} 
-                currentMapId={selectedMapId} 
-                mapDetails={mapDetails}
-                isMapDetailsLoading={isMapDetailsLoading} // Pass the new loading state
-              />
-            ) : (
-              <Card className="h-[70vh] flex items-center justify-center">
-                <CardContent className="text-center">
-                  <p className="text-muted-foreground">Please select a map or create a new one to view the network map.</p>
-                </CardContent>
-              </Card>
-            )}
+            <NetworkMap devices={devices} onMapUpdate={fetchDevices} />
           </TabsContent>
         </Tabs>
 

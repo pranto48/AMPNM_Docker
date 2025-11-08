@@ -107,8 +107,6 @@ try {
             `background_color` VARCHAR(20) NULL,
             `background_image_url` VARCHAR(255) NULL,
             `is_default` BOOLEAN DEFAULT FALSE,
-            `share_id` VARCHAR(36) UNIQUE NULL, -- NEW COLUMN for shareable link
-            `is_public` BOOLEAN DEFAULT FALSE, -- NEW COLUMN for public access
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
@@ -225,10 +223,64 @@ try {
         return $stmt->fetchColumn() > 0;
     }
 
-    // Helper to check if index exists
-    function indexExists($pdo, $db, $table, $indexName) {
+    if (!columnExists($pdo, $dbname, 'maps', 'user_id')) {
+        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `user_id` INT(6) UNSIGNED;");
+        $updateStmt = $pdo->prepare("UPDATE `maps` SET user_id = ?");
+        $updateStmt->execute([$admin_id]);
+        $pdo->exec("ALTER TABLE `maps` MODIFY COLUMN `user_id` INT(6) UNSIGNED NOT NULL;");
+        $pdo->exec("ALTER TABLE `maps` ADD CONSTRAINT `fk_maps_user_id` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE;");
+        message("Upgraded 'maps' table: assigned existing maps to admin.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'user_id')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `user_id` INT(6) UNSIGNED;");
+        $updateStmt = $pdo->prepare("UPDATE `devices` SET user_id = ?");
+        $updateStmt->execute([$admin_id]);
+        $pdo->exec("ALTER TABLE `devices` MODIFY COLUMN `user_id` INT(6) UNSIGNED NOT NULL;");
+        $pdo->exec("ALTER TABLE `devices` ADD CONSTRAINT `fk_devices_user_id` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE;");
+        message("Upgraded 'devices' table: assigned existing devices to admin.");
+    }
+    if (!columnExists($pdo, $dbname, 'device_edges', 'user_id')) {
+        $pdo->exec("ALTER TABLE `device_edges` ADD COLUMN `user_id` INT(6) UNSIGNED;");
+        $updateStmt = $pdo->prepare("UPDATE `device_edges` SET user_id = ?");
+        $updateStmt->execute([$admin_id]);
+        $pdo->exec("ALTER TABLE `device_edges` MODIFY COLUMN `user_id` INT(6) UNSIGNED NOT NULL;");
+        $pdo->exec("ALTER TABLE `device_edges` ADD CONSTRAINT `fk_device_edges_user_id` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE;");
+        message("Upgraded 'device_edges' table: assigned existing edges to admin.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'check_port')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `check_port` INT(5) NULL AFTER `ip`;");
+        message("Upgraded 'devices' table: added 'check_port' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'icon_url')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `icon_url` VARCHAR(255) NULL AFTER `name_text_size`;");
+        message("Upgraded 'devices' table: added 'icon_url' column for custom icons.");
+    }
+    if (!columnExists($pdo, $dbname, 'maps', 'background_color')) {
+        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `background_color` VARCHAR(20) NULL AFTER `description`;");
+        message("Upgraded 'maps' table: added 'background_color' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'maps', 'background_image_url')) {
+        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `background_image_url` VARCHAR(255) NULL AFTER `background_color`;");
+        message("Upgraded 'maps' table: added 'background_image_url' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'description')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `description` TEXT NULL AFTER `type`;");
+        message("Upgraded 'devices' table: added 'description' column.");
+    }
+
+
+    // Step 5: Check if the admin user has any maps
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
+    $stmt->execute([$admin_id]);
+    if ($stmt->fetchColumn() == 0) {
+        $pdo->prepare("INSERT INTO `maps` (user_id, name, type, is_default) VALUES (?, 'Default LAN Map', 'lan', TRUE)")->execute([$admin_id]);
+        message("Created a default map for the admin user.");
+    }
+
+    // Step 6: Indexing for Performance
+    function indexExists($pdo, $db, $table, $index) {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?");
-        $stmt->execute([$db, $table, $indexName]);
+        $stmt->execute([$db, $table, $index]);
         return $stmt->fetchColumn() > 0;
     }
 
@@ -252,25 +304,6 @@ try {
                 message("Index '$indexName' on table '$table' already exists.");
             }
         }
-    }
-
-    // NEW MIGRATION: Add share_id and is_public to maps table
-    if (!columnExists($pdo, $dbname, 'maps', 'share_id')) {
-        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `share_id` VARCHAR(36) UNIQUE NULL AFTER `is_default`;");
-        message("Migrated `maps` table: added `share_id` column.");
-    }
-    if (!columnExists($pdo, $dbname, 'maps', 'is_public')) {
-        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `is_public` BOOLEAN DEFAULT FALSE AFTER `share_id`;");
-        message("Migrated `maps` table: added `is_public` column.");
-    }
-
-
-    // Step 5: Check if the admin user has any maps
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM `maps` WHERE user_id = ?");
-    $stmt->execute([$admin_id]);
-    if ($stmt->fetchColumn() == 0) {
-        $pdo->prepare("INSERT INTO `maps` (user_id, name, type, is_default) VALUES (?, 'Default LAN Map', 'lan', TRUE)")->execute([$admin_id]);
-        message("Created a default map for the admin user.");
     }
 
     // Initialize app_settings for license management

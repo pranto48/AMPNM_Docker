@@ -25,7 +25,7 @@ if (!isset($_SESSION['license_grace_period_end'])) $_SESSION['license_grace_peri
 $app_license_key = getAppLicenseKey();
 $installation_id = getInstallationId(); // Retrieve the installation ID
 
-error_log("DEBUG: auth_check.php - Retrieved app_license_key: " . (empty($app_license_key) ? 'EMPTY' : 'PRESENT') . ", Installation ID: " . (empty($installation_id) ? 'EMPTY' : $installation_id) . ", User ID: " . ($_SESSION['user_id'] ?? 'NOT SET'));
+error_log("DEBUG: auth_check.php - Retrieved app_license_key: " . (empty($app_license_key) ? 'EMPTY' : 'PRESENT') . ", Installation ID: " . (empty($installation_id) ? 'EMPTY' : $installation_id));
 
 if (!$app_license_key) {
     $_SESSION['license_message'] = 'Application license key not configured.';
@@ -69,3 +69,4 @@ if (isset($_SESSION['license_grace_period_end']) && $_SESSION['license_grace_per
 if ($_SESSION['license_status_code'] === 'unknown') {
     $_SESSION['license_message'] = 'License status needs to be verified. Please refresh or check the License tab.';
 }
+?>

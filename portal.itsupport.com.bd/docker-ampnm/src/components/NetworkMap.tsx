@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, Download, Share2, Link, XCircle, Loader2 } from 'lucide-react';
+import { PlusCircle, Upload, Download, Wifi, WifiOff } from 'lucide-react';
 import {
   addDevice,
   updateDevice,
@@ -27,45 +27,27 @@ import {
   updateEdgeInDB,
   importMap,
   MapData,
-  generateMapShareLink,
-  disableMapShareLink,
-  NetworkMapDetails,
-  // subscribeToDeviceChanges, // Removed Supabase subscription
+  subscribeToDeviceChanges
 } from '@/services/networkDeviceService';
 import { DeviceEditorDialog } from './DeviceEditorDialog';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 
-interface NetworkMapProps {
-  devices: NetworkDevice[];
-  onMapUpdate: () => void;
-  currentMapId: string;
-  mapDetails: NetworkMapDetails | null;
-  isReadOnly?: boolean;
-  isMapDetailsLoading?: boolean; // New prop for loading state
-}
-
-const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly = false, isMapDetailsLoading = false }: NetworkMapProps) => {
+const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Partial<NetworkDevice> | undefined>(undefined);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
   const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [shareLink, setShareLink] = useState<string>('');
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
-      if (isReadOnly) return;
       // Optimistically update UI
       setNodes((nds) =>
         nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status } } : node))
@@ -89,7 +71,7 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         );
       }
     },
-    [setNodes, devices, isReadOnly]
+    [setNodes, devices]
   );
 
   const mapDeviceToNode = useCallback(
@@ -112,25 +94,20 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         onDelete: (id: string) => handleDelete(id),
         onStatusChange: handleStatusChange,
       },
-      draggable: !isReadOnly,
-      selectable: !isReadOnly,
     }),
-    [handleStatusChange, handleEdit, handleDelete, isReadOnly]
+    [handleStatusChange]
   );
 
   // Update nodes when devices change
   useEffect(() => {
-    console.log('DEBUG: NetworkMap.tsx - Devices prop changed, updating nodes:', devices);
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
   // Load edges and subscribe to edge changes
   useEffect(() => {
     const loadEdges = async () => {
-      console.log('DEBUG: NetworkMap.tsx - Loading edges for map:', currentMapId, 'shareId:', mapDetails?.share_id);
       try {
-        const edgesData = await getEdges(currentMapId, mapDetails?.share_id);
-        console.log('DEBUG: NetworkMap.tsx - Fetched edges:', edgesData);
+        const edgesData = await getEdges();
         setEdges(
           edgesData.map((edge: any) => ({
             id: edge.id,
@@ -140,46 +117,44 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
           }))
         );
       } catch (error) {
-        console.error('ERROR: NetworkMap.tsx - Failed to load network edges:', error);
+        console.error('Failed to load network edges:', error);
         showError('Failed to load network connections.');
       }
     };
     loadEdges();
 
-    // Removed Supabase real-time subscription for edges
-    // if (!isReadOnly) {
-    //   const handleEdgeInsert = (payload: any) => {
-    //     const newEdge = { 
-    //       id: payload.new.id, 
-    //       source: payload.new.source_id, 
-    //       target: payload.new.target_id, 
-    //       data: { connection_type: payload.new.connection_type } 
-    //     };
-    //     setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
-    //   };
-      
-    //   const handleEdgeUpdate = (payload: any) => {
-    //     setEdges((eds) => 
-    //       eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
-    //     );
-    //   };
-      
-    //   const handleEdgeDelete = (payload: any) => {
-    //     setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
-    //   };
+    // Subscribe to edge changes
+    const handleEdgeInsert = (payload: any) => {
+      const newEdge = { 
+        id: payload.new.id, 
+        source: payload.new.source_id, 
+        target: payload.new.target_id, 
+        data: { connection_type: payload.new.connection_type } 
+      };
+      setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+    };
+    
+    const handleEdgeUpdate = (payload: any) => {
+      setEdges((eds) => 
+        eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
+      );
+    };
+    
+    const handleEdgeDelete = (payload: any) => {
+      setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
+    };
 
-    //   const edgeChannel = supabase.channel('network-map-edge-changes');
-    //   edgeChannel
-    //     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
-    //     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
-    //     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
-    //     .subscribe();
+    const edgeChannel = supabase.channel('network-map-edge-changes');
+    edgeChannel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
+      .subscribe();
 
-    //   return () => {
-    //     supabase.removeChannel(edgeChannel);
-    //   };
-    // }
-  }, [setEdges, currentMapId, mapDetails?.share_id, isReadOnly]);
+    return () => {
+      supabase.removeChannel(edgeChannel);
+    };
+  }, [setEdges]);
 
   // Style edges based on connection type and device status
   const styledEdges = useMemo(() => {
@@ -227,8 +202,6 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
 
   const onConnect = useCallback(
     async (params: Connection) => {
-      if (isReadOnly) return;
-      console.log('DEBUG: NetworkMap.tsx - onConnect called:', params);
       // Optimistically add edge to UI
       const newEdge = { 
         id: `reactflow__edge-${params.source}${params.target}`, 
@@ -240,29 +213,24 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
       
       try {
         // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: currentMapId });
+        await addEdgeToDB({ source: params.source!, target: params.target! });
         showSuccess('Connection saved.');
-        console.log('DEBUG: NetworkMap.tsx - Connection saved to DB.');
       } catch (error) {
-        console.error('ERROR: NetworkMap.tsx - Failed to save connection:', error);
+        console.error('Failed to save connection:', error);
         showError('Failed to save connection.');
         // Revert UI update on failure
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges, currentMapId, isReadOnly]
+    [setEdges]
   );
 
   const handleAddDevice = () => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleAddDevice called.');
     setEditingDevice(undefined);
     setIsEditorOpen(true);
   };
 
   const handleEdit = (deviceId: string) => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleEdit called for device ID:', deviceId);
     const nodeToEdit = nodes.find((n) => n.id === deviceId);
     if (nodeToEdit) {
       setEditingDevice({ id: nodeToEdit.id, ...nodeToEdit.data });
@@ -271,8 +239,6 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   };
 
   const handleDelete = async (deviceId: string) => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleDelete called for device ID:', deviceId);
     if (window.confirm('Are you sure you want to delete this device?')) {
       // Optimistically remove from UI
       const originalNodes = nodes;
@@ -282,9 +248,8 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
-        console.log('DEBUG: NetworkMap.tsx - Device deleted from DB.');
       } catch (error) {
-        console.error('ERROR: NetworkMap.tsx - Failed to delete device:', error);
+        console.error('Failed to delete device:', error);
         showError('Failed to delete device.');
         // Revert UI update on failure
         setNodes(originalNodes);
@@ -293,74 +258,59 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   };
 
   const handleSaveDevice = async (deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleSaveDevice called with data:', deviceData);
     try {
       if (editingDevice?.id) {
         // Update existing device
         await updateDevice(editingDevice.id, deviceData);
         showSuccess('Device updated successfully.');
-        console.log('DEBUG: NetworkMap.tsx - Device updated in DB.');
       } else {
         // Add new device
-        await addDevice({ ...deviceData, map_id: currentMapId, position_x: 100, position_y: 100, status: 'unknown' });
+        await addDevice({ ...deviceData, position_x: 100, position_y: 100, status: 'unknown' });
         showSuccess('Device added successfully.');
-        console.log('DEBUG: NetworkMap.tsx - Device added to DB.');
       }
       setIsEditorOpen(false);
-      onMapUpdate(); // Refresh map to show new/updated device
     } catch (error) {
-      console.error('ERROR: NetworkMap.tsx - Failed to save device:', error);
+      console.error('Failed to save device:', error);
       showError('Failed to save device.');
     }
   };
 
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
-      if (isReadOnly) return;
-      console.log('DEBUG: NetworkMap.tsx - onNodeDragStop called for node:', node.id, 'position:', node.position);
       try {
         await updateDevice(node.id, { position_x: node.position.x, position_y: node.position.y });
-        console.log('DEBUG: NetworkMap.tsx - Device position updated in DB.');
       } catch (error) {
-        console.error('ERROR: NetworkMap.tsx - Failed to save device position:', error);
+        console.error('Failed to save device position:', error);
         showError('Failed to save device position.');
       }
     },
-    [isReadOnly]
+    []
   );
 
   const onEdgesChangeHandler: OnEdgesChange = useCallback(
     (changes) => {
-      if (isReadOnly) return;
-      console.log('DEBUG: NetworkMap.tsx - onEdgesChangeHandler called with changes:', changes);
       onEdgesChange(changes);
       changes.forEach(async (change) => {
         if (change.type === 'remove') {
           try {
             await deleteEdgeFromDB(change.id);
             showSuccess('Connection deleted.');
-            console.log('DEBUG: NetworkMap.tsx - Connection deleted from DB.');
           } catch (error) {
-            console.error('ERROR: NetworkMap.tsx - Failed to delete connection:', error);
+            console.error('Failed to delete connection:', error);
             showError('Failed to delete connection.');
           }
         }
       });
     },
-    [onEdgesChange, isReadOnly]
+    [onEdgesChange]
   );
 
   const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - onEdgeClick called for edge:', edge.id);
     setEditingEdge(edge);
     setIsEdgeEditorOpen(true);
   };
 
   const handleSaveEdge = async (edgeId: string, connectionType: string) => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleSaveEdge called for edge:', edgeId, 'type:', connectionType);
     // Optimistically update UI
     const originalEdges = edges;
     setEdges((eds) => eds.map(e => e.id === edgeId ? { ...e, data: { connection_type } } : e));
@@ -369,9 +319,8 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
       // Update in database
       await updateEdgeInDB(edgeId, { connection_type });
       showSuccess('Connection updated.');
-      console.log('DEBUG: NetworkMap.tsx - Connection updated in DB.');
     } catch (error) {
-      console.error('ERROR: NetworkMap.tsx - Failed to update connection:', error);
+      console.error('Failed to update connection:', error);
       showError('Failed to update connection.');
       // Revert UI update on failure
       setEdges(originalEdges);
@@ -379,8 +328,6 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
   };
 
   const handleExport = async () => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleExport called.');
     const exportData: MapData = {
       devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => rest),
       edges: edges.map(({ id, source, target, data }) => ({ 
@@ -400,18 +347,11 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showSuccess('Map exported successfully!');
-    console.log('DEBUG: NetworkMap.tsx - Map exported.');
   };
 
-  const handleImportClick = () => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleImportClick called.');
-    importInputRef.current?.click();
-  };
+  const handleImportClick = () => importInputRef.current?.click();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleFileChange called.');
     const file = event.target.files?.[0];
     if (!file) return;
     if (!window.confirm('Are you sure you want to import this map? This will overwrite your current map.')) return;
@@ -422,14 +362,13 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(mapData, currentMapId); // Pass currentMapId
+        await importMap(mapData);
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data
-        console.log('DEBUG: NetworkMap.tsx - Map imported.');
       } catch (error: any) {
         dismissToast(toastId);
-        console.error('ERROR: NetworkMap.tsx - Failed to import map:', error);
+        console.error('Failed to import map:', error);
         showError(error.message || 'Failed to import map.');
       } finally {
         if (importInputRef.current) importInputRef.current.value = '';
@@ -438,86 +377,8 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
     reader.readAsText(file);
   };
 
-  const handleGenerateShareLink = async () => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleGenerateShareLink called. currentMapId:', currentMapId);
-    if (!currentMapId) {
-      showError('Please select a map to share.');
-      return;
-    }
-    const toastId = showLoading('Generating share link...');
-    try {
-      const newShareId = await generateMapShareLink(currentMapId);
-      // Construct the local PHP URL for sharing
-      const fullShareLink = `${window.location.origin}/docker-ampnm/shared_map_view.php?share_id=${newShareId}`;
-      setShareLink(fullShareLink);
-      setIsShareDialogOpen(true);
-      dismissToast(toastId);
-      showSuccess('Share link generated!');
-      onMapUpdate(); // Refresh map details to show share_id
-      console.log('DEBUG: NetworkMap.tsx - Share link generated:', fullShareLink);
-    } catch (error: any) {
-      dismissToast(toastId);
-      console.error('ERROR: NetworkMap.tsx - Failed to generate share link:', error);
-      showError(error.message || 'Failed to generate share link.');
-    }
-  };
-
-  const handleDisableShareLink = async () => {
-    if (isReadOnly) return;
-    console.log('DEBUG: NetworkMap.tsx - handleDisableShareLink called. currentMapId:', currentMapId);
-    if (!currentMapId) {
-      showError('No map selected.');
-      return;
-    }
-    if (!window.confirm('Are you sure you want to disable the share link for this map? It will no longer be publicly accessible.')) {
-      return;
-    }
-    const toastId = showLoading('Disabling share link...');
-    try {
-      await disableMapShareLink(currentMapId);
-      setShareLink('');
-      setIsShareDialogOpen(false);
-      dismissToast(toastId);
-      showSuccess('Share link disabled successfully.');
-      onMapUpdate(); // Refresh map details to remove share_id
-      console.log('DEBUG: NetworkMap.tsx - Share link disabled.');
-    } catch (error: any) {
-      dismissToast(toastId);
-      console.error('ERROR: NetworkMap.tsx - Failed to disable share link:', error);
-      showError(error.message || 'Failed to disable share link.');
-    }
-  };
-
-  const handleCopyShareLink = () => {
-    navigator.clipboard.writeText(shareLink);
-    showSuccess('Share link copied to clipboard!');
-    console.log('DEBUG: NetworkMap.tsx - Share link copied.');
-  };
-
-  const backgroundStyle: React.CSSProperties = useMemo(() => {
-    console.log('DEBUG: NetworkMap.tsx - Recalculating background style. mapDetails:', mapDetails);
-    if (mapDetails?.background_image_url) {
-      return {
-        backgroundImage: `url(${mapDetails.background_image_url})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      };
-    }
-    if (mapDetails?.background_color) {
-      return {
-        backgroundColor: mapDetails.background_color,
-      };
-    }
-    return {
-      backgroundColor: '#1e293b', // Default dark background
-    };
-  }, [mapDetails]);
-
-  console.log('DEBUG: NetworkMap.tsx - Rendering. mapDetails:', mapDetails, 'isMapDetailsLoading:', isMapDetailsLoading);
-
   return (
-    <div style={{ height: '70vh', width: '100%', ...backgroundStyle }} className="relative border rounded-lg">
+    <div style={{ height: '70vh', width: '100%' }} className="relative border rounded-lg bg-gray-900">
       <ReactFlow
         nodes={nodes}
         edges={styledEdges}
@@ -529,16 +390,8 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         onEdgeClick={onEdgeClick}
         fitView
         fitViewOptions={{ padding: 0.1 }}
-        proOptions={{ hideAttribution: true }}
-        nodesDraggable={!isReadOnly}
-        nodesConnectable={!isReadOnly}
-        elementsSelectable={!isReadOnly}
-        panOnDrag={!isReadOnly}
-        zoomOnScroll={true}
-        zoomOnPinch={true}
-        zoomOnDoubleClick={!isReadOnly}
       >
-        <Controls showInteractive={false} />
+        <Controls />
         <MiniMap 
           nodeColor={(n) => {
             switch (n.data.status) {
@@ -552,39 +405,24 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
         />
         <Background gap={16} size={1} color="#444" />
       </ReactFlow>
-      {!isReadOnly && (
-        <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-          <Button onClick={handleAddDevice} size="sm">
-            <PlusCircle className="h-4 w-4 mr-2" />Add Device
-          </Button>
-          <Button onClick={handleExport} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />Export
-          </Button>
-          <Button onClick={handleImportClick} variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />Import
-          </Button>
-          <input 
-            type="file" 
-            ref={importInputRef} 
-            onChange={handleFileChange} 
-            accept="application/json" 
-            className="hidden" 
-          />
-          {isMapDetailsLoading ? (
-            <Button variant="secondary" size="sm" disabled>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading...
-            </Button>
-          ) : mapDetails?.is_public && mapDetails.share_id ? (
-            <Button onClick={() => { setShareLink(`${window.location.origin}/docker-ampnm/shared_map_view.php?share_id=${mapDetails.share_id}`); setIsShareDialogOpen(true); }} variant="secondary" size="sm">
-              <Link className="h-4 w-4 mr-2" />View Share Link
-            </Button>
-          ) : (
-            <Button onClick={handleGenerateShareLink} variant="secondary" size="sm" disabled={!currentMapId}>
-              <Share2 className="h-4 w-4 mr-2" />Share Map
-            </Button>
-          )}
-        </div>
-      )}
+      <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+        <Button onClick={handleAddDevice} size="sm">
+          <PlusCircle className="h-4 w-4 mr-2" />Add Device
+        </Button>
+        <Button onClick={handleExport} variant="outline" size="sm">
+          <Download className="h-4 w-4 mr-2" />Export
+        </Button>
+        <Button onClick={handleImportClick} variant="outline" size="sm">
+          <Upload className="h-4 w-4 mr-2" />Import
+        </Button>
+        <input 
+          type="file" 
+          ref={importInputRef} 
+          onChange={handleFileChange} 
+          accept="application/json" 
+          className="hidden" 
+        />
+      </div>
       {isEditorOpen && (
         <DeviceEditorDialog 
           isOpen={isEditorOpen} 
@@ -601,39 +439,6 @@ const NetworkMap = ({ devices, onMapUpdate, currentMapId, mapDetails, isReadOnly
           edge={editingEdge} 
         />
       )}
-
-      {/* Share Link Dialog */}
-      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Share Map</DialogTitle>
-            <DialogDescription>
-              Anyone with this link can view your map.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-3 items-center gap-4">
-              <Label htmlFor="share-link" className="text-right">
-                Link
-              </Label>
-              <Input
-                id="share-link"
-                value={shareLink}
-                readOnly
-                className="col-span-2"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCopyShareLink}>
-              Copy Link
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleDisableShareLink}>
-              <XCircle className="h-4 w-4 mr-2" />Disable Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
