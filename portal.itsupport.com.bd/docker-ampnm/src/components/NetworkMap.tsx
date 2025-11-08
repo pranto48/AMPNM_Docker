@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, Download, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Upload, Download, Share2 } from 'lucide-react';
 import {
   addDevice,
   updateDevice,
@@ -345,6 +345,29 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     reader.readAsText(file);
   };
 
+  const handleShareMap = async () => {
+    // Assuming the current map ID is available from the devices prop or a context
+    // For simplicity, let's assume the first device's map_id is the current map_id
+    const currentMapId = devices.length > 0 ? devices[0].map_id : null;
+
+    if (!currentMapId) {
+      showError('No map selected to share.');
+      return;
+    }
+
+    // Construct the shareable URL
+    // Using hardcoded IP and port as requested by the user
+    const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${currentMapId}`;
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      showSuccess('Share link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy share link:', err);
+      showError('Failed to copy share link. Please copy manually: ' + shareUrl);
+    }
+  };
+
   return (
     <div style={{ height: '70vh', width: '100%' }} className="relative border rounded-lg bg-gray-900">
       <ReactFlow
@@ -390,6 +413,9 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           accept="application/json" 
           className="hidden" 
         />
+        <Button onClick={handleShareMap} variant="outline" size="sm">
+          <Share2 className="h-4 w-4 mr-2" />Share Map
+        </Button>
       </div>
       {isEdgeEditorOpen && (
         <EdgeEditorDialog 

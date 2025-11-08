@@ -1,11 +1,69 @@
 <?php
-require_once 'includes/auth_check.php';
+require_once 'includes/functions.php';
 
-header('Content-Type: application/json');
-
-$pdo = getDbConnection();
+// --- Public Actions (NO AUTH REQUIRED) ---
 $action = $_GET['action'] ?? '';
-$input = json_decode(file_get_contents('php://input'), true) ?? [];
+if ($action === 'get_public_map_data') {
+    header('Content-Type: application/json');
+    $pdo = getDbConnection();
+    $map_id = $_GET['map_id'] ?? null;
+
+    if (!$map_id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Map ID is required.']);
+        exit;
+    }
+
+    // Fetch map details
+    $stmt_map = $pdo->prepare("SELECT id, name, background_color, background_image_url FROM maps WHERE id = ?");
+    $stmt_map->execute([$map_id]);
+    $map = $stmt_map->fetch(PDO::FETCH_ASSOC);
+
+    if (!$map) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Map not found.']);
+        exit;
+    }
+
+    // Fetch devices for the map (no user_id filter for public view)
+    $stmt_devices = $pdo->prepare("
+        SELECT 
+            d.id, d.name, d.ip, d.check_port, d.type, d.description, d.x, d.y, 
+            d.ping_interval, d.icon_size, d.name_text_size, d.icon_url, 
+            d.warning_latency_threshold, d.warning_packetloss_threshold, 
+            d.critical_latency_threshold, d.critical_packetloss_threshold, 
+            d.show_live_ping, d.status, d.last_seen, d.last_avg_time, d.last_ttl,
+            p.output as last_ping_output
+        FROM 
+            devices d
+        LEFT JOIN 
+            ping_results p ON p.id = (
+                SELECT id 
+                FROM ping_results 
+                WHERE host = d.ip 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            )
+        WHERE d.map_id = ?
+    ");
+    $stmt_devices->execute([$map_id]);
+    $devices = $stmt_devices->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fetch edges for the map (no user_id filter for public view)
+    $stmt_edges = $pdo->prepare("SELECT id, source_id, target_id, connection_type FROM device_edges WHERE map_id = ?");
+    $stmt_edges->execute([$map_id]);
+    $edges = $stmt_edges->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'map' => $map,
+        'devices' => $devices,
+        'edges' => $edges
+    ]);
+    exit; // IMPORTANT: Exit after public action to prevent auth_check from running
+}
+
+// --- Authenticated Actions (AUTH REQUIRED) ---
+require_once 'includes/auth_check.php'; // This will now only run if the above public action didn't exit.
 
 // Group actions by handler
 $pingActions = ['manual_ping', 'scan_network', 'ping_device', 'get_ping_history'];
