@@ -1,23 +1,29 @@
+version: '3.8'
+
 services:
   app:
     build:
-      context: ../ # Change context to the parent directory (portal.itsupport.com.bd/)
-      dockerfile: docker-ampnm/Dockerfile # Specify Dockerfile path relative to new context
+      context: .
+      dockerfile: Dockerfile
+    # This entrypoint ensures the script is executable and then runs it.
+    # The script configures and starts the Apache server on the correct port.
+    entrypoint: ["/bin/sh", "-c", "chmod +x /var/www/html/docker-entrypoint.sh && /var/www/html/docker-entrypoint.sh"]
     volumes:
-      - ../:/var/www/html/ # Mount the parent directory (portal.itsupport.com.bd/) as the web root
+      - ./:/var/www/html/
     depends_on:
       db:
         condition: service_healthy
     environment:
+      # We use 127.0.0.1 because network_mode: host connects the app container
+      # directly to the host's network, so it sees the database on localhost.
       - DB_HOST=127.0.0.1
       - DB_NAME=network_monitor
       - DB_USER=user
       - DB_PASSWORD=password
       - MYSQL_ROOT_PASSWORD=rootpassword
       - ADMIN_PASSWORD=password
-      - LICENSE_API_URL=https://portal.itsupport.com.bd/verify_license.php
-      - APP_LICENSE_KEY=
     restart: unless-stopped
+    # network_mode: host is required for the ping command to work correctly.
     network_mode: "host"
 
   db:
@@ -31,6 +37,7 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     ports:
+      # Expose the database port to the host for external tools if needed
       - "3306:3306"
     restart: unless-stopped
     healthcheck:

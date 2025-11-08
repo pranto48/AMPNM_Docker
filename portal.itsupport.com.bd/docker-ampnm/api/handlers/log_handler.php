@@ -1,14 +1,6 @@
 <?php
 // This file is included by api.php and assumes $pdo is available.
 $current_user_id = $_SESSION['user_id'];
-$user_role = $_SESSION['user_role'] ?? 'basic'; // Get user role
-
-// Helper to get admin user IDs
-function getAdminUserIds($pdo) {
-    $stmt = $pdo->prepare("SELECT id FROM `users` WHERE role = 'admin'");
-    $stmt->execute();
-    return $stmt->fetchAll(PDO::FETCH_COLUMN);
-}
 
 if ($action === 'get_status_logs') {
     $map_id = $_GET['map_id'] ?? null;
@@ -18,29 +10,6 @@ if ($action === 'get_status_logs') {
     if (!$map_id) {
         http_response_code(400);
         echo json_encode(['error' => 'Map ID is required.']);
-        exit;
-    }
-
-    // Check if the user has access to this map
-    $sql_check_map_access = "SELECT user_id FROM maps WHERE id = ?";
-    $params_check_map_access = [$map_id];
-    $stmt_check_map_access = $pdo->prepare($sql_check_map_access);
-    $stmt_check_map_access->execute($params_check_map_access);
-    $map_owner_id = $stmt_check_map_access->fetchColumn();
-
-    $has_access = false;
-    if ($map_owner_id == $current_user_id || $user_role === 'admin') {
-        $has_access = true;
-    } elseif ($user_role === 'basic') {
-        $admin_ids = getAdminUserIds($pdo);
-        if (in_array($map_owner_id, $admin_ids)) {
-            $has_access = true;
-        }
-    }
-
-    if (!$has_access) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Forbidden: You do not have access to this map.']);
         exit;
     }
 
@@ -76,7 +45,7 @@ if ($action === 'get_status_logs') {
         WHERE d.user_id = ? AND d.map_id = ? AND l.created_at >= NOW() - $interval
     ";
     
-    $params = [$dateFormat, $map_owner_id, $map_id]; // Use map_owner_id for filtering logs
+    $params = [$dateFormat, $current_user_id, $map_id];
 
     if ($device_id) {
         $sql .= " AND l.device_id = ?";
@@ -91,4 +60,3 @@ if ($action === 'get_status_logs') {
 
     echo json_encode($logs);
 }
-?>

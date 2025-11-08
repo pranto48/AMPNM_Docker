@@ -1,14 +1,15 @@
 #!/bin/bash
+set -e
 
-# Wait for MySQL to be ready
-/usr/local/bin/wait-for-it.sh db:3306 --timeout=60 --strict -- echo "MySQL is up and running!"
+# This script is executed when the Docker container starts.
 
-# Run database setup script if not already done
-php /var/www/html/license_setup.php # Changed to license_setup.php as it's the main setup for the portal
+# 1. Modify Apache's configuration to listen on port 2266 instead of the default 80.
+echo "Configuring Apache to listen on port 2266..."
+sed -i 's/Listen 80/Listen 2266/g' /etc/apache2/ports.conf
+sed -i 's/<VirtualHost \*:80>/<VirtualHost \*:2266>/g' /etc/apache2/sites-available/000-default.conf
 
-# Set permissions for uploads directory (now that the volume is mounted)
-chown -R www-data:www-data /var/www/html/uploads
-chmod -R 775 /var/www/html/uploads
-
-# Start Apache web server
-apache2-foreground
+# 2. Start the Apache web server.
+# 'exec' is used to replace the script process with the Apache process,
+# which is standard practice for container entrypoints.
+echo "Starting Apache web server..."
+exec apache2-foreground

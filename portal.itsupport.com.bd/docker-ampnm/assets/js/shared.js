@@ -18,20 +18,14 @@ async function createMapSelector(containerId, onChangeCallback) {
             container.innerHTML = `
                 <label for="mapSelector" class="text-slate-400">Map:</label>
                 <select id="mapSelector" class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                    ${maps.map(map => `<option value="${map.id}">${map.name} ${map.owner_username ? `(${map.owner_username})` : ''}</option>`).join('')}
+                    ${maps.map(map => `<option value="${map.id}">${map.name}</option>`).join('')}
                 </select>
             `;
             const selector = document.getElementById('mapSelector');
             selector.addEventListener('change', () => onChangeCallback(selector.value));
             return selector;
         } else {
-            // Only admin can create maps, so hide the button for basic users
-            const userRole = '<?php echo $_SESSION['user_role'] ?? 'guest'; ?>';
-            if (userRole === 'admin') {
-                container.innerHTML = `<a href="map.php" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Create a Map</a>`;
-            } else {
-                container.innerHTML = `<p class="text-slate-500">No maps available. Contact your administrator.</p>`;
-            }
+            container.innerHTML = `<a href="map.php" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Create a Map</a>`;
             return null;
         }
     } catch (error) {

@@ -20,7 +20,7 @@ MapApp.mapManager = {
             maps.forEach(map => { 
                 const option = document.createElement('option'); 
                 option.value = map.id; 
-                option.textContent = `${map.name} ${map.owner_username ? `(${map.owner_username})` : ''}`; 
+                option.textContent = map.name; 
                 MapApp.ui.els.mapSelector.appendChild(option); 
             });
             MapApp.ui.els.mapContainer.classList.remove('hidden'); 

@@ -24,7 +24,6 @@
     <script src="assets/js/users.js"></script>
     <script src="assets/js/status_logs.js"></script>
     <script src="assets/js/email_notifications.js"></script>
-    <script src="assets/js/profile.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -40,7 +39,6 @@
         });
 
         const page = '<?php echo basename($_SERVER['PHP_SELF']); ?>';
-        const userRole = '<?php echo $_SESSION['user_role'] ?? 'guest'; ?>';
         
         // Set active nav link
         const navLinks = document.querySelectorAll('#main-nav a');
@@ -53,21 +51,19 @@
 
         // Initialize page-specific JS
         if (page === 'index.php') {
-            initDashboard(userRole); // Pass userRole to dashboard.js
+            initDashboard();
         } else if (page === 'devices.php') {
-            initDevices(userRole); // Pass userRole to devices.js
+            initDevices();
         } else if (page === 'history.php') {
-            initHistory(userRole); // Pass userRole to history.js
+            initHistory();
         } else if (page === 'map.php') {
-            initMap(userRole); // Pass userRole to map.js
+            initMap();
         } else if (page === 'users.php') {
-            initUsers(); // Only admin can access, so no need to pass role explicitly
+            initUsers();
         } else if (page === 'status_logs.php') {
-            initStatusLogs(userRole); // Pass userRole to status_logs.js
+            initStatusLogs();
         } else if (page === 'email_notifications.php') {
-            initEmailNotifications(userRole); // Pass userRole to email_notifications.js
-        } else if (page === 'profile.php') {
-            initProfile(); // Personal page, no role needed
+            initEmailNotifications();
         }
     });
     </script>

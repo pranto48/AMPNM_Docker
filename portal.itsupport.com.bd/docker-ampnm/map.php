@@ -42,9 +42,6 @@ include 'header.php';
                             <input type="file" id="importFile" class="hidden" accept=".json">
                             <button id="mapSettingsBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Map Settings"><i class="fas fa-cog"></i></button>
                             <button id="fullscreenBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
-                            
-                            <!-- NEW: Share Map Button -->
-                            <button id="shareMapBtn" class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700" title="Share Map"><i class="fas fa-share-alt"></i> Share</button>
                         </div>
                     </div>
                 </div>
@@ -268,21 +265,6 @@ include 'header.php';
                 <!-- Unmapped devices will be listed here -->
             </div>
             <div id="placeDeviceLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
-        </div>
-    </div>
-
-    <!-- Share Map Modal -->
-    <div id="shareMapModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-semibold text-white">Share Map</h2>
-                <button id="closeShareMapModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <p class="text-slate-300 mb-4">Copy this link to share a read-only view of your map:</p>
-            <div class="flex items-center space-x-2">
-                <input type="text" id="shareLinkInput" class="flex-grow bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white" readonly>
-                <button id="copyShareLinkBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Copy</button>
-            </div>
         </div>
     </div>
 </main>

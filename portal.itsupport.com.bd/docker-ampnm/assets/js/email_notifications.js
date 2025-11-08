@@ -1,4 +1,4 @@
-function initEmailNotifications(userRole) {
+function initEmailNotifications() {
     const API_URL = 'api.php';
 
     const els = {
@@ -41,11 +41,6 @@ function initEmailNotifications(userRole) {
 
     // --- SMTP Settings Logic ---
     const loadSmtpSettings = async () => {
-        if (userRole !== 'admin') {
-            // Hide SMTP settings section for non-admins
-            els.smtpSettingsForm.closest('.bg-slate-800').classList.add('hidden');
-            return;
-        }
         els.smtpLoader.classList.remove('hidden');
         try {
             const settings = await api.get('get_smtp_settings');
@@ -97,7 +92,7 @@ function initEmailNotifications(userRole) {
         try {
             const devices = await api.get('get_all_devices_for_subscriptions');
             els.deviceSelect.innerHTML = '<option value="">-- Select a device --</option>' + 
-                devices.map(d => `<option value="${d.id}">${d.name} (${d.ip || 'No IP'}) ${d.map_name ? `[${d.map_name}]` : ''} ${d.owner_role === 'admin' ? '(Admin)' : ''}</option>`).join('');
+                devices.map(d => `<option value="${d.id}">${d.name} (${d.ip || 'No IP'}) ${d.map_name ? `[${d.map_name}]` : ''}</option>`).join('');
         } catch (error) {
             console.error('Failed to load devices for subscriptions:', error);
             window.notyf.error('Failed to load devices for subscriptions.');

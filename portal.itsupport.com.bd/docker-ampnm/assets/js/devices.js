@@ -1,22 +1,27 @@
-function initDevices(userRole) {
+function initDevices() {
     const API_URL = 'api.php';
     const devicesTableBody = document.getElementById('devicesTableBody');
     const bulkCheckBtn = document.getElementById('bulkCheckBtn');
     const tableLoader = document.getElementById('tableLoader');
     const noDevicesMessage = document.getElementById('noDevicesMessage');
+    const createDeviceBtn = document.getElementById('createDeviceBtn');
     const exportDevicesBtn = document.getElementById('exportDevicesBtn');
     const importDevicesBtn = document.getElementById('importDevicesBtn');
     const importDevicesFile = document.getElementById('importDevicesFile');
     const deviceSearchInput = document.getElementById('deviceSearchInput');
 
-    // Modals (only details modal remains)
+    // Modals
     const detailsModal = document.getElementById('detailsModal');
     const detailsModalTitle = document.getElementById('detailsModalTitle');
     const detailsModalContent = document.getElementById('detailsModalContent');
     const detailsModalLoader = document.getElementById('detailsModalLoader');
     const closeDetailsModal = document.getElementById('closeDetailsModal');
     
+    const deviceModal = document.getElementById('deviceModal');
+    const deviceForm = document.getElementById('deviceForm');
+    const cancelBtn = document.getElementById('cancelBtn');
     let latencyChart = null;
+    let availableMaps = []; // Cache maps list
 
     const api = {
         get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
@@ -38,15 +43,6 @@ function initDevices(userRole) {
         const mapLink = device.map_id ? `<a href="map.php?map_id=${device.map_id}" class="text-cyan-400 hover:underline">${device.map_name}</a>` : '<span class="text-slate-500">Unassigned</span>';
         const viewOnMapLink = device.map_id ? `<a href="map.php?map_id=${device.map_id}&edit_device_id=${device.id}" class="text-cyan-400 hover:text-cyan-300 mr-3" title="View on Map"><i class="fas fa-map-marked-alt"></i></a>` : `<span class="text-slate-600 mr-3" title="Not on a map"><i class="fas fa-map-marked-alt"></i></span>`;
 
-        const isEditable = userRole === 'admin' || device.user_id === '<?php echo $_SESSION['user_id']; ?>'; // Check if admin or owner
-        const actionButtons = `
-            <button class="details-device-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${device.id}" title="View Details"><i class="fas fa-chart-line"></i></button>
-            ${viewOnMapLink}
-            ${isEditable ? `<a href="edit_device.php?id=${device.id}" class="text-yellow-400 hover:text-yellow-300 mr-3" title="Edit Device"><i class="fas fa-edit"></i></a>` : ''}
-            <button class="check-device-btn text-green-400 hover:text-green-300 mr-3" data-id="${device.id}" title="Check Status"><i class="fas fa-sync"></i></button>
-            ${isEditable ? `<button class="delete-device-btn text-red-500 hover:text-red-400" data-id="${device.id}" title="Delete Device"><i class="fas fa-trash"></i></button>` : ''}
-        `;
-
         return `
             <tr data-id="${device.id}" class="border-b border-slate-700 hover:bg-slate-800/50">
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${device.name}</div><div class="text-sm text-slate-400 capitalize">${device.type}</div></td>
@@ -55,7 +51,11 @@ function initDevices(userRole) {
                 <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex items-center gap-2 text-xs leading-5 font-semibold rounded-full ${statusClass}"><div class="${statusIndicatorClass}"></div>${device.status}</span></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${lastSeen}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    ${actionButtons}
+                    <button class="details-device-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${device.id}" title="View Details"><i class="fas fa-chart-line"></i></button>
+                    ${viewOnMapLink}
+                    <button class="edit-device-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${device.id}" title="Edit Device"><i class="fas fa-edit"></i></button>
+                    <button class="check-device-btn text-green-400 hover:text-green-300 mr-3" data-id="${device.id}" title="Check Status"><i class="fas fa-sync"></i></button>
+                    <button class="delete-device-btn text-red-500 hover:text-red-400" data-id="${device.id}" title="Delete Device"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
         `;
@@ -76,6 +76,74 @@ function initDevices(userRole) {
         } catch (error) { console.error('Failed to load devices:', error); }
         finally { tableLoader.classList.add('hidden'); }
     };
+
+    const populateMapSelector = async (selectElement, selectedMapId) => {
+        if (availableMaps.length === 0) {
+            try {
+                availableMaps = await api.get('get_maps');
+            } catch (e) {
+                console.error("Could not fetch maps for selector", e);
+                return;
+            }
+        }
+        selectElement.innerHTML = `
+            <option value="">Unassigned</option>
+            ${availableMaps.map(map => `<option value="${map.id}" ${map.id == selectedMapId ? 'selected' : ''}>${map.name}</option>`).join('')}
+        `;
+    };
+
+    const openDeviceModal = async (device = null) => {
+        deviceForm.reset();
+        document.getElementById('deviceId').value = '';
+        const mapSelector = document.getElementById('deviceMap');
+        
+        if (device) {
+            document.getElementById('modalTitle').textContent = 'Edit Device';
+            document.getElementById('deviceId').value = device.id;
+            document.getElementById('deviceName').value = device.name;
+            document.getElementById('deviceIp').value = device.ip;
+            document.getElementById('deviceDescription').value = device.description;
+            document.getElementById('checkPort').value = device.check_port;
+            document.getElementById('deviceType').value = device.type;
+            document.getElementById('icon_url').value = device.icon_url || '';
+            document.getElementById('pingInterval').value = device.ping_interval;
+            document.getElementById('iconSize').value = device.icon_size;
+            document.getElementById('nameTextSize').value = device.name_text_size;
+            document.getElementById('warning_latency_threshold').value = device.warning_latency_threshold;
+            document.getElementById('warning_packetloss_threshold').value = device.warning_packetloss_threshold;
+            document.getElementById('critical_latency_threshold').value = device.critical_latency_threshold;
+            document.getElementById('critical_packetloss_threshold').value = device.critical_packetloss_threshold;
+            document.getElementById('showLivePing').checked = device.show_live_ping;
+            await populateMapSelector(mapSelector, device.map_id);
+        } else {
+            document.getElementById('modalTitle').textContent = 'Create Device';
+            await populateMapSelector(mapSelector, null);
+        }
+        openModal('deviceModal');
+    };
+
+    deviceForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(deviceForm);
+        const data = Object.fromEntries(formData.entries());
+        data.show_live_ping = document.getElementById('showLivePing').checked;
+        const id = data.id;
+        delete data.id;
+
+        try {
+            if (id) {
+                await api.post('update_device', { id, updates: data });
+                window.notyf.success('Device updated.');
+            } else {
+                await api.post('create_device', data);
+                window.notyf.success('Device created.');
+            }
+            closeModal('deviceModal');
+            loadDevices();
+        } catch (error) {
+            window.notyf.error('Failed to save device.');
+        }
+    });
 
     const openDetailsModal = async (deviceId) => {
         openModal('detailsModal');
@@ -179,11 +247,10 @@ function initDevices(userRole) {
             openDetailsModal(deviceId);
         }
 
-        // Edit device button now redirects to edit_device.php
-        // if (button.classList.contains('edit-device-btn')) {
-        //     const deviceDetails = await api.get('get_device_details', { id: deviceId });
-        //     await openDeviceModal(deviceDetails.device);
-        // }
+        if (button.classList.contains('edit-device-btn')) {
+            const deviceDetails = await api.get('get_device_details', { id: deviceId });
+            await openDeviceModal(deviceDetails.device);
+        }
 
         if (button.classList.contains('check-device-btn')) {
             const icon = button.querySelector('i');
@@ -306,9 +373,8 @@ function initDevices(userRole) {
     });
 
     closeDetailsModal.addEventListener('click', () => closeModal('detailsModal'));
+    createDeviceBtn.addEventListener('click', async () => await openDeviceModal());
+    cancelBtn.addEventListener('click', () => closeModal('deviceModal'));
 
-    // Initial load and UI adjustments based on role
     loadDevices();
-    // The createDeviceBtn, exportDevicesBtn, importDevicesBtn are now conditionally rendered in PHP
-    // so no need to hide them with JS here.
 }

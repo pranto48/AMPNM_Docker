@@ -1,4 +1,4 @@
-function initHistory(userRole) { // Added userRole parameter
+function initHistory() {
     const API_URL = 'api.php';
     const historyChartCanvas = document.getElementById('historyChart');
     const historyTableBody = document.getElementById('historyTableBody');

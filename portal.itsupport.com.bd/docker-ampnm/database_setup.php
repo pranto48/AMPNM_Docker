@@ -50,7 +50,6 @@ try {
         `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         `username` VARCHAR(50) NOT NULL UNIQUE,
         `password` VARCHAR(255) NOT NULL,
-        `role` ENUM('admin', 'basic') DEFAULT 'basic', -- NEW: Add role column
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'users' checked/created successfully.");
@@ -60,15 +59,15 @@ try {
     $admin_password = getenv('ADMIN_PASSWORD') ?: 'password';
     $is_default_password = ($admin_password === 'password');
 
-    $stmt = $pdo->prepare("SELECT id, password, role FROM `users` WHERE username = ?");
+    $stmt = $pdo->prepare("SELECT id, password FROM `users` WHERE username = ?");
     $stmt->execute([$admin_user]);
     $admin_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$admin_data) {
         $admin_pass_hash = password_hash($admin_password, PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO `users` (username, password, role) VALUES (?, ?, ?)")->execute([$admin_user, $admin_pass_hash, 'admin']); // Set admin role
+        $pdo->prepare("INSERT INTO `users` (username, password) VALUES (?, ?)")->execute([$admin_user, $admin_pass_hash]);
         $admin_id = $pdo->lastInsertId();
-        message("Created default user 'admin' with role 'admin'.");
+        message("Created default user 'admin'.");
         if ($is_default_password) {
             message("WARNING: Admin password is set to the default 'password'. Please change the ADMIN_PASSWORD in docker-compose.yml for security.", true);
         } else {
@@ -82,12 +81,6 @@ try {
             $updateStmt = $pdo->prepare("UPDATE `users` SET password = ? WHERE id = ?");
             $updateStmt->execute([$new_hash, $admin_id]);
             message("Updated admin password from environment variable.");
-        }
-        // Ensure admin user has 'admin' role
-        if ($admin_data['role'] !== 'admin') {
-            $updateStmt = $pdo->prepare("UPDATE `users` SET role = 'admin' WHERE id = ?");
-            $updateStmt->execute([$admin_id]);
-            message("Updated 'admin' user role to 'admin'.");
         }
     }
 
@@ -229,14 +222,6 @@ try {
         $stmt->execute([$db, $table, $column]);
         return $stmt->fetchColumn() > 0;
     }
-
-    // NEW MIGRATION: Add 'role' column to 'users' table if it doesn't exist
-    if (!columnExists($pdo, $dbname, 'users', 'role')) {
-        $pdo->exec("ALTER TABLE `users` ADD COLUMN `role` ENUM('admin', 'basic') DEFAULT 'basic' AFTER `password`;");
-        $pdo->exec("UPDATE `users` SET `role` = 'admin' WHERE `username` = 'admin';"); // Set existing admin to 'admin' role
-        message("Upgraded 'users' table: added 'role' column and set 'admin' user role.");
-    }
-
 
     if (!columnExists($pdo, $dbname, 'maps', 'user_id')) {
         $pdo->exec("ALTER TABLE `maps` ADD COLUMN `user_id` INT(6) UNSIGNED;");
