@@ -29,3 +29,20 @@ if (basename($_SERVER['PHP_SELF']) !== 'database_setup.php') {
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// Fetch user role if logged in
+if (isset($_SESSION['user_id'])) {
+    try {
+        $pdo = getDbConnection();
+        $stmt = $pdo->prepare("SELECT role FROM `users` WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        $_SESSION['user_role'] = $user_data['role'] ?? 'basic'; // Default to basic if not found
+    } catch (PDOException $e) {
+        error_log("Error fetching user role: " . $e->getMessage());
+        $_SESSION['user_role'] = 'basic'; // Fallback
+    }
+} else {
+    $_SESSION['user_role'] = 'guest'; // Not logged in
+}
+?>

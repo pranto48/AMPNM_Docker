@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+$user_role = $_SESSION['user_role'] ?? 'guest'; // Get user role from session
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,7 +36,8 @@ if (session_status() === PHP_SESSION_NONE) {
                         <a href="map.php" class="nav-link"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
                         <a href="status_logs.php" class="nav-link"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
                         <a href="email_notifications.php" class="nav-link"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
-                        <?php if (isset($_SESSION['username']) && $_SESSION['username'] === 'admin'): ?>
+                        <a href="profile.php" class="nav-link"><i class="fas fa-user-circle fa-fw mr-2"></i>Profile</a>
+                        <?php if ($user_role === 'admin'): ?>
                             <a href="users.php" class="nav-link"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
                         <?php endif; ?>
                         <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Logout</a>

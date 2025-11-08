@@ -20,6 +20,9 @@ if (!isset($_SESSION['license_message'])) $_SESSION['license_message'] = 'Licens
 if (!isset($_SESSION['max_devices'])) $_SESSION['max_devices'] = 0;
 if (!isset($_SESSION['license_status_code'])) $_SESSION['license_status_code'] = 'unknown';
 if (!isset($_SESSION['license_grace_period_end'])) $_SESSION['license_grace_period_end'] = null;
+// Ensure user_role is set, fallback to 'basic' if not explicitly defined
+if (!isset($_SESSION['user_role'])) $_SESSION['user_role'] = 'basic';
+
 
 // Retrieve the application license key dynamically
 $app_license_key = getAppLicenseKey();

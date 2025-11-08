@@ -1,4 +1,4 @@
-function initDevices() {
+function initDevices(userRole) {
     const API_URL = 'api.php';
     const devicesTableBody = document.getElementById('devicesTableBody');
     const bulkCheckBtn = document.getElementById('bulkCheckBtn');
@@ -43,6 +43,15 @@ function initDevices() {
         const mapLink = device.map_id ? `<a href="map.php?map_id=${device.map_id}" class="text-cyan-400 hover:underline">${device.map_name}</a>` : '<span class="text-slate-500">Unassigned</span>';
         const viewOnMapLink = device.map_id ? `<a href="map.php?map_id=${device.map_id}&edit_device_id=${device.id}" class="text-cyan-400 hover:text-cyan-300 mr-3" title="View on Map"><i class="fas fa-map-marked-alt"></i></a>` : `<span class="text-slate-600 mr-3" title="Not on a map"><i class="fas fa-map-marked-alt"></i></span>`;
 
+        const isEditable = userRole === 'admin' || device.user_id === '<?php echo $_SESSION['user_id']; ?>'; // Check if admin or owner
+        const actionButtons = `
+            <button class="details-device-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${device.id}" title="View Details"><i class="fas fa-chart-line"></i></button>
+            ${viewOnMapLink}
+            ${isEditable ? `<button class="edit-device-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${device.id}" title="Edit Device"><i class="fas fa-edit"></i></button>` : ''}
+            <button class="check-device-btn text-green-400 hover:text-green-300 mr-3" data-id="${device.id}" title="Check Status"><i class="fas fa-sync"></i></button>
+            ${isEditable ? `<button class="delete-device-btn text-red-500 hover:text-red-400" data-id="${device.id}" title="Delete Device"><i class="fas fa-trash"></i></button>` : ''}
+        `;
+
         return `
             <tr data-id="${device.id}" class="border-b border-slate-700 hover:bg-slate-800/50">
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${device.name}</div><div class="text-sm text-slate-400 capitalize">${device.type}</div></td>
@@ -51,11 +60,7 @@ function initDevices() {
                 <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex items-center gap-2 text-xs leading-5 font-semibold rounded-full ${statusClass}"><div class="${statusIndicatorClass}"></div>${device.status}</span></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${lastSeen}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button class="details-device-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${device.id}" title="View Details"><i class="fas fa-chart-line"></i></button>
-                    ${viewOnMapLink}
-                    <button class="edit-device-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${device.id}" title="Edit Device"><i class="fas fa-edit"></i></button>
-                    <button class="check-device-btn text-green-400 hover:text-green-300 mr-3" data-id="${device.id}" title="Check Status"><i class="fas fa-sync"></i></button>
-                    <button class="delete-device-btn text-red-500 hover:text-red-400" data-id="${device.id}" title="Delete Device"><i class="fas fa-trash"></i></button>
+                    ${actionButtons}
                 </td>
             </tr>
         `;
@@ -88,7 +93,7 @@ function initDevices() {
         }
         selectElement.innerHTML = `
             <option value="">Unassigned</option>
-            ${availableMaps.map(map => `<option value="${map.id}" ${map.id == selectedMapId ? 'selected' : ''}>${map.name}</option>`).join('')}
+            ${availableMaps.map(map => `<option value="${map.id}" ${map.id == selectedMapId ? 'selected' : ''}>${map.name} ${map.owner_username ? `(${map.owner_username})` : ''}</option>`).join('')}
         `;
     };
 
@@ -376,5 +381,11 @@ function initDevices() {
     createDeviceBtn.addEventListener('click', async () => await openDeviceModal());
     cancelBtn.addEventListener('click', () => closeModal('deviceModal'));
 
+    // Initial load and UI adjustments based on role
     loadDevices();
+    if (userRole !== 'admin') {
+        createDeviceBtn.classList.add('hidden');
+        exportDevicesBtn.classList.add('hidden');
+        importDevicesBtn.classList.add('hidden');
+    }
 }

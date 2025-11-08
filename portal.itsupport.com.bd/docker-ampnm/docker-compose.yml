@@ -22,6 +22,8 @@ services:
       - DB_PASSWORD=password
       - MYSQL_ROOT_PASSWORD=rootpassword
       - ADMIN_PASSWORD=password
+      - LICENSE_API_URL=https://portal.itsupport.com.bd/verify_license.php # Added license API URL
+      - APP_LICENSE_KEY= # Added application license key (can be set via .env or left empty for setup)
     restart: unless-stopped
     # network_mode: host is required for the ping command to work correctly.
     network_mode: "host"

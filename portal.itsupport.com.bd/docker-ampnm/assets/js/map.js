@@ -1,4 +1,4 @@
-function initMap() {
+function initMap(userRole) {
     // Initialize all modules
     MapApp.ui.cacheElements();
 
@@ -18,6 +18,9 @@ function initMap() {
         deviceManager
     } = MapApp;
 
+    // Set user role in state
+    state.userRole = userRole;
+
     // Add new elements to cache
     els.mapSettingsBtn = document.getElementById('mapSettingsBtn');
     els.mapSettingsModal = document.getElementById('mapSettingsModal');
@@ -30,6 +33,13 @@ function initMap() {
     els.closePlaceDeviceModal = document.getElementById('closePlaceDeviceModal');
     els.placeDeviceList = document.getElementById('placeDeviceList');
     els.placeDeviceLoader = document.getElementById('placeDeviceLoader');
+    // NEW: Share Map elements
+    els.shareMapBtn = document.getElementById('shareMapBtn');
+    els.shareMapModal = document.getElementById('shareMapModal');
+    els.closeShareMapModal = document.getElementById('closeShareMapModal');
+    els.shareLinkInput = document.getElementById('shareLinkInput');
+    els.copyShareLinkBtn = document.getElementById('copyShareLinkBtn');
+
 
     // Cleanup function for SPA navigation
     window.cleanup = () => {
@@ -287,7 +297,7 @@ function initMap() {
             const reader = new FileReader();
             reader.onload = async (event) => {
                 try {
-                    const data = JSON.parse(event.target.result);
+                    const data = JSON.parse(event.target?.result);
                     await api.post('import_map', { map_id: state.currentMapId, ...data });
                     await mapManager.switchMap(state.currentMapId);
                     window.notyf.success('Map imported successfully.');
@@ -295,7 +305,7 @@ function initMap() {
                     window.notyf.error('Failed to import map: ' + err.message);
                 }
             };
-            reader.readText(file);
+            reader.readAsText(file);
         }
         els.importFile.value = '';
     });
@@ -318,6 +328,13 @@ function initMap() {
             return;
         }
         const selectedOption = els.mapSelector.options[els.mapSelector.selectedIndex];
+        const currentMap = state.maps.find(m => m.id == state.currentMapId);
+        // Only allow rename if admin or owner of the map
+        if (userRole !== 'admin' && currentMap.user_id !== '<?php echo $_SESSION['user_id']; ?>') {
+            window.notyf.error('Forbidden: You can only rename your own maps.');
+            return;
+        }
+
         const currentName = selectedOption.text;
         const newName = prompt('Enter a new name for the map:', currentName);
     
@@ -334,6 +351,17 @@ function initMap() {
         }
     });
     els.deleteMapBtn.addEventListener('click', async () => {
+        if (!state.currentMapId) {
+            window.notyf.error('No map selected to delete.');
+            return;
+        }
+        const currentMap = state.maps.find(m => m.id == state.currentMapId);
+        // Only allow delete if admin or owner of the map
+        if (userRole !== 'admin' && currentMap.user_id !== '<?php echo $_SESSION['user_id']; ?>') {
+            window.notyf.error('Forbidden: You can only delete your own maps.');
+            return;
+        }
+
         if (confirm(`Delete map "${els.mapSelector.options[els.mapSelector.selectedIndex].text}"?`)) {
             await api.post('delete_map', { id: state.currentMapId });
             const firstMapId = await mapManager.loadMaps();
@@ -482,6 +510,28 @@ function initMap() {
         }
     });
 
+    // NEW: Share Map Logic
+    els.shareMapBtn.addEventListener('click', () => {
+        if (!state.currentMapId) {
+            window.notyf.error('No map selected to share.');
+            return;
+        }
+        // Construct the share URL. Assuming the base URL is the same as the current page,
+        // but pointing to map_share.php.
+        const shareUrl = `${window.location.origin}/map_share.php?map_id=${state.currentMapId}`;
+        els.shareLinkInput.value = shareUrl;
+        openModal('shareMapModal');
+    });
+
+    els.closeShareMapModal.addEventListener('click', () => closeModal('shareMapModal'));
+
+    els.copyShareLinkBtn.addEventListener('click', () => {
+        els.shareLinkInput.select();
+        document.execCommand('copy');
+        window.notyf.success('Share link copied to clipboard!');
+    });
+
+
     // Initial Load
     (async () => {
         els.liveRefreshToggle.checked = false;
@@ -500,4 +550,21 @@ function initMap() {
             }
         }
     })();
+
+    // UI adjustments based on role
+    if (userRole !== 'admin') {
+        els.newMapBtn.classList.add('hidden');
+        els.renameMapBtn.classList.add('hidden');
+        els.deleteMapBtn.classList.add('hidden');
+        els.addDeviceBtn.classList.add('hidden');
+        els.addEdgeBtn.classList.add('hidden');
+        els.exportBtn.classList.add('hidden');
+        els.importBtn.classList.add('hidden');
+        els.mapSettingsBtn.classList.add('hidden');
+        els.scanNetworkBtn.classList.add('hidden');
+        els.placeDeviceBtn.classList.add('hidden');
+        if (els.createFirstMapBtn) els.createFirstMapBtn.classList.add('hidden'); // Hide if no maps exist
+        // NEW: Hide share button for non-admins if desired, or keep it visible
+        // els.shareMapBtn.classList.add('hidden'); 
+    }
 }

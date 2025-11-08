@@ -9,5 +9,6 @@ MapApp.state = {
     pingIntervals: {},
     animationFrameId: null,
     tick: 0,
-    globalRefreshIntervalId: null
+    globalRefreshIntervalId: null,
+    userRole: 'basic' // Default role, will be updated on init
 };

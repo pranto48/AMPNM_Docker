@@ -1,9 +1,23 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'] ?? 'basic'; // Get user role
+
+// Helper to get admin user IDs
+function getAdminUserIds($pdo) {
+    $stmt = $pdo->prepare("SELECT id FROM `users` WHERE role = 'admin'");
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
 
 switch ($action) {
     case 'get_smtp_settings':
+        // Only admin or owner can view/edit SMTP settings
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin users can manage SMTP settings.']);
+            exit;
+        }
         $stmt = $pdo->prepare("SELECT host, port, username, password, encryption, from_email, from_name FROM smtp_settings WHERE user_id = ?");
         $stmt->execute([$current_user_id]);
         $settings = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -15,6 +29,12 @@ switch ($action) {
         break;
 
     case 'save_smtp_settings':
+        // Only admin or owner can view/edit SMTP settings
+        if ($user_role !== 'admin') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Only admin users can manage SMTP settings.']);
+            exit;
+        }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $host = $input['host'] ?? '';
             $port = $input['port'] ?? '';
@@ -54,8 +74,20 @@ switch ($action) {
 
     case 'get_all_devices_for_subscriptions':
         // Get all devices for the current user, including their map name
-        $stmt = $pdo->prepare("SELECT d.id, d.name, d.ip, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.user_id = ? ORDER BY d.name ASC");
-        $stmt->execute([$current_user_id]);
+        $sql = "SELECT d.id, d.name, d.ip, m.name as map_name, u.role as owner_role FROM devices d LEFT JOIN maps m ON d.map_id = m.id JOIN users u ON d.user_id = u.id WHERE d.user_id = ?";
+        $params = [$current_user_id];
+
+        if ($user_role === 'basic') {
+            $admin_ids = getAdminUserIds($pdo);
+            if (!empty($admin_ids)) {
+                $admin_id_placeholders = implode(',', array_fill(0, count($admin_ids), '?'));
+                $sql .= " OR d.user_id IN ({$admin_id_placeholders})";
+                $params = array_merge($params, $admin_ids);
+            }
+        }
+        $sql .= " ORDER BY d.name ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($devices);
         break;
@@ -67,6 +99,29 @@ switch ($action) {
             echo json_encode(['error' => 'Device ID is required.']);
             exit;
         }
+        // Check if the user has access to this device
+        $sql_check_device_access = "SELECT user_id FROM devices WHERE id = ?";
+        $params_check_device_access = [$device_id];
+        $stmt_check_device_access = $pdo->prepare($sql_check_device_access);
+        $stmt_check_device_access->execute($params_check_device_access);
+        $device_owner_id = $stmt_check_device_access->fetchColumn();
+
+        $has_access = false;
+        if ($device_owner_id == $current_user_id || $user_role === 'admin') {
+            $has_access = true;
+        } elseif ($user_role === 'basic') {
+            $admin_ids = getAdminUserIds($pdo);
+            if (in_array($device_owner_id, $admin_ids)) {
+                $has_access = true;
+            }
+        }
+
+        if (!$has_access) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: You do not have access to manage subscriptions for this device.']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("SELECT id, recipient_email, notify_on_online, notify_on_offline, notify_on_warning, notify_on_critical FROM device_email_subscriptions WHERE user_id = ? AND device_id = ? ORDER BY recipient_email ASC");
         $stmt->execute([$current_user_id, $device_id]);
         $subscriptions = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -86,6 +141,29 @@ switch ($action) {
             if (!$device_id || empty($recipient_email)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Device ID and Recipient Email are required.']);
+                exit;
+            }
+
+            // Check if the user has access to this device
+            $sql_check_device_access = "SELECT user_id FROM devices WHERE id = ?";
+            $params_check_device_access = [$device_id];
+            $stmt_check_device_access = $pdo->prepare($sql_check_device_access);
+            $stmt_check_device_access->execute($params_check_device_access);
+            $device_owner_id = $stmt_check_device_access->fetchColumn();
+
+            $has_access = false;
+            if ($device_owner_id == $current_user_id || $user_role === 'admin') {
+                $has_access = true;
+            } elseif ($user_role === 'basic') {
+                $admin_ids = getAdminUserIds($pdo);
+                if (in_array($device_owner_id, $admin_ids)) {
+                    $has_access = true;
+                }
+            }
+
+            if (!$has_access) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden: You do not have access to manage subscriptions for this device.']);
                 exit;
             }
 
@@ -113,6 +191,17 @@ switch ($action) {
                 echo json_encode(['error' => 'Subscription ID is required.']);
                 exit;
             }
+            // Check if the user owns this subscription
+            $stmt_check_owner = $pdo->prepare("SELECT user_id FROM device_email_subscriptions WHERE id = ?");
+            $stmt_check_owner->execute([$id]);
+            $subscription_owner_id = $stmt_check_owner->fetchColumn();
+
+            if ($subscription_owner_id != $current_user_id && $user_role !== 'admin') {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden: You can only delete your own subscriptions.']);
+                exit;
+            }
+
             $stmt = $pdo->prepare("DELETE FROM device_email_subscriptions WHERE id = ? AND user_id = ?");
             $stmt->execute([$id, $current_user_id]);
             echo json_encode(['success' => true, 'message' => 'Subscription deleted successfully.']);

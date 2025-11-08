@@ -1,4 +1,4 @@
-function initStatusLogs() {
+function initStatusLogs(userRole) { // Added userRole parameter
     const API_URL = 'api.php';
     let statusLogChart = null;
     let liveInterval = null;

@@ -25,12 +25,29 @@ MapApp.network = {
         MapApp.state.network.on("dragEnd", async (params) => { 
             if (params.nodes.length > 0) { 
                 const nodeId = params.nodes[0]; 
-                const position = MapApp.state.network.getPositions([nodeId])[nodeId]; 
-                await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                const node = MapApp.state.nodes.get(nodeId);
+                // Only allow drag if admin or owner of the device
+                if (MapApp.state.userRole === 'admin' || node.deviceData.user_id === '<?php echo $_SESSION['user_id']; ?>') {
+                    const position = MapApp.state.network.getPositions([nodeId])[nodeId]; 
+                    await MapApp.api.post('update_device', { id: nodeId, updates: { x: position.x, y: position.y } }); 
+                } else {
+                    window.notyf.error('Forbidden: You can only move your own devices.');
+                    // Revert position if not allowed to save
+                    MapApp.state.network.moveNode(nodeId, node.x, node.y);
+                }
             } 
         });
         MapApp.state.network.on("doubleClick", (params) => { 
-            if (params.nodes.length > 0) MapApp.ui.openDeviceModal(params.nodes[0]); 
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = MapApp.state.nodes.get(nodeId);
+                // Only allow edit if admin or owner of the device
+                if (MapApp.state.userRole === 'admin' || node.deviceData.user_id === '<?php echo $_SESSION['user_id']; ?>') {
+                    MapApp.ui.openDeviceModal(nodeId); 
+                } else {
+                    window.notyf.error('Forbidden: You can only edit your own devices.');
+                }
+            }
         });
 
         const closeContextMenu = () => { contextMenu.style.display = 'none'; };
@@ -41,21 +58,29 @@ MapApp.network = {
 
             if (nodeId) {
                 const node = MapApp.state.nodes.get(nodeId);
-                contextMenu.innerHTML = `
-                    <div class="context-menu-item" data-action="edit" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit</div>
-                    <div class="context-menu-item" data-action="copy" data-id="${nodeId}"><i class="fas fa-copy fa-fw mr-2"></i>Copy</div>
+                const isEditable = MapApp.state.userRole === 'admin' || node.deviceData.user_id === '<?php echo $_SESSION['user_id']; ?>';
+                
+                let menuHtml = `
+                    ${isEditable ? `<div class="context-menu-item" data-action="edit" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit</div>` : ''}
+                    ${isEditable ? `<div class="context-menu-item" data-action="copy" data-id="${nodeId}"><i class="fas fa-copy fa-fw mr-2"></i>Copy</div>` : ''}
                     ${node.deviceData.ip ? `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>` : ''}
-                    <div class="context-menu-item" data-action="delete" data-id="${nodeId}" style="color: #ef4444;"><i class="fas fa-trash-alt fa-fw mr-2"></i>Delete</div>
+                    ${isEditable ? `<div class="context-menu-item" data-action="delete" data-id="${nodeId}" style="color: #ef4444;"><i class="fas fa-trash-alt fa-fw mr-2"></i>Delete</div>` : ''}
                 `;
+                contextMenu.innerHTML = menuHtml;
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';
                 document.addEventListener('click', closeContextMenu, { once: true });
             } else if (edgeId) {
-                contextMenu.innerHTML = `
-                    <div class="context-menu-item" data-action="edit-edge" data-id="${edgeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit Connection</div>
-                    <div class="context-menu-item" data-action="delete-edge" data-id="${edgeId}" style="color: #ef4444;"><i class="fas fa-trash-alt fa-fw mr-2"></i>Delete Connection</div>
+                const edge = MapApp.state.edges.get(edgeId);
+                const sourceNode = MapApp.state.nodes.get(edge.from);
+                const isEditable = MapApp.state.userRole === 'admin' || sourceNode.deviceData.user_id === '<?php echo $_SESSION['user_id']; ?>'; // Assuming edge ownership is tied to source device owner
+                
+                let menuHtml = `
+                    ${isEditable ? `<div class="context-menu-item" data-action="edit-edge" data-id="${edgeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit Connection</div>` : ''}
+                    ${isEditable ? `<div class="context-menu-item" data-action="delete-edge" data-id="${edgeId}" style="color: #ef4444;"><i class="fas fa-trash-alt fa-fw mr-2"></i>Delete Connection</div>` : ''}
                 `;
+                contextMenu.innerHTML = menuHtml;
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';

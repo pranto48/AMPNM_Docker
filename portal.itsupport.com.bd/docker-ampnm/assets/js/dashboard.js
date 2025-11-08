@@ -1,4 +1,4 @@
-function initDashboard() {
+function initDashboard(userRole) { // Added userRole parameter
     const API_URL = 'api.php';
     const dashboardLoader = document.getElementById('dashboardLoader');
     const dashboardWidgets = document.getElementById('dashboard-widgets');
@@ -8,7 +8,7 @@ function initDashboard() {
     const onlineCountEl = document.getElementById('onlineCount');
     const warningCountEl = document.getElementById('warningCount');
     const criticalCountEl = document.getElementById('criticalCount');
-    const offlineCountEl = document.getElementById('offlineCount');
+    const offlineCountEl = document = document.getElementById('offlineCount');
     const recentActivityListEl = document.getElementById('recentActivityList');
     const noRecentActivityMessage = document.getElementById('noRecentActivityMessage');
     const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
