@@ -16,8 +16,15 @@ RUN apt-get update && apt-get install -y \
     mariadb-client-compat \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions (removed explicit gd configure)
-RUN docker-php-ext-install gd pdo_mysql zip intl opcache bcmath exif curl
+# Install PHP extensions in separate steps for stability
+RUN docker-php-ext-install gd
+RUN docker-php-ext-install pdo_mysql
+RUN docker-php-ext-install zip
+RUN docker-php-ext-install intl
+RUN docker-php-ext-install opcache
+RUN docker-php-ext-install bcmath
+RUN docker-php-ext-install exif
+RUN docker-php-ext-install curl
 
 # Enable Apache modules
 RUN a2enmod rewrite
