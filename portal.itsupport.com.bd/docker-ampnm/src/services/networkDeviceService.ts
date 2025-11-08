@@ -14,11 +14,10 @@ export interface NetworkDevice {
   name_text_size?: number;
   last_ping?: string | null;
   last_ping_result?: boolean | null;
-  map_id?: string; // Added map_id
 }
 
 export interface MapData {
-  devices: Omit<NetworkDevice, 'user_id' | 'status' | 'map_id'>[]; // map_id is handled by importMap function
+  devices: Omit<NetworkDevice, 'user_id' | 'status'>[];
   edges: { source: string; target: string; connection_type: string }[];
 }
 
@@ -70,16 +69,16 @@ export const deleteDevice = async (id: string) => {
 };
 
 export const getEdges = async () => {
-  const { data, error } = await supabase.from('network_edges').select('id, source:source_id, target:target_id, connection_type, map_id');
+  const { data, error } = await supabase.from('network_edges').select('id, source:source_id, target:target_id, connection_type');
   if (error) throw new Error(error.message);
   return data;
 };
 
-export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string }) => {
+export const addEdgeToDB = async (edge: { source: string; target: string }) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { data, error } = await supabase.from('network_edges').insert({ source_id: edge.source, target_id: edge.target, user_id: user.id, connection_type: 'cat5', map_id: edge.map_id }).select().single();
+  const { data, error } = await supabase.from('network_edges').insert({ source_id: edge.source, target_id: edge.target, user_id: user.id, connection_type: 'cat5' }).select().single();
   if (error) throw new Error(error.message);
   return data;
 };
@@ -95,9 +94,8 @@ export const deleteEdgeFromDB = async (edgeId: string) => {
   if (error) throw new Error(error.message);
 };
 
-export const importMap = async (mapId: string, mapData: MapData) => {
+export const importMap = async (mapData: MapData) => {
   const { error } = await supabase.rpc('import_network_map', {
-    map_id_param: mapId, // Renamed to avoid conflict with function parameter
     devices_data: mapData.devices,
     edges_data: mapData.edges,
   });
