@@ -51,9 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                     $show_live_ping
                 ]);
-                $message = '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" added successfully!</div>';
-                // Clear form fields after successful submission
-                $_POST = [];
+                // Redirect to map.php with the map_id
+                if ($map_id) {
+                    header('Location: map.php?map_id=' . urlencode($map_id));
+                } else {
+                    header('Location: map.php'); // If no map_id, go to map page without specific map
+                }
+                exit; // Important to exit after redirect
             }
         } catch (PDOException $e) {
             $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Error adding device: ' . htmlspecialchars($e->getMessage()) . '</div>';

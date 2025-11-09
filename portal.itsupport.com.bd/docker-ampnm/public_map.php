@@ -203,6 +203,129 @@ if ($map['background_image_url']) {
     </div>
 
     <script>
+        // Define color and icon maps (copy from MapApp.config)
+        const statusColorMap = {
+            online: '#22c55e', warning: '#f59e0b', critical: '#ef4444',
+            offline: '#64748b', unknown: '#94a3b8'
+        };
+        const iconMap = {
+            server: '\uf233', router: '\uf4d7', switch: '\uf796', printer: '\uf02f', nas: '\uf0a0',
+            camera: '\uf030', other: '\uf108', firewall: '\uf3ed', ipphone: '\uf87d',
+            punchdevice: '\uf2c2', 'wifi-router': '\uf1eb', 'radio-tower': '\uf519',
+            rack: '\uf1b3', laptop: '\uf109', tablet: '\uf3fa', mobile: '\uf3cd',
+            cloud: '\uf0c2', database: '\uf1c0', box: '\uf49e'
+        };
+        const edgeColorMap = {
+            cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16'
+        };
+
+        // Utility to build node title (copy from MapApp.utils.buildNodeTitle)
+        function buildNodeTitle(deviceData) {
+            let title = `${deviceData.name}<br>${deviceData.ip}<br>Status: ${deviceData.status}`;
+            if (deviceData.status === 'offline' && deviceData.last_ping_output) {
+                const lines = deviceData.last_ping_output.split('\n');
+                let reason = 'No response';
+                for (const line of lines) {
+                    if (line.toLowerCase().includes('unreachable') || line.toLowerCase().includes('timed out') || line.toLowerCase().includes('could not find host')) {
+                        reason = line.trim();
+                        break;
+                    }
+                }
+                const sanitizedReason = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
+            }
+            return title;
+        }
+
+        let animationFrameId = null;
+        let tick = 0;
+
+        function updateAndAnimateEdges(nodesDataSet, edgesDataSet) {
+            tick++;
+            const animatedDashes = [4 - (tick % 12), 8, tick % 12];
+            const updates = [];
+            const allEdges = edgesDataSet.get();
+            if (nodesDataSet.length > 0 && allEdges.length > 0) {
+                const deviceStatusMap = new Map(nodesDataSet.get({ fields: ['id', 'deviceData'] }).map(d => [d.id, d.deviceData.status]));
+                allEdges.forEach(edge => {
+                    const sourceStatus = deviceStatusMap.get(edge.from);
+                    const targetStatus = deviceStatusMap.get(edge.to);
+                    const isOffline = sourceStatus === 'offline' || targetStatus === 'offline';
+                    const isActive = sourceStatus === 'online' && targetStatus === 'online';
+                    
+                    const color = isOffline ? statusColorMap.offline : (edgeColorMap[edge.label] || edgeColorMap.cat5);
+                    
+                    let dashes = false;
+                    if (isActive) { dashes = animatedDashes; } 
+                    else if (edge.label === 'wifi' || edge.label === 'radio') { dashes = [5, 5]; }
+                    
+                    updates.push({ id: edge.id, color: { color: color }, dashes });
+                });
+            }
+            if (updates.length > 0) edgesDataSet.update(updates);
+            animationFrameId = requestAnimationFrame(() => updateAndAnimateEdges(nodesDataSet, edgesDataSet));
+        }
+
+        async function updateMapLive(nodesDataSet, edgesDataSet) {
+            const mapId = <?= json_encode($map_id) ?>;
+            const apiUrl = `http://192.168.20.5:2266/api.php?action=get_public_map_data&map_id=${mapId}`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data && data.devices) {
+                    const nodeUpdates = [];
+                    data.devices.forEach(d => {
+                        const oldNode = nodesDataSet.get(d.id);
+                        if (!oldNode) return; // Skip if node doesn't exist
+
+                        const status = d.status ?? 'unknown';
+                        const icon_size = d.icon_size ?? 50;
+                        const name_text_size = d.name_text_size ?? 14;
+                        const node_color = statusColorMap[status] ?? statusColorMap.unknown;
+
+                        let label = d.name;
+                        if ((d.show_live_ping ?? false) && status === 'online' && (d.last_avg_time ?? null) !== null) {
+                            label += `\n${d.last_avg_time}ms | TTL:${d.last_ttl}`;
+                        }
+
+                        const updatedNode = {
+                            id: d.id,
+                            label: label,
+                            title: buildNodeTitle(d),
+                            font: { color: 'white', size: parseInt(name_text_size), multi: true },
+                            deviceData: d // Update deviceData for tooltips
+                        };
+
+                        if (d.icon_url) {
+                            Object.assign(updatedNode, {
+                                image: d.icon_url,
+                                size: parseInt(icon_size) / 2,
+                                color: { border: node_color, background: 'transparent' },
+                                borderWidth: 3
+                            });
+                        } else if (d.type === 'box') {
+                            Object.assign(updatedNode, {
+                                color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
+                            });
+                        } else {
+                            Object.assign(updatedNode, {
+                                icon: { ...oldNode.icon, color: node_color, size: parseInt(icon_size) },
+                            });
+                        }
+                        nodeUpdates.push(updatedNode);
+                    });
+                    nodesDataSet.update(nodeUpdates);
+                }
+            } catch (error) {
+                console.error("Error updating map live:", error);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const nodes = new vis.DataSet(<?= json_encode($vis_nodes) ?>);
             const edges = new vis.DataSet(<?= json_encode($vis_edges) ?>);
@@ -270,6 +393,13 @@ if ($map['background_image_url']) {
             network.on("stabilizationIterationsDone", function () {
                 network.setOptions( { physics: false } );
             });
+
+            // Start live updates
+            updateMapLive(nodes, edges); // Initial call
+            setInterval(() => updateMapLive(nodes, edges), 15000); // Update every 15 seconds
+
+            // Start edge animation
+            updateAndAnimateEdges(nodes, edges);
         });
     </script>
 </body>

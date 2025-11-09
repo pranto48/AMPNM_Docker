@@ -303,7 +303,7 @@ function initMap() {
                     window.notyf.error('Failed to import map: ' + err.message);
                 }
             };
-            reader.readText(file);
+            reader.readAsText(file);
         }
         els.importFile.value = '';
     });
@@ -418,7 +418,7 @@ function initMap() {
             } else if (updatedDevice.type === 'box') {
                 visNode = { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
             } else {
-                visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[updatedDevice.type] || MapApp.config.iconMap.other, size: parseInt(updatedDevice.icon_size) || 50, color: MapApp.config.statusColorMap[updatedDevice.status] || MapApp.config.statusColorMap.unknown } };
+                visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[updatedDevice.type] || MapApp.config.iconMap.other, size: parseInt(updated.icon_size) || 50, color: MapApp.config.statusColorMap[updatedDevice.status] || MapApp.config.statusColorMap.unknown } };
             }
             state.nodes.add(visNode);
             
@@ -511,9 +511,11 @@ function initMap() {
     (async () => {
         els.liveRefreshToggle.checked = false;
         const urlParams = new URLSearchParams(window.location.search);
-        const mapToLoad = urlParams.get('map_id');
+        const mapToLoad = urlParams.get('map_id'); // Check for map_id in URL
+        
         const firstMapId = await mapManager.loadMaps();
-        const initialMapId = mapToLoad || firstMapId;
+        const initialMapId = mapToLoad || firstMapId; // Prioritize URL param
+        
         if (initialMapId) {
             els.mapSelector.value = initialMapId;
             await mapManager.switchMap(initialMapId);
