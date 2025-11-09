@@ -31,10 +31,6 @@ if (session_status() === PHP_SESSION_NONE) {
                     <div id="main-nav" class="ml-10 flex items-baseline space-x-1">
                         <a href="index.php" class="nav-link"><i class="fas fa-tachometer-alt fa-fw mr-2"></i>Dashboard</a>
                         <a href="devices.php" class="nav-link"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
-                        <a href="history.php" class="nav-link"><i class="fas fa-history fa-fw mr-2"></i>History</a>
-                        <a href="map.php" class="nav-link"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
-                        <a href="status_logs.php" class="nav-link"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
-                        <a href="email_notifications.php" class="nav-link"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
                         <?php if (isset($_SESSION['username']) && $_SESSION['username'] === 'admin'): ?>
                             <a href="users.php" class="nav-link"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
                         <?php endif; ?>
@@ -113,3 +109,147 @@ if (session_status() === PHP_SESSION_NONE) {
             </div>
         </div>
     <?php endif; ?>
+</dyad-file>
+
+<dyad-write path="portal.itsupport.com.bd/docker-ampnm/index.php" description="Simplifying the dashboard in index.php to remove React components.">
+<?php
+require_once 'includes/auth_check.php';
+include 'header.php';
+
+$pdo = getDbConnection();
+$current_user_id = $_SESSION['user_id'];
+
+// Fetch dashboard stats
+$stmt = $pdo->prepare("
+    SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'online' THEN 1 ELSE 0 END) as online,
+        SUM(CASE WHEN status = 'warning' THEN 1 ELSE 0 END) as warning,
+        SUM(CASE WHEN status = 'critical' THEN 1 ELSE 0 END) as critical,
+        SUM(CASE WHEN status = 'offline' THEN 1 ELSE 0 END) as offline
+    FROM devices WHERE user_id = ?
+");
+$stmt->execute([$current_user_id]);
+$stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Ensure counts are integers, not null
+$stats['total'] = $stats['total'] ?? 0;
+$stats['online'] = $stats['online'] ?? 0;
+$stats['warning'] = $stats['warning'] ?? 0;
+$stats['critical'] = $stats['critical'] ?? 0;
+$stats['offline'] = $stats['offline'] ?? 0;
+
+// Get recent status logs
+$stmt = $pdo->prepare("
+    SELECT 
+        dsl.created_at, 
+        dsl.status, 
+        dsl.details, 
+        d.name as device_name, 
+        d.ip as device_ip
+    FROM 
+        device_status_logs dsl
+    JOIN 
+        devices d ON dsl.device_id = d.id
+    WHERE 
+        d.user_id = ?
+    ORDER BY 
+        dsl.created_at DESC 
+    LIMIT 5
+");
+$stmt->execute([$current_user_id]);
+$recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$statusColorMap = [
+    'online' => 'text-green-400',
+    'warning' => 'text-yellow-400',
+    'critical' => 'text-red-400',
+    'offline' => 'text-slate-400',
+    'unknown' => 'text-slate-500'
+];
+?>
+
+<main id="app">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+            <h1 class="text-3xl font-bold text-white">Dashboard</h1>
+            <button id="refreshAllDevicesBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh All Devices
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Status Chart -->
+            <div class="lg:col-span-1 bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg p-6 flex flex-col items-center justify-center">
+                <h3 class="text-lg font-semibold text-white mb-4">Device Status Overview</h3>
+                <div class="w-48 h-48 relative">
+                    <canvas id="statusChart"></canvas>
+                    <div id="totalDevicesText" class="absolute inset-0 flex flex-col items-center justify-center text-white">
+                        <span class="text-4xl font-bold"><?= $stats['total'] ?></span>
+                        <span class="text-sm text-slate-400">Total Devices</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Status Counters -->
+            <div class="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg p-6 text-center">
+                    <h3 class="text-sm font-medium text-slate-400">Online</h3>
+                    <div id="onlineCount" class="text-4xl font-bold text-green-400 mt-2"><?= $stats['online'] ?></div>
+                </div>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg p-6 text-center">
+                    <h3 class="text-sm font-medium text-slate-400">Warning</h3>
+                    <div id="warningCount" class="text-4xl font-bold text-yellow-400 mt-2"><?= $stats['warning'] ?></div>
+                </div>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg p-6 text-center">
+                    <h3 class="text-sm font-medium text-slate-400">Critical</h3>
+                    <div id="criticalCount" class="text-4xl font-bold text-red-400 mt-2"><?= $stats['critical'] ?></div>
+                </div>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-lg p-6 text-center">
+                    <h3 class="text-sm font-medium text-slate-400">Offline</h3>
+                    <div id="offlineCount" class="text-4xl font-bold text-slate-500 mt-2"><?= $stats['offline'] ?></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Manual Ping Test -->
+            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
+                <h2 class="text-xl font-semibold text-white mb-4">Manual Ping Test</h2>
+                <form id="pingForm" class="flex flex-col sm:flex-row gap-4 mb-4">
+                    <input type="text" id="pingHostInput" name="ping_host" placeholder="Enter hostname or IP" value="192.168.1.1" class="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+                    <button type="submit" id="pingButton" class="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500">
+                        <i class="fas fa-bolt mr-2"></i>Ping
+                    </button>
+                </form>
+                <div id="pingResultContainer" class="hidden mt-4">
+                    <pre id="pingResultPre" class="bg-slate-900/50 text-white text-sm p-4 rounded-lg overflow-x-auto"></pre>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
+                <h2 class="text-xl font-semibold text-white mb-4">Recent Activity</h2>
+                <div id="recentActivityList" class="space-y-3 max-h-60 overflow-y-auto">
+                    <?php if (empty($recent_activity)): ?>
+                        <div class="text-center py-4 text-slate-500">
+                            <i class="fas fa-bell text-4xl mb-2"></i>
+                            <p>No recent activity.</p>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($recent_activity as $activity): ?>
+                            <div class="border border-slate-700 rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium text-white"><?= htmlspecialchars($activity['device_name']) ?> <span class="text-sm text-slate-500 font-mono">(<?= htmlspecialchars($activity['device_ip'] ?: 'N/A') ?>)</span></div>
+                                    <div class="text-sm <?= $statusColorMap[$activity['status']] ?? $statusColorMap['unknown'] ?>"><?= htmlspecialchars(ucfirst($activity['status'])) ?>: <?= htmlspecialchars($activity['details']) ?></div>
+                                </div>
+                                <div class="text-xs text-slate-500"><?= date('H:i', strtotime($activity['created_at'])) ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<?php include 'footer.php'; ?>

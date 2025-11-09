@@ -11,7 +11,7 @@ function initDashboard() {
     const offlineCountEl = document.getElementById('offlineCount');
     const recentActivityListEl = document.getElementById('recentActivityList');
     const noRecentActivityMessage = document.getElementById('noRecentActivityMessage');
-    const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
+    const refreshAllDevicesBtn = document.getElementById('refreshAllDevicesBtn');
     let statusChart = null;
 
     const pingForm = document.getElementById('pingForm');
@@ -33,17 +33,12 @@ function initDashboard() {
         unknown: 'text-slate-500'
     };
 
-    const loadDashboardData = async (mapId) => {
-        if (!mapId) {
-            dashboardLoader.classList.add('hidden');
-            return;
-        }
+    const loadDashboardData = async () => {
         dashboardLoader.classList.remove('hidden');
         dashboardWidgets.classList.add('hidden');
-        // manageDevicesLink.href = `devices.php?map_id=${mapId}`; // This link is not present in the current index.php
 
         try {
-            const data = await api.get('get_dashboard_data', { map_id: mapId });
+            const data = await api.get('get_dashboard_data');
             
             totalDevicesText.querySelector('span:first-child').textContent = data.stats.total;
             onlineCountEl.textContent = data.stats.online;
@@ -98,13 +93,10 @@ function initDashboard() {
         }
     };
 
-    createMapSelector('map-selector-container', loadDashboardData).then(selector => {
-        if (selector) {
-            loadDashboardData(selector.value);
-        } else {
-            dashboardLoader.classList.add('hidden');
-        }
-    });
+    loadDashboardData(); // Initial load
+
+    // Set up auto-refresh for dashboard data every 30 seconds
+    setInterval(loadDashboardData, 30000);
 
     pingForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -124,6 +116,28 @@ function initDashboard() {
         } finally {
             pingButton.disabled = false;
             pingButton.innerHTML = '<i class="fas fa-bolt mr-2"></i>Ping';
+        }
+    });
+
+    refreshAllDevicesBtn.addEventListener('click', async () => {
+        refreshAllDevicesBtn.disabled = true;
+        refreshAllDevicesBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
+        window.notyf.info('Starting global device status check...');
+
+        try {
+            const result = await api.post('check_all_devices_globally');
+            if (result.success) {
+                window.notyf.success(`${result.message} ${result.status_changes} status changes detected.`);
+                await loadDashboardData(); // Reload dashboard data after refresh
+            } else {
+                throw new Error(result.error || 'Unknown error during bulk check.');
+            }
+        } catch (error) {
+            console.error('Bulk check failed:', error);
+            window.notyf.error('Global device check failed.');
+        } finally {
+            refreshAllDevicesBtn.disabled = false;
+            refreshAllDevicesBtn.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Refresh All Devices';
         }
     });
 }
