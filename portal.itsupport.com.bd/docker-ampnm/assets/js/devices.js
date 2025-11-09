@@ -62,8 +62,9 @@ function initDevices() {
         devicesTableBody.innerHTML = '';
         
         try {
-            const devices = await api.get('get_devices');
-            if (devices.length > 0) {
+            const result = await api.get('get_devices'); // This fetches from api.php
+            const devices = result.devices; // Access the 'devices' array from the response
+            if (devices && devices.length > 0) {
                 devicesTableBody.innerHTML = devices.map(renderDeviceRow).join('');
             } else {
                 noDevicesMessage.classList.remove('hidden');
@@ -222,7 +223,8 @@ function initDevices() {
 
     exportDevicesBtn.addEventListener('click', async () => {
         try {
-            const devices = await api.get('get_devices');
+            const result = await api.get('get_devices'); // Access the 'devices' array
+            const devices = result.devices;
             if (devices.length === 0) {
                 window.notyf.error('No devices to export.');
                 return;
