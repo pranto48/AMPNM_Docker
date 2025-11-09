@@ -367,7 +367,11 @@ switch ($action) {
 
         $sql = "
             SELECT 
-                d.*, 
+                d.id, d.name, d.ip, d.check_port, d.type, d.description, d.enabled, d.x, d.y, d.map_id, 
+                d.ping_interval, d.icon_size, d.name_text_size, d.icon_url, 
+                d.warning_latency_threshold, d.warning_packetloss_threshold, 
+                d.critical_latency_threshold, d.critical_packetloss_threshold, 
+                d.last_avg_time, d.last_ttl, d.show_live_ping, d.status, d.last_seen,
                 m.name as map_name,
                 p.output as last_ping_output
             FROM 
@@ -396,7 +400,7 @@ switch ($action) {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($devices);
+        echo json_encode(['devices' => $devices]); // Wrap in 'devices' key
         break;
 
     case 'create_device':
@@ -434,24 +438,67 @@ switch ($action) {
             $id = $input['id'] ?? null;
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Device ID and updates are required']); exit; }
-            $allowed_fields = ['name', 'ip', 'check_port', 'type', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'icon_url', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping'];
+            $allowed_fields = ['name', 'ip', 'check_port', 'type', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'icon_url', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl']; // Added status and last_seen
             $fields = []; $params = [];
             foreach ($updates as $key => $value) {
                 if (in_array($key, $allowed_fields)) {
                     $fields[] = "$key = ?";
                     if ($key === 'show_live_ping') {
                         $params[] = $value ? 1 : 0;
-                    } else {
+                    } else if ($key === 'last_seen') { // Handle last_seen as a timestamp
+                        $params[] = $value;
+                    }
+                    else {
                         $params[] = ($value === '' || is_null($value)) ? null : $value;
                     }
                 }
             }
             if (empty($fields)) { http_response_code(400); echo json_encode(['error' => 'No valid fields to update']); exit; }
             $params[] = $id; $params[] = $current_user_id;
-            $sql = "UPDATE devices SET " . implode(', ', $fields) . " WHERE id = ? AND user_id = ?";
+            $sql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
             $stmt = $pdo->prepare($sql); $stmt->execute($params);
             $stmt = $pdo->prepare("SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id = ?"); $stmt->execute([$id, $current_user_id]);
             $device = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($device);
+        }
+        break;
+
+    case 'update_device_status_by_ip': // NEW ACTION
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $ip_address = $input['ip_address'] ?? null;
+            $status = $input['status'] ?? null;
+
+            if (empty($ip_address) || empty($status)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'IP address and status are required.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("SELECT * FROM devices WHERE ip = ? AND user_id = ?");
+            $stmt->execute([$ip_address, $current_user_id]);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$device) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Device not found for the given IP.']);
+                exit;
+            }
+            
+            $old_status = $device['status'];
+            $last_seen = ($status === 'online') ? date('Y-m-d H:i:s') : $device['last_seen'];
+            $details = "Status updated by auto-ping to {$status}.";
+
+            logStatusChange($pdo, $device['id'], $old_status, $status, $details);
+            sendEmailNotification($pdo, $device, $old_status, $status, $details);
+
+            $sql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ? AND user_id = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$status, $last_seen, $ip_address, $current_user_id]);
+
+            $stmt = $pdo->prepare("SELECT * FROM devices WHERE ip = ? AND user_id = ?");
+            $stmt->execute([$ip_address, $current_user_id]);
+            $updated_device = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            echo json_encode($updated_device);
         }
         break;
 
@@ -517,6 +564,92 @@ switch ($action) {
             } else {
                 http_response_code(500);
                 echo json_encode(['error' => 'Failed to save uploaded file.']);
+            }
+        }
+        break;
+    
+    case 'import_map': // NEW ACTION
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $devices_data = $input['devices'] ?? [];
+            $edges_data = $input['edges'] ?? [];
+            $map_id = $input['map_id'] ?? null; // Assuming map_id is passed for context, though devices might not have it yet
+
+            if (empty($devices_data) && empty($edges_data)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No devices or edges provided for import.']);
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            try {
+                // Clear existing devices and edges for the current user (or map if provided)
+                // For simplicity, we'll assume import is for unmapped devices or a new map.
+                // If importing to an existing map, you'd typically clear that map's devices/edges first.
+                // For now, we'll just add them.
+
+                $device_id_map = []; // To map old IDs from import file to new DB IDs
+
+                // Insert devices
+                $sql_device = "INSERT INTO devices (
+                    user_id, name, ip, check_port, type, description, map_id, x, y, 
+                    ping_interval, icon_size, name_text_size, icon_url, 
+                    warning_latency_threshold, warning_packetloss_threshold, 
+                    critical_latency_threshold, critical_packetloss_threshold, 
+                    show_live_ping
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $stmt_device = $pdo->prepare($sql_device);
+
+                foreach ($devices_data as $device) {
+                    $stmt_device->execute([
+                        $current_user_id,
+                        $device['name'] ?? 'Imported Device',
+                        $device['ip_address'] ?? null, // Use ip_address from frontend
+                        $device['check_port'] ?? null,
+                        $device['icon'] ?? 'other', // Use icon from frontend
+                        $device['description'] ?? null,
+                        $device['map_id'] ?? null,
+                        $device['position_x'] ?? null,
+                        $device['position_y'] ?? null,
+                        $device['ping_interval'] ?? null,
+                        $device['icon_size'] ?? 50,
+                        $device['name_text_size'] ?? 14,
+                        $device['icon_url'] ?? null,
+                        $device['warning_latency_threshold'] ?? null,
+                        $device['warning_packetloss_threshold'] ?? null,
+                        $device['critical_latency_threshold'] ?? null,
+                        $device['critical_packetloss_threshold'] ?? null,
+                        ($device['show_live_ping'] ?? false) ? 1 : 0
+                    ]);
+                    $new_id = $pdo->lastInsertId();
+                    $device_id_map[$device['id']] = $new_id; // Map old ID to new ID
+                }
+
+                // Insert edges, using the new device IDs
+                $sql_edge = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
+                $stmt_edge = $pdo->prepare($sql_edge);
+
+                foreach ($edges_data as $edge) {
+                    $new_source_id = $device_id_map[$edge['source']] ?? null;
+                    $new_target_id = $device_id_map[$edge['target']] ?? null;
+                    
+                    if ($new_source_id && $new_target_id) {
+                        $stmt_edge->execute([
+                            $current_user_id,
+                            $new_source_id,
+                            $new_target_id,
+                            $map_id, // Assuming edges are for the current map
+                            $edge['connection_type'] ?? 'cat5'
+                        ]);
+                    }
+                }
+
+                $pdo->commit();
+                echo json_encode(['success' => true, 'message' => 'Map imported successfully.']);
+
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                http_response_code(500);
+                echo json_encode(['error' => 'Import failed: ' . $e->getMessage()]);
             }
         }
         break;

@@ -16,10 +16,10 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  subscribeToDeviceChanges 
+  // subscribeToDeviceChanges // Removed Supabase subscription
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
-import { supabase } from "@/integrations/supabase/client";
+// import { supabase } from "@/integrations/supabase/client"; // Removed Supabase import
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
@@ -32,7 +32,30 @@ const Index = () => {
   const fetchDevices = useCallback(async () => {
     try {
       const dbDevices = await getDevices();
-      setDevices(dbDevices as NetworkDevice[]);
+      // Map PHP API response to NetworkDevice interface
+      const mappedDevices: NetworkDevice[] = dbDevices.map(d => ({
+        id: d.id,
+        name: d.name,
+        ip_address: d.ip, // PHP uses 'ip'
+        position_x: d.x, // PHP uses 'x'
+        position_y: d.y, // PHP uses 'y'
+        icon: d.type, // PHP uses 'type' for icon
+        status: d.status || 'unknown',
+        ping_interval: d.ping_interval,
+        icon_size: d.icon_size,
+        name_text_size: d.name_text_size,
+        last_ping: d.last_seen, // PHP uses 'last_seen'
+        last_ping_result: d.status === 'online', // Derive from status
+        check_port: d.check_port,
+        description: d.description,
+        warning_latency_threshold: d.warning_latency_threshold,
+        warning_packetloss_threshold: d.warning_packetloss_threshold,
+        critical_latency_threshold: d.critical_latency_threshold,
+        critical_packetloss_threshold: d.critical_packetloss_threshold,
+        show_live_ping: d.show_live_ping,
+        map_id: d.map_id,
+      }));
+      setDevices(mappedDevices);
     } catch (error) {
       showError("Failed to load devices from database.");
     } finally {
@@ -43,15 +66,17 @@ const Index = () => {
   useEffect(() => {
     fetchDevices();
 
-    // Subscribe to real-time device changes
-    const channel = subscribeToDeviceChanges((payload) => {
-      console.log('Device change received:', payload);
-      fetchDevices();
-    });
+    // Removed Supabase subscription.
+    // For real-time updates with PHP, you would need to implement a polling mechanism
+    // or a different real-time solution (e.g., WebSockets with a custom PHP server).
+    // const channel = subscribeToDeviceChanges((payload) => {
+    //   console.log('Device change received:', payload);
+    //   fetchDevices();
+    // });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // return () => {
+    //   supabase.removeChannel(channel);
+    // };
   }, [fetchDevices]);
 
   // Auto-ping devices based on their ping interval

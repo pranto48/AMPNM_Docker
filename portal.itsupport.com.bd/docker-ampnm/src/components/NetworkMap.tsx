@@ -27,12 +27,12 @@ import {
   updateEdgeInDB,
   importMap,
   MapData,
-  subscribeToDeviceChanges
+  // subscribeToDeviceChanges // Removed Supabase subscription
 } from '@/services/networkDeviceService';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { supabase } from '@/integrations/supabase/client';
+// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
@@ -57,8 +57,8 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         if (device && device.ip_address) {
           await updateDevice(nodeId, { 
             status,
-            last_ping: new Date().toISOString(),
-            last_ping_result: status === 'online'
+            last_ping: new Date().toISOString(), // PHP uses last_seen
+            // last_ping_result: status === 'online' // Not directly stored in PHP
           });
         }
       } catch (error) {
@@ -77,7 +77,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     (device: NetworkDevice): Node => ({
       id: device.id!,
       type: 'device',
-      position: { x: device.position_x, y: device.position_y },
+      position: { x: device.position_x || 0, y: device.position_y || 0 }, // Ensure default position
       data: {
         id: device.id,
         name: device.name,
@@ -122,37 +122,39 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     };
     loadEdges();
 
-    // Subscribe to edge changes
-    const handleEdgeInsert = (payload: any) => {
-      const newEdge = { 
-        id: payload.new.id, 
-        source: payload.new.source_id, 
-        target: payload.new.target_id, 
-        data: { connection_type: payload.new.connection_type } 
-      };
-      setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
-    };
+    // Removed Supabase subscription for edges.
+    // For real-time updates with PHP, you would need to implement a polling mechanism
+    // or a different real-time solution.
+    // const handleEdgeInsert = (payload: any) => {
+    //   const newEdge = { 
+    //     id: payload.new.id, 
+    //     source: payload.new.source_id, 
+    //     target: payload.new.target_id, 
+    //     data: { connection_type: payload.new.connection_type } 
+    //   };
+    //   setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+    // };
     
-    const handleEdgeUpdate = (payload: any) => {
-      setEdges((eds) => 
-        eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
-      );
-    };
+    // const handleEdgeUpdate = (payload: any) => {
+    //   setEdges((eds) => 
+    //     eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
+    //   );
+    // };
     
-    const handleEdgeDelete = (payload: any) => {
-      setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
-    };
+    // const handleEdgeDelete = (payload: any) => {
+    //   setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
+    // };
 
-    const edgeChannel = supabase.channel('network-map-edge-changes');
-    edgeChannel
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
-      .subscribe();
+    // const edgeChannel = supabase.channel('network-map-edge-changes');
+    // edgeChannel
+    //   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
+    //   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
+    //   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
+    //   .subscribe();
 
-    return () => {
-      supabase.removeChannel(edgeChannel);
-    };
+    // return () => {
+    //   supabase.removeChannel(edgeChannel);
+    // };
   }, [setEdges]);
 
   // Style edges based on connection type and device status
@@ -234,6 +236,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
+        onMapUpdate(); // Refresh parent component's device list
       } catch (error) {
         console.error('Failed to delete device:', error);
         showError('Failed to delete device.');
@@ -297,7 +300,23 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleExport = async () => {
     const exportData: MapData = {
-      devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => rest),
+      devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => ({
+        ...rest,
+        ip_address: rest.ip_address || null,
+        position_x: rest.position_x || null,
+        position_y: rest.position_y || null,
+        ping_interval: rest.ping_interval || null,
+        icon_size: rest.icon_size || null,
+        name_text_size: rest.name_text_size || null,
+        check_port: rest.check_port || null,
+        description: rest.description || null,
+        warning_latency_threshold: rest.warning_latency_threshold || null,
+        warning_packetloss_threshold: rest.warning_packetloss_threshold || null,
+        critical_latency_threshold: rest.critical_latency_threshold || null,
+        critical_packetloss_threshold: rest.critical_packetloss_threshold || null,
+        show_live_ping: rest.show_live_ping || false,
+        map_id: rest.map_id || null,
+      })),
       edges: edges.map(({ id, source, target, data }) => ({ 
         source, 
         target, 
