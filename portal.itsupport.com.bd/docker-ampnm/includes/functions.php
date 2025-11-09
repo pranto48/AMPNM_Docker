@@ -122,88 +122,82 @@ function savePingResult($pdo, $host, $pingResult) {
     ]);
 }
 
-// Placeholder for email notification function
-function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
-    // In a real application, this would fetch SMTP settings and subscriptions,
-    // then use a mailer library (e.g., PHPMailer) to send emails.
-    // For now, we'll just log that a notification *would* be sent.
-    error_log("DEBUG: Notification triggered for device '{$device['name']}' (ID: {$device['id']}). Status changed from {$oldStatus} to {$newStatus}. Details: {$details}");
+// Function to ping a single device and return structured data
+function pingDevice($ip) {
+    $pingResult = executePing($ip, 1); // Ping once for speed
+    $parsedResult = parsePingOutput($pingResult['output']);
+    $alive = $pingResult['success'];
 
-    // Fetch SMTP settings for the current user
-    $stmtSmtp = $pdo->prepare("SELECT * FROM smtp_settings WHERE user_id = ?");
-    $stmtSmtp->execute([$_SESSION['user_id']]);
-    $smtpSettings = $stmtSmtp->fetch(PDO::FETCH_ASSOC);
-
-    if (!$smtpSettings) {
-        error_log("DEBUG: No SMTP settings found for user {$_SESSION['user_id']}. Cannot send email notification.");
-        return;
-    }
-
-    // Fetch subscriptions for this device and status change
-    $sqlSubscriptions = "SELECT recipient_email FROM device_email_subscriptions WHERE device_id = ? AND user_id = ?";
-    $paramsSubscriptions = [$device['id'], $_SESSION['user_id']];
-
-    if ($newStatus === 'online') {
-        $sqlSubscriptions .= " AND notify_on_online = TRUE";
-    } elseif ($newStatus === 'offline') {
-        $sqlSubscriptions .= " AND notify_on_offline = TRUE";
-    } elseif ($newStatus === 'warning') {
-        $sqlSubscriptions .= " AND notify_on_warning = TRUE";
-    } elseif ($newStatus === 'critical') {
-        $sqlSubscriptions .= " AND notify_on_critical = TRUE";
-    } else {
-        // No specific notification for 'unknown' status changes
-        return;
-    }
-
-    $stmtSubscriptions = $pdo->prepare($sqlSubscriptions);
-    $stmtSubscriptions->execute($paramsSubscriptions);
-    $recipients = $stmtSubscriptions->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($recipients)) {
-        error_log("DEBUG: No active subscriptions for device '{$device['name']}' on status '{$newStatus}'.");
-        return;
-    }
-
-    // Simulate sending email
-    foreach ($recipients as $recipient) {
-        error_log("DEBUG: Simulating email to {$recipient} for device '{$device['name']}' status change to '{$newStatus}'.");
-        // In a real scenario, you'd use a mailer library here:
-        // $mailer = new PHPMailer(true);
-        // Configure $mailer with $smtpSettings
-        // Set recipient, subject, body
-        // $mailer->send();
-    }
+    return [
+        'ip' => $ip,
+        'alive' => $alive,
+        'time' => $alive ? $parsedResult['avg_time'] : null,
+        'timestamp' => date('c'), // ISO 8601 format
+        'error' => !$alive ? 'Host unreachable or timed out' : null
+    ];
 }
 
-function getStatusFromPingResult($device, $pingResult, $parsedResult, &$details) {
-    if (!$pingResult['success']) {
-        $details = 'Device offline or unreachable.';
-        return 'offline';
+// Function to scan the network for devices using nmap
+function scanNetwork($subnet) {
+    // NOTE: This function requires 'nmap' to be installed on the server.
+    // The web server user (e.g., www-data) may need permissions to run it.
+    if (empty($subnet) || !preg_match('/^[a-zA-Z0-9\.\/]+$/', $subnet)) {
+        // Default to a common local subnet if none is provided or if input is invalid
+        $subnet = '192.168.1.0/24';
     }
 
-    $status = 'online';
-    $details = "Online with {$parsedResult['avg_time']}ms latency.";
+    // Escape the subnet to prevent command injection
+    $escaped_subnet = escapeshellarg($subnet);
+    
+    // Use nmap for a discovery scan (-sn: ping scan, -oG -: greppable output)
+    $command = "nmap -sn $escaped_subnet -oG -";
+    $output = @shell_exec($command);
 
-    if ($device['critical_latency_threshold'] && $parsedResult['avg_time'] > $device['critical_latency_threshold']) {
-        $status = 'critical';
-        $details = "Critical latency: {$parsedResult['avg_time']}ms (>{$device['critical_latency_threshold']}ms).";
-    } elseif ($device['critical_packetloss_threshold'] && $parsedResult['packet_loss'] > $device['critical_packetloss_threshold']) {
-        $status = 'critical';
-        $details = "Critical packet loss: {$parsedResult['packet_loss']}% (>{$device['critical_packetloss_threshold']}%).";
-    } elseif ($device['warning_latency_threshold'] && $parsedResult['avg_time'] > $device['warning_latency_threshold']) {
-        $status = 'warning';
-        $details = "Warning latency: {$parsedResult['avg_time']}ms (>{$device['warning_latency_threshold']}ms).";
-    } elseif ($device['warning_packetloss_threshold'] && $parsedResult['packet_loss'] > $device['warning_packetloss_threshold']) {
-        $status = 'warning';
-        $details = "Warning packet loss: {$parsedResult['packet_loss']}% (>{$device['warning_packetloss_threshold']}%).";
+    if (empty($output)) {
+        return []; // nmap might not be installed or failed to run
     }
-    return $status;
+
+    $results = [];
+    $lines = explode("\n", $output);
+    foreach ($lines as $line) {
+        if (strpos($line, 'Host:') === 0 && strpos($line, 'Status: Up') !== false) {
+            $parts = preg_split('/\s+/', $line);
+            $ip = $parts[1];
+            $hostname = (isset($parts[2]) && $parts[2] !== '') ? trim($parts[2], '()') : null;
+            
+            $results[] = [
+                'ip' => $ip,
+                'hostname' => $hostname,
+                'mac' => null, // nmap -sn doesn't always provide MAC, a privileged scan is needed
+                'vendor' => null,
+                'alive' => true
+            ];
+        }
+    }
+    return $results;
 }
 
-function logStatusChange($pdo, $deviceId, $oldStatus, $newStatus, $details) {
-    if ($oldStatus !== $newStatus) {
-        $stmt = $pdo->prepare("INSERT INTO device_status_logs (device_id, status, details) VALUES (?, ?, ?)");
-        $stmt->execute([$deviceId, $newStatus, $details]);
+// Function to check if host is reachable via HTTP
+function checkHttpConnectivity($host) {
+    if (empty($host) || filter_var($host, FILTER_VALIDATE_IP) === false) {
+        return ['success' => false, 'http_code' => 0, 'error' => 'Invalid IP address'];
     }
+    $url = "http://$host";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 2); // Reduced timeout for faster checks
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 2);
+    
+    curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    return [
+        'success' => ($httpCode >= 200 && $httpCode < 400),
+        'http_code' => $httpCode,
+        'error' => $error
+    ];
 }
