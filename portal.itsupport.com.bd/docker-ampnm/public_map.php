@@ -43,8 +43,8 @@ foreach ($devices as $d) {
         'server' => '\uf233', 'router' => '\uf4d7', 'switch' => '\uf796', 'printer' => '\uf02f', 'nas' => '\uf0a0',
         'camera' => '\uf030', 'other' => '\uf108', 'firewall' => '\uf3ed', 'ipphone' => '\uf87d',
         'punchdevice' => '\uf2c2', 'wifi-router' => '\uf1eb', 'radio-tower' => '\uf519',
-        'rack' => '\uf1b3', 'laptop' => '\uf109', 'tablet' => '\uf3fa', 'mobile' => '\uf3cd',
-        'cloud' => '\uf0c2', 'database' => '\uf1c0', 'box' => '\uf49e'
+        'rack' => '\uf1b3', laptop => '\uf109', tablet => '\uf3fa', mobile => '\uf3cd',
+        'cloud' => '\uf0c2', database => '\uf1c0', box => '\uf49e'
     ];
 
     $status = $d['status'] ?? 'unknown';
@@ -146,7 +146,7 @@ if ($map['background_image_url']) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shared Map: <?= htmlspecialchars($map['name']) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"> <!-- Added Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
@@ -180,6 +180,15 @@ if ($map['background_image_url']) {
         }
         .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
         .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        /* Explicitly ensure Font Awesome font is used for vis.js icons */
+        .vis-network .vis-label {
+            font-family: 'Inter', sans-serif !important; /* Keep Inter for labels */
+        }
+        .vis-network .vis-icon {
+            font-family: 'Font Awesome 6 Free' !important; /* Force Font Awesome for icons */
+            font-weight: 900 !important; /* Ensure solid icons are used */
+        }
     </style>
 </head>
 <body>
@@ -289,8 +298,11 @@ if ($map['background_image_url']) {
                         const node_color = statusColorMap[status] ?? statusColorMap.unknown;
 
                         let label = d.name;
+                        // DEBUG: Log values for live ping status
+                        console.log(`Device: ${d.name}, show_live_ping: ${d.show_live_ping}, status: ${status}, last_avg_time: ${d.last_avg_time}, last_ttl: ${d.last_ttl}`);
                         if ((d.show_live_ping ?? false) && status === 'online' && (d.last_avg_time ?? null) !== null) {
                             label += `\n${d.last_avg_time}ms | TTL:${d.last_ttl}`;
+                            console.log(`  -> Live ping label added: ${label}`);
                         }
 
                         const updatedNode = {
