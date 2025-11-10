@@ -1,17 +1,12 @@
 <?php
-require_once 'includes/auth_check.php';
-include 'header.php';
+require_once 'includes/functions.php'; // Include functions early for DB connection and license checks
+require_once 'includes/auth_check.php'; // Auth check also needs to be early
 
 $pdo = getDbConnection();
 $current_user_id = $_SESSION['user_id'];
 $message = '';
 
-// Fetch all maps for the dropdown
-$stmt_maps = $pdo->prepare("SELECT id, name FROM maps WHERE user_id = ? ORDER BY name ASC");
-$stmt_maps->execute([$current_user_id]);
-$maps = $stmt_maps->fetchAll(PDO::FETCH_ASSOC);
-
-// Handle form submission
+// Handle form submission BEFORE any HTML output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $ip = trim($_POST['ip'] ?? '');
@@ -64,6 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Now include header.php, after all potential redirects
+include 'header.php';
 ?>
 
 <main id="app">
