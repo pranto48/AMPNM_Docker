@@ -420,13 +420,14 @@ switch ($action) {
             $sql .= " AND d.map_id = ?"; 
             $params[] = $map_id; 
             // If map_id is provided, viewers can see all devices on that map
+            // Only filter by user_id if the user is NOT a viewer
             if ($user_role !== 'viewer') {
                 $sql .= " AND d.user_id = ?";
                 $params[] = $current_user_id;
             }
         } else {
             // If no map_id is provided (e.g., on the main devices inventory page),
-            // viewers should only see devices they own. Admins see their own.
+            // always filter by user_id, as this is a personal inventory.
             $sql .= " AND d.user_id = ?";
             $params[] = $current_user_id;
         }

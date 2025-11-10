@@ -43,10 +43,18 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const importInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate(); // Initialize useNavigate
 
+  // Get user role from global scope
+  const userRole = (window as any).userRole || 'viewer';
+  const isAdmin = userRole === 'admin';
+
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
+      if (!isAdmin) {
+        showError('You do not have permission to change device status.');
+        return;
+      }
       // Optimistically update UI
       setNodes((nds) =>
         nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status } } : node))
@@ -70,7 +78,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         );
       }
     },
-    [setNodes, devices]
+    [setNodes, devices, isAdmin]
   );
 
   const mapDeviceToNode = useCallback(
@@ -89,12 +97,24 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         name_text_size: device.name_text_size,
         last_ping: device.last_ping,
         last_ping_result: device.last_ping_result,
-        onEdit: (id: string) => navigate(`/edit-device/${id}`), // Navigate to edit page
-        onDelete: (id: string) => handleDelete(id),
+        onEdit: (id: string) => {
+          if (!isAdmin) {
+            showError('You do not have permission to edit devices.');
+            return;
+          }
+          navigate(`/edit-device/${id}`);
+        },
+        onDelete: (id: string) => {
+          if (!isAdmin) {
+            showError('You do not have permission to delete devices.');
+            return;
+          }
+          handleDelete(id);
+        },
         onStatusChange: handleStatusChange,
       },
     }),
-    [handleStatusChange, navigate]
+    [handleStatusChange, navigate, isAdmin]
   );
 
   // Update nodes when devices change
@@ -157,6 +177,16 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     // };
   }, [setEdges]);
 
+  // Implement polling for live status updates for all users
+  useEffect(() => {
+    const pollingInterval = setInterval(() => {
+      onMapUpdate(); // This fetches updated device data
+    }, 15000); // Poll every 15 seconds
+
+    return () => clearInterval(pollingInterval);
+  }, [onMapUpdate]);
+
+
   // Style edges based on connection type and device status
   const styledEdges = useMemo(() => {
     return edges.map((edge) => {
@@ -203,6 +233,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onConnect = useCallback(
     async (params: Connection) => {
+      if (!isAdmin) {
+        showError('You do not have permission to add connections.');
+        return;
+      }
       // Optimistically add edge to UI
       const newEdge = { 
         id: `reactflow__edge-${params.source}${params.target}`, 
@@ -223,10 +257,14 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges]
+    [setEdges, isAdmin]
   );
 
   const handleDelete = async (deviceId: string) => {
+    if (!isAdmin) {
+      showError('You do not have permission to delete devices.');
+      return;
+    }
     if (window.confirm('Are you sure you want to delete this device?')) {
       // Optimistically remove from UI
       const originalNodes = nodes;
@@ -248,6 +286,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
+      if (!isAdmin) {
+        showError('You do not have permission to move devices.');
+        return;
+      }
       try {
         await updateDevice(node.id, { position_x: node.position.x, position_y: node.position.y });
       } catch (error) {
@@ -255,7 +297,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         showError('Failed to save device position.');
       }
     },
-    []
+    [isAdmin]
   );
 
   const onEdgesChangeHandler: OnEdgesChange = useCallback(
@@ -263,6 +305,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       onEdgesChange(changes);
       changes.forEach(async (change) => {
         if (change.type === 'remove') {
+          if (!isAdmin) {
+            showError('You do not have permission to delete connections.');
+            return;
+          }
           try {
             await deleteEdgeFromDB(change.id);
             showSuccess('Connection deleted.');
@@ -273,15 +319,23 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         }
       });
     },
-    [onEdgesChange]
+    [onEdgesChange, isAdmin]
   );
 
   const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
+    if (!isAdmin) {
+      showError('You do not have permission to edit connections.');
+      return;
+    }
     setEditingEdge(edge);
     setIsEdgeEditorOpen(true);
   };
 
   const handleSaveEdge = async (edgeId: string, connectionType: string) => {
+    if (!isAdmin) {
+      showError('You do not have permission to save connection changes.');
+      return;
+    }
     // Optimistically update UI
     const originalEdges = edges;
     setEdges((eds) => eds.map(e => e.id === edgeId ? { ...e, data: { connection_type } } : e));
@@ -299,6 +353,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleExport = async () => {
+    if (!isAdmin) {
+      showError('You do not have permission to export maps.');
+      return;
+    }
     const exportData: MapData = {
       devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => ({
         ...rest,
@@ -336,9 +394,19 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     showSuccess('Map exported successfully!');
   };
 
-  const handleImportClick = () => importInputRef.current?.click();
+  const handleImportClick = () => {
+    if (!isAdmin) {
+      showError('You do not have permission to import maps.');
+      return;
+    }
+    importInputRef.current?.click();
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAdmin) {
+      showError('You do not have permission to import maps.');
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) return;
     if (!window.confirm('Are you sure you want to import this map? This will overwrite your current map.')) return;
@@ -365,8 +433,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleShareMap = async () => {
-    // Assuming the current map ID is available from the devices prop or a context
-    // For simplicity, let's assume the first device's map_id is the current map_id
+    // Share map is accessible to all roles, as it's just generating a public link.
     const currentMapId = devices.length > 0 ? devices[0].map_id : null;
 
     if (!currentMapId) {
@@ -400,6 +467,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         onEdgeClick={onEdgeClick}
         fitView
         fitViewOptions={{ padding: 0.1 }}
+        proOptions={{ hideAttribution: true }} // Hide React Flow attribution
+        nodesDraggable={isAdmin} // Only allow admins to drag nodes
+        nodesConnectable={isAdmin} // Only allow admins to connect nodes
+        elementsSelectable={isAdmin} // Only allow admins to select elements
       >
         <Controls />
         <MiniMap 
@@ -416,15 +487,21 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         <Background gap={16} size={1} color="#444" />
       </ReactFlow>
       <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-        <Button onClick={() => navigate('/add-device')} size="sm"> {/* Navigate to Add Device page */}
-          <PlusCircle className="h-4 w-4 mr-2" />Add Device
-        </Button>
-        <Button onClick={handleExport} variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />Export
-        </Button>
-        <Button onClick={handleImportClick} variant="outline" size="sm">
-          <Upload className="h-4 w-4 mr-2" />Import
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => navigate('/add-device')} size="sm">
+            <PlusCircle className="h-4 w-4 mr-2" />Add Device
+          </Button>
+        )}
+        {isAdmin && (
+          <Button onClick={handleExport} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />Export
+          </Button>
+        )}
+        {isAdmin && (
+          <Button onClick={handleImportClick} variant="outline" size="sm">
+            <Upload className="h-4 w-4 mr-2" />Import
+          </Button>
+        )}
         <input 
           type="file" 
           ref={importInputRef} 
