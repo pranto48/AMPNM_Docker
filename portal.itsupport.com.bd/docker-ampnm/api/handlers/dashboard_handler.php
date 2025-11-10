@@ -10,7 +10,7 @@ if ($action === 'get_dashboard_data') {
         exit;
     }
 
-    // Get detailed stats for each status
+    // Get detailed stats for each status for the SELECTED MAP
     $stmt = $pdo->prepare("
         SELECT
             COUNT(*) as total,
@@ -21,15 +21,22 @@ if ($action === 'get_dashboard_data') {
         FROM devices WHERE map_id = ? AND user_id = ?
     ");
     $stmt->execute([$map_id, $current_user_id]);
-    $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+    $map_stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // Ensure counts are integers, not null
-    $stats['online'] = $stats['online'] ?? 0;
-    $stats['warning'] = $stats['warning'] ?? 0;
-    $stats['critical'] = $stats['critical'] ?? 0;
-    $stats['offline'] = $stats['offline'] ?? 0;
+    $map_stats['online'] = $map_stats['online'] ?? 0;
+    $map_stats['warning'] = $map_stats['warning'] ?? 0;
+    $map_stats['critical'] = $map_stats['critical'] ?? 0;
+    $map_stats['offline'] = $map_stats['offline'] ?? 0;
+    $map_stats['total'] = $map_stats['total'] ?? 0; // Ensure total is also set
 
-    // Get devices
+    // Get GLOBAL total devices for the user
+    $stmt_global_total = $pdo->prepare("SELECT COUNT(*) as global_total FROM devices WHERE user_id = ?");
+    $stmt_global_total->execute([$current_user_id]);
+    $global_total_devices = $stmt_global_total->fetch(PDO::FETCH_ASSOC)['global_total'] ?? 0;
+
+
+    // Get devices (this part is not directly used by dashboard.js for display, but kept for consistency)
     $stmt = $pdo->prepare("SELECT name, ip, status FROM devices WHERE map_id = ? AND user_id = ? ORDER BY name ASC LIMIT 10");
     $stmt->execute([$map_id, $current_user_id]);
     $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -56,7 +63,8 @@ if ($action === 'get_dashboard_data') {
     $recent_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
-        'stats' => $stats,
+        'map_stats' => $map_stats,
+        'global_total_devices' => $global_total_devices,
         'devices' => $devices,
         'recent_activity' => $recent_activity
     ]);
