@@ -1,5 +1,5 @@
 function initStatusLogs() {
-    const API_URL = AppClient.config.API_URL; // Use AppClient.config
+    const API_URL = 'api.php';
     let statusLogChart = null;
     let liveInterval = null;
 
@@ -20,7 +20,9 @@ function initStatusLogs() {
         currentPeriod: '24h',
     };
 
-    const api = AppClient.api; // Use AppClient.api
+    const api = {
+        get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json())
+    };
 
     const populateMapSelector = async () => {
         try {

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,10 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { NetworkDevice, getMaps } from '@/services/networkDeviceService'; // Import getMaps
+import { NetworkDevice } from '@/services/networkDeviceService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
-import { showError } from '@/utils/toast';
 
 const deviceSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -27,33 +25,17 @@ const deviceSchema = z.object({
   critical_latency_threshold: z.coerce.number().int().positive().optional().nullable(),
   critical_packetloss_threshold: z.coerce.number().int().positive().max(100).optional().nullable(),
   show_live_ping: z.boolean().default(false),
-  map_id: z.string().optional().nullable(), // Add map_id to schema
 });
 
 interface DeviceFormProps {
   initialData?: Partial<NetworkDevice>;
-  onSubmit: (device: Omit<NetworkDevice, 'id' | 'user_id'>) => void; // Adjusted type to include map_id
+  onSubmit: (device: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => void;
   isEditing?: boolean;
 }
 
 const icons = ['server', 'router', 'printer', 'laptop', 'wifi', 'database', 'box', 'camera', 'cloud', 'firewall', 'ipphone', 'mobile', 'nas', 'rack', 'punchdevice', 'radio-tower', 'switch', 'tablet', 'other'];
 
 export const DeviceForm = ({ initialData, onSubmit, isEditing = false }: DeviceFormProps) => {
-  const [maps, setMaps] = useState<{ id: string; name: string }[]>([]);
-
-  useEffect(() => {
-    const fetchMapsData = async () => {
-      try {
-        const fetchedMaps = await getMaps();
-        setMaps(fetchedMaps);
-      } catch (error) {
-        console.error('Failed to fetch maps:', error);
-        showError('Failed to load maps for selection.');
-      }
-    };
-    fetchMapsData();
-  }, []);
-
   const form = useForm<z.infer<typeof deviceSchema>>({
     resolver: zodResolver(deviceSchema),
     defaultValues: {
@@ -70,7 +52,6 @@ export const DeviceForm = ({ initialData, onSubmit, isEditing = false }: DeviceF
       critical_latency_threshold: initialData?.critical_latency_threshold || undefined,
       critical_packetloss_threshold: initialData?.critical_packetloss_threshold || undefined,
       show_live_ping: initialData?.show_live_ping || false,
-      map_id: initialData?.map_id || undefined, // Set default map_id
     },
   });
 
@@ -148,34 +129,6 @@ export const DeviceForm = ({ initialData, onSubmit, isEditing = false }: DeviceF
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="map_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assign to Map (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a map" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
-                      {maps.map((map) => (
-                        <SelectItem key={map.id} value={map.id}>
-                          {map.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Assign this device to an existing network map.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

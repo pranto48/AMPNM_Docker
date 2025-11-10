@@ -29,11 +29,33 @@ $map = $data['map'];
 $devices = $data['devices'];
 $edges = $data['edges'];
 
-// Utility to build node title (copied from old MapApp.utils.buildNodeTitle)
-function buildNodeTitle($deviceData) {
-    $title = "{$deviceData['name']}<br>{$deviceData['ip']}<br>Status: {$deviceData['status']}";
-    if ($deviceData['status'] === 'offline' && $deviceData['last_ping_output']) {
-        $lines = explode("\n", $deviceData['last_ping_output']);
+// Prepare data for vis.js
+$vis_nodes = [];
+foreach ($devices as $d) {
+    $status_color_map = [
+        'online' => '#22c55e',
+        'warning' => '#f59e0b',
+        'critical' => '#ef4444',
+        'offline' => '#64748b',
+        'unknown' => '#94a3b8'
+    ];
+    $icon_map = [
+        'server' => '\uf233', 'router' => '\uf4d7', 'switch' => '\uf796', 'printer' => '\uf02f', 'nas' => '\uf0a0',
+        'camera' => '\uf030', 'other' => '\uf108', 'firewall' => '\uf3ed', 'ipphone' => '\uf87d',
+        'punchdevice' => '\uf2c2', 'wifi-router' => '\uf1eb', 'radio-tower' => '\uf519',
+        'rack' => '\uf1b3', 'laptop' => '\uf109', 'tablet' => '\uf3fa', 'mobile' => '\uf3cd',
+        'cloud' => '\uf0c2', 'database' => '\uf1c0', 'box' => '\uf49e'
+    ];
+
+    $status = $d['status'] ?? 'unknown';
+    $icon_code = $icon_map[$d['type']] ?? $icon_map['other'];
+    $icon_size = $d['icon_size'] ?? 50;
+    $name_text_size = $d['name_text_size'] ?? 14;
+    $node_color = $status_color_map[$status] ?? $status_color_map['unknown'];
+
+    $title = "{$d['name']}<br>{$d['ip']}<br>Status: {$status}";
+    if ($status === 'offline' && $d['last_ping_output']) {
+        $lines = explode("\n", $d['last_ping_output']);
         $reason = 'No response';
         foreach ($lines as $line) {
             if (stripos($line, 'unreachable') !== false || stripos($line, 'timed out') !== false || stripos($line, 'could not find host') !== false) {
@@ -41,37 +63,8 @@ function buildNodeTitle($deviceData) {
                 break;
             }
         }
-        $sanitizedReason = htmlspecialchars($reason);
-        $title .= "<br><small style='color: #fca5a5; font-family: monospace;'>{$sanitizedReason}</small>";
+        $title .= "<br><small style='color: #fca5a5; font-family: monospace;'>{$reason}</small>";
     }
-    return $title;
-}
-
-// Define color and icon maps (copied from old MapApp.config)
-$status_color_map = [
-    'online' => '#22c55e', 'warning' => '#f59e0b', 'critical' => '#ef4444',
-    'offline' => '#64748b', 'unknown' => '#94a3b8'
-];
-$icon_map = [
-    'server' => '\uf233', 'router' => '\uf4d7', 'switch' => '\uf796', 'printer' => '\uf02f', 'nas' => '\uf0a0',
-    'camera' => '\uf030', 'other' => '\uf108', 'firewall' => '\uf3ed', 'ipphone' => '\uf87d',
-    'punchdevice' => '\uf2c2', 'wifi-router' => '\uf1eb', 'radio-tower' => '\uf519',
-    'rack' => '\uf1b3', 'laptop' => '\uf109', 'tablet' => '\uf3fa', 'mobile' => '\uf3cd',
-    'cloud' => '\uf0c2', 'database' => '\uf1c0', 'box' => '\uf49e'
-];
-$edge_color_map = [
-    'cat5' => '#a78bfa', 'fiber' => '#f97316', 'wifi' => '#38bdf8', 'radio' => '#84cc16'
-];
-
-
-// Prepare data for vis.js
-$vis_nodes = [];
-foreach ($devices as $d) {
-    $status = $d['status'] ?? 'unknown';
-    $icon_code = $icon_map[$d['type']] ?? $icon_map['other'];
-    $icon_size = $d['icon_size'] ?? 50;
-    $name_text_size = $d['name_text_size'] ?? 14;
-    $node_color = $status_color_map[$status] ?? $status_color_map['unknown'];
 
     $label = $d['name'];
     if (($d['show_live_ping'] ?? false) && $status === 'online' && ($d['last_avg_time'] ?? null) !== null) {
@@ -81,7 +74,7 @@ foreach ($devices as $d) {
     $node = [
         'id' => $d['id'],
         'label' => $label,
-        'title' => buildNodeTitle($d),
+        'title' => $title,
         'x' => $d['x'],
         'y' => $d['y'],
         'font' => ['color' => 'white', 'size' => (int)$name_text_size, 'multi' => true],
@@ -112,6 +105,12 @@ foreach ($devices as $d) {
 
 $vis_edges = [];
 foreach ($edges as $e) {
+    $edge_color_map = [
+        'cat5' => '#a78bfa',
+        'fiber' => '#f97316',
+        'wifi' => '#38bdf8',
+        'radio' => '#84cc16'
+    ];
     $connection_type = $e['connection_type'] ?? 'cat5';
     $edge_color = $edge_color_map[$connection_type] ?? $edge_color_map['cat5'];
 
@@ -216,7 +215,7 @@ if ($map['background_image_url']) {
     </div>
 
     <script>
-        // Define color and icon maps (copy from old MapApp.config)
+        // Define color and icon maps (copy from MapApp.config)
         const statusColorMap = {
             online: '#22c55e', warning: '#f59e0b', critical: '#ef4444',
             offline: '#64748b', unknown: '#94a3b8'
@@ -232,7 +231,7 @@ if ($map['background_image_url']) {
             cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16'
         };
 
-        // Utility to build node title (copied from old MapApp.utils.buildNodeTitle)
+        // Utility to build node title (copy from MapApp.utils.buildNodeTitle)
         function buildNodeTitle(deviceData) {
             let title = `${deviceData.name}<br>${deviceData.ip}<br>Status: ${deviceData.status}`;
             if (deviceData.status === 'offline' && deviceData.last_ping_output) {

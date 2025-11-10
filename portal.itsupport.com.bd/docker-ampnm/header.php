@@ -24,25 +24,25 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="flex items-center gap-2 text-white font-bold">
+                    <a href="index.php" class="flex items-center gap-2 text-white font-bold">
                         <i class="fas fa-shield-halved text-cyan-400 text-2xl"></i>
                         <span>AMPNM</span>
                     </a>
                 </div>
                 <div class="hidden md:block">
                     <div id="main-nav" class="ml-10 flex items-baseline space-x-1">
-                        <a href="/" class="nav-link"><i class="fas fa-tachometer-alt fa-fw mr-2"></i>Dashboard</a>
+                        <a href="index.php" class="nav-link"><i class="fas fa-tachometer-alt fa-fw mr-2"></i>Dashboard</a>
                         <?php if ($user_role === 'admin'): ?>
-                            <a href="/devices" class="nav-link"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
-                            <a href="/history" class="nav-link"><i class="fas fa-history fa-fw mr-2"></i>History</a>
+                            <a href="devices.php" class="nav-link"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
+                            <a href="history.php" class="nav-link"><i class="fas fa-history fa-fw mr-2"></i>History</a>
                         <?php endif; ?>
-                        <a href="/map" class="nav-link"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
+                        <a href="map.php" class="nav-link"><i class="fas fa-project-diagram fa-fw mr-2"></i>Map</a>
                         <?php if ($user_role === 'admin'): ?>
-                            <a href="/status-logs" class="nav-link"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
-                            <a href="/email-notifications" class="nav-link"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
-                            <a href="/users" class="nav-link"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
+                            <a href="status_logs.php" class="nav-link"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
+                            <a href="email_notifications.php" class="nav-link"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
+                            <a href="users.php" class="nav-link"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
                         <?php endif; ?>
-                        <a href="/logout.php" class="nav-link"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Logout</a>
+                        <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Logout</a>
                     </div>
                 </div>
             </div>

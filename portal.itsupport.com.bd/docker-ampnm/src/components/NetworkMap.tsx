@@ -1,13 +1,39 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Edge } from 'reactflow';
-import { EdgeEditorDialog } from './EdgeEditorDialog';
-import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { importMap, MapData, NetworkDevice } from '@/services/networkDeviceService';
-import { useNetworkMapData } from '@/hooks/useNetworkMapData';
-import { useNetworkMapInteractions } from '@/hooks/useNetworkMapInteractions';
-import { MapControls } from './MapControls';
-import { NetworkMapCanvas } from './NetworkMapCanvas';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  Node,
+  Edge,
+  Connection,
+  NodeDragHandler,
+  OnEdgesChange,
+  applyNodeChanges,
+  applyEdgeChanges,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
+import { PlusCircle, Upload, Download, Share2 } from 'lucide-react';
+import {
+  addDevice,
+  updateDevice,
+  deleteDevice,
+  NetworkDevice,
+  getEdges,
+  addEdgeToDB,
+  deleteEdgeFromDB,
+  updateEdgeInDB,
+  importMap,
+  MapData,
+  // subscribeToDeviceChanges // Removed Supabase subscription
+} from '@/services/networkDeviceService';
+import { EdgeEditorDialog } from './EdgeEditorDialog';
+import DeviceNode from './DeviceNode';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 // Declare SoundManager globally
 declare global {
@@ -18,55 +44,159 @@ declare global {
   }
 }
 
-const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: (mapId?: string) => void }) => {
+const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
+  const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
-  const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate(); // Initialize useNavigate
 
-  const [liveRefreshEnabled, setLiveRefreshEnabled] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  // Ref to store previous devices for status comparison
+  const prevDevicesRef = useRef<NetworkDevice[]>([]);
 
   // Get user role from global scope
   const userRole = (window as any).userRole || 'viewer';
   const isAdmin = userRole === 'admin';
 
-  // Use custom hook for map data and selection
-  const { maps, currentMapId, handleMapChange, fetchMaps } = useNetworkMapData({ onMapUpdate });
+  const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
-  // Use custom hook for ReactFlow interactions
-  const {
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    nodeTypes,
-    onNodeDragStop,
-    onEdgeClick,
-    styledEdges,
-    handleDelete,
-    handleSaveEdge,
-    isEdgeEditorOpen,
-    setIsEdgeEditorOpen,
-    editingEdge,
-    setEditingEdge,
-  } = useNetworkMapInteractions({ currentMapId, devices, isAdmin, onMapUpdate });
+  const handleStatusChange = useCallback(
+    async (nodeId: string, status: 'online' | 'offline') => {
+      if (!isAdmin) {
+        showError('You do not have permission to change device status.');
+        return;
+      }
+      // Optimistically update UI
+      setNodes((nds) =>
+        nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status } } : node))
+      );
+      try {
+        // Update in database
+        const device = devices.find(d => d.id === nodeId);
+        if (device && device.ip_address) {
+          await updateDevice(nodeId, { 
+            status,
+            last_ping: new Date().toISOString(), // PHP uses last_seen
+            // last_ping_result: status === 'online' // Not directly stored in PHP
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update device status in DB:', error);
+        showError('Failed to update device status.');
+        // Revert UI update on failure
+        setNodes((nds) =>
+          nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status: device?.status || 'unknown' } } : node))
+        );
+      }
+    },
+    [setNodes, devices, isAdmin]
+  );
 
-  // Ref to store previous devices for status comparison
-  const prevDevicesRef = useRef<NetworkDevice[]>([]);
+  const mapDeviceToNode = useCallback(
+    (device: NetworkDevice): Node => ({
+      id: device.id!,
+      type: 'device',
+      position: { x: device.position_x || 0, y: device.position_y || 0 }, // Ensure default position
+      data: {
+        id: device.id,
+        name: device.name,
+        ip_address: device.ip_address,
+        icon: device.icon,
+        status: device.status || 'unknown',
+        ping_interval: device.ping_interval,
+        icon_size: device.icon_size,
+        name_text_size: device.name_text_size,
+        last_ping: device.last_ping,
+        last_ping_result: device.last_ping_result,
+        onEdit: (id: string) => {
+          if (!isAdmin) {
+            showError('You do not have permission to edit devices.');
+            return;
+          }
+          navigate(`/edit-device/${id}`);
+        },
+        onDelete: (id: string) => {
+          if (!isAdmin) {
+            showError('You do not have permission to delete devices.');
+            return;
+          }
+          handleDelete(id);
+        },
+        onStatusChange: handleStatusChange,
+      },
+    }),
+    [handleStatusChange, navigate, isAdmin]
+  );
+
+  // Update nodes when devices change
+  useEffect(() => {
+    setNodes(devices.map(mapDeviceToNode));
+  }, [devices, mapDeviceToNode, setNodes]);
+
+  // Load edges and subscribe to edge changes
+  useEffect(() => {
+    const loadEdges = async () => {
+      try {
+        const edgesData = await getEdges();
+        setEdges(
+          edgesData.map((edge: any) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            data: { connection_type: edge.connection_type || 'cat5' },
+          }))
+        );
+      } catch (error) {
+        console.error('Failed to load network edges:', error);
+        showError('Failed to load network connections.');
+      }
+    };
+    loadEdges();
+
+    // Removed Supabase subscription for edges.
+    // For real-time updates with PHP, you would need to implement a polling mechanism
+    // or a different real-time solution.
+    // const handleEdgeInsert = (payload: any) => {
+    //   const newEdge = { 
+    //     id: payload.new.id, 
+    //     source: payload.new.source_id, 
+    //     target: payload.new.target_id, 
+    //     data: { connection_type: payload.new.connection_type } 
+    //   };
+    //   setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+    // };
+    
+    // const handleEdgeUpdate = (payload: any) => {
+    //   setEdges((eds) => 
+    //     eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
+    //   );
+    // };
+    
+    // const handleEdgeDelete = (payload: any) => {
+    //   setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
+    // };
+
+    // const edgeChannel = supabase.channel('network-map-edge-changes');
+    // edgeChannel
+    //   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
+    //   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
+    //   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
+    //   .subscribe();
+
+    // return () => {
+    //   supabase.removeChannel(edgeChannel);
+    // };
+  }, [setEdges]);
 
   // Implement polling for live status updates for all users
   useEffect(() => {
-    let pollingInterval: NodeJS.Timeout | undefined;
-    if (liveRefreshEnabled && currentMapId) {
-      pollingInterval = setInterval(() => {
-        onMapUpdate(currentMapId);
-      }, 15000); // Poll every 15 seconds
-    }
+    const pollingInterval = setInterval(() => {
+      onMapUpdate(); // This fetches updated device data
+    }, 15000); // Poll every 15 seconds
 
-    return () => {
-      if (pollingInterval) clearInterval(pollingInterval);
-    };
-  }, [liveRefreshEnabled, currentMapId, onMapUpdate]);
+    return () => clearInterval(pollingInterval);
+  }, [onMapUpdate]);
 
   // Effect to detect status changes and play sounds
   useEffect(() => {
@@ -77,6 +207,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       const newStatus = currentDevice.status;
 
       if (prevStatus && newStatus && prevStatus !== newStatus) {
+        // Play sound based on new status
         if (window.SoundManager) {
           if (newStatus === 'online' && (prevStatus === 'offline' || prevStatus === 'critical' || prevStatus === 'warning')) {
             window.SoundManager.play('online');
@@ -91,16 +222,179 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       }
     });
 
+    // Update ref for the next render
     prevDevicesRef.current = devices;
   }, [devices]);
+
+
+  // Style edges based on connection type and device status
+  const styledEdges = useMemo(() => {
+    return edges.map((edge) => {
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      const targetNode = nodes.find((n) => n.id === edge.target);
+      const isConnectionBroken = 
+        sourceNode?.data.status === 'offline' || 
+        targetNode?.data.status === 'offline';
+      
+      const type = edge.data?.connection_type || 'cat5';
+      let style: React.CSSProperties = { strokeWidth: 2 };
+      
+      if (isConnectionBroken) {
+        style.stroke = '#ef4444'; // Red for offline
+      } else {
+        switch (type) {
+          case 'fiber': 
+            style.stroke = '#f97316'; // Orange
+            break;
+          case 'wifi': 
+            style.stroke = '#38bdf8'; // Sky blue
+            style.strokeDasharray = '5, 5';
+            break;
+          case 'radio': 
+            style.stroke = '#84cc16'; // Lime green
+            style.strokeDasharray = '2, 7';
+            break;
+          case 'cat5': 
+          default: 
+            style.stroke = '#a78bfa'; // Violet
+            break;
+        }
+      }
+
+      return { 
+        ...edge, 
+        animated: !isConnectionBroken, 
+        style, 
+        label: type,
+        labelStyle: { fill: 'white', fontWeight: 'bold' }
+      };
+    });
+  }, [nodes, edges]);
+
+  const onConnect = useCallback(
+    async (params: Connection) => {
+      if (!isAdmin) {
+        showError('You do not have permission to add connections.');
+        return;
+      }
+      // Optimistically add edge to UI
+      const newEdge = { 
+        id: `reactflow__edge-${params.source}${params.target}`, 
+        source: params.source!, 
+        target: params.target!, 
+        data: { connection_type: 'cat5' } 
+      };
+      setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
+      
+      try {
+        // Save to database
+        await addEdgeToDB({ source: params.source!, target: params.target! });
+        showSuccess('Connection saved.');
+      } catch (error) {
+        console.error('Failed to save connection:', error);
+        showError('Failed to save connection.');
+        // Revert UI update on failure
+        setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
+      }
+    },
+    [setEdges, isAdmin]
+  );
+
+  const handleDelete = async (deviceId: string) => {
+    if (!isAdmin) {
+      showError('You do not have permission to delete devices.');
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete this device?')) {
+      // Optimistically remove from UI
+      const originalNodes = nodes;
+      setNodes((nds) => nds.filter((node) => node.id !== deviceId));
+      
+      try {
+        // Delete from database
+        await deleteDevice(deviceId);
+        showSuccess('Device deleted successfully.');
+        onMapUpdate(); // Refresh parent component's device list
+      } catch (error) {
+        console.error('Failed to delete device:', error);
+        showError('Failed to delete device.');
+        // Revert UI update on failure
+        setNodes(originalNodes);
+      }
+    }
+  };
+
+  const onNodeDragStop: NodeDragHandler = useCallback(
+    async (_event, node) => {
+      if (!isAdmin) {
+        showError('You do not have permission to move devices.');
+        return;
+      }
+      try {
+        await updateDevice(node.id, { position_x: node.position.x, position_y: node.position.y });
+      } catch (error) {
+        console.error('Failed to save device position:', error);
+        showError('Failed to save device position.');
+      }
+    },
+    [isAdmin]
+  );
+
+  const onEdgesChangeHandler: OnEdgesChange = useCallback(
+    (changes) => {
+      onEdgesChange(changes);
+      changes.forEach(async (change) => {
+        if (change.type === 'remove') {
+          if (!isAdmin) {
+            showError('You do not have permission to delete connections.');
+            return;
+          }
+          try {
+            await deleteEdgeFromDB(change.id);
+            showSuccess('Connection deleted.');
+          } catch (error) {
+            console.error('Failed to delete connection:', error);
+            showError('Failed to delete connection.');
+          }
+        }
+      });
+    },
+    [onEdgesChange, isAdmin]
+  );
+
+  const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
+    if (!isAdmin) {
+      showError('You do not have permission to edit connections.');
+      return;
+    }
+    setEditingEdge(edge);
+    setIsEdgeEditorOpen(true);
+  };
+
+  const handleSaveEdge = async (edgeId: string, connectionType: string) => {
+    if (!isAdmin) {
+      showError('You do not have permission to save connection changes.');
+      return;
+    }
+    // Optimistically update UI
+    const originalEdges = edges;
+    setEdges((eds) => eds.map(e => e.id === edgeId ? { ...e, data: { connection_type } } : e));
+    
+    try {
+      // Update in database
+      await updateEdgeInDB(edgeId, { connection_type });
+      showSuccess('Connection updated.');
+    } catch (error) {
+      console.error('Failed to update connection:', error);
+      showError('Failed to update connection.');
+      // Revert UI update on failure
+      setEdges(originalEdges);
+    }
+  };
 
   const handleExport = async () => {
     if (!isAdmin) {
       showError('You do not have permission to export maps.');
-      return;
-    }
-    if (!currentMapId) {
-      showError('No map selected to export.');
       return;
     }
     const exportData: MapData = {
@@ -121,10 +415,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         show_live_ping: rest.show_live_ping || false,
         map_id: rest.map_id || null,
       })),
-      edges: edges.map(({ id, source, target, data }) => ({
-        source,
-        target,
-        connection_type: data.connection_type || 'cat5',
+      edges: edges.map(({ id, source, target, data }) => ({ 
+        source, 
+        target, 
+        connection_type: data.connection_type || 'cat5' 
       })),
     };
     const jsonString = JSON.stringify(exportData, null, 2);
@@ -145,10 +439,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       showError('You do not have permission to import maps.');
       return;
     }
-    if (!currentMapId) {
-      showError('Please select a map to import into.');
-      return;
-    }
     importInputRef.current?.click();
   };
 
@@ -167,10 +457,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(currentMapId!, mapData); // Pass currentMapId
+        await importMap(mapData);
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
-        onMapUpdate(currentMapId); // Refresh the map data
+        onMapUpdate(); // Refresh the map data
       } catch (error: any) {
         dismissToast(toastId);
         console.error('Failed to import map:', error);
@@ -183,11 +473,16 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleShareMap = async () => {
+    // Share map is accessible to all roles, as it's just generating a public link.
+    const currentMapId = devices.length > 0 ? devices[0].map_id : null;
+
     if (!currentMapId) {
       showError('No map selected to share.');
       return;
     }
 
+    // Construct the shareable URL
+    // Using hardcoded IP and port as requested by the user
     const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${currentMapId}`;
 
     try {
@@ -199,82 +494,71 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     }
   };
 
-  const handleToggleFullscreen = () => {
-    if (!mapWrapperRef.current) return;
-
-    if (!document.fullscreenElement) {
-      mapWrapperRef.current.requestFullscreen().catch((err) => {
-        showError(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
-  };
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  const currentMap = maps.find(m => m.id === currentMapId);
-  const backgroundStyle = currentMap?.background_image_url
-    ? { backgroundImage: `url(${currentMap.background_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : currentMap?.background_color
-    ? { backgroundColor: currentMap.background_color }
-    : { backgroundColor: '#1e293b' }; // Default if nothing set
-
   return (
-    <div className="space-y-4">
-      <MapControls
-        maps={maps}
-        currentMapId={currentMapId}
-        handleMapChange={handleMapChange}
-        onRefresh={() => onMapUpdate(currentMapId)}
-        liveRefreshEnabled={liveRefreshEnabled}
-        setLiveRefreshEnabled={setLiveRefreshEnabled}
-        onExport={handleExport}
-        onImportClick={handleImportClick}
-        onFileChange={handleFileChange}
-        onShareMap={handleShareMap}
-        onToggleFullscreen={handleToggleFullscreen}
-        isFullScreen={isFullScreen}
-        isAdmin={isAdmin}
-      />
-
-      {maps.length === 0 && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center p-4">
-          <h2 className="text-2xl font-bold mb-2">No Network Maps Available</h2>
-          <p className="text-lg mb-4">
-            {isAdmin ? 'Create a new map to start visualizing your network.' : 'Please ask an administrator to create a map.'}
-          </p>
-          {isAdmin && (
-            <Button onClick={() => console.log('Create First Map')} className="mt-4">Create First Map</Button>
-          )}
-        </div>
-      )}
-      {currentMapId && maps.length > 0 && (
-        <NetworkMapCanvas
-          nodes={nodes}
-          edges={styledEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          onNodeDragStop={onNodeDragStop}
-          onEdgeClick={onEdgeClick}
-          isAdmin={isAdmin}
-          backgroundStyle={backgroundStyle}
+    <div style={{ height: '70vh', width: '100%' }} className="relative border rounded-lg bg-gray-900">
+      <ReactFlow
+        nodes={nodes}
+        edges={styledEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChangeHandler}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        onNodeDragStop={onNodeDragStop}
+        onEdgeClick={onEdgeClick}
+        fitView
+        fitViewOptions={{ padding: 0.1 }}
+        proOptions={{ hideAttribution: true }} // Hide React Flow attribution
+        nodesDraggable={isAdmin} // Only allow admins to drag nodes
+        nodesConnectable={isAdmin} // Only allow admins to connect nodes
+        elementsSelectable={isAdmin} // Only allow admins to select elements
+      >
+        <Controls />
+        <MiniMap 
+          nodeColor={(n) => {
+            switch (n.data.status) {
+              case 'online': return '#22c55e';
+              case 'offline': return '#ef4444';
+              default: return '#94a3b8';
+            }
+          }} 
+          nodeStrokeWidth={3} 
+          maskColor="rgba(15, 23, 42, 0.8)"
         />
-      )}
+        <Background gap={16} size={1} color="#444" />
+      </ReactFlow>
+      <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+        {isAdmin && (
+          <Button onClick={() => navigate('/add-device')} size="sm">
+            <PlusCircle className="h-4 w-4 mr-2" />Add Device
+          </Button>
+        )}
+        {isAdmin && (
+          <Button onClick={handleExport} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />Export
+          </Button>
+        )}
+        {isAdmin && (
+          <Button onClick={handleImportClick} variant="outline" size="sm">
+            <Upload className="h-4 w-4 mr-2" />Import
+          </Button>
+        )}
+        <input 
+          type="file" 
+          ref={importInputRef} 
+          onChange={handleFileChange} 
+          accept="application/json" 
+          className="hidden" 
+        />
+        <Button onClick={handleShareMap} variant="outline" size="sm">
+          <Share2 className="h-4 w-4 mr-2" />Share Map
+        </Button>
+      </div>
       {isEdgeEditorOpen && (
-        <EdgeEditorDialog
-          isOpen={isEdgeEditorOpen}
-          onClose={() => setIsEdgeEditorOpen(false)}
-          onSave={handleSaveEdge}
-          edge={editingEdge}
+        <EdgeEditorDialog 
+          isOpen={isEdgeEditorOpen} 
+          onClose={() => setIsEdgeEditorOpen(false)} 
+          onSave={handleSaveEdge} 
+          edge={editingEdge} 
         />
       )}
     </div>
