@@ -18,20 +18,6 @@ function initMap() {
         deviceManager
     } = MapApp;
 
-    // Add new elements to cache
-    els.mapSettingsBtn = document.getElementById('mapSettingsBtn');
-    els.mapSettingsModal = document.getElementById('mapSettingsModal');
-    els.mapSettingsForm = document.getElementById('mapSettingsForm');
-    els.cancelMapSettingsBtn = document.getElementById('cancelMapSettingsBtn');
-    els.resetMapBgBtn = document.getElementById('resetMapBgBtn');
-    els.mapBgUpload = document.getElementById('mapBgUpload');
-    els.placeDeviceBtn = document.getElementById('placeDeviceBtn');
-    els.placeDeviceModal = document.getElementById('placeDeviceModal');
-    els.closePlaceDeviceModal = document.getElementById('closePlaceDeviceModal');
-    els.placeDeviceList = document.getElementById('placeDeviceList');
-    els.placeDeviceLoader = document.getElementById('placeDeviceLoader');
-    els.shareMapBtn = document.getElementById('shareMapBtn'); // Cache the new share button
-
     // Cleanup function for SPA navigation
     window.cleanup = () => {
         if (state.animationFrameId) {
@@ -52,155 +38,6 @@ function initMap() {
     };
 
     // Event Listeners Setup
-    // els.deviceForm.addEventListener('submit', async (e) => { // Removed
-    //     e.preventDefault();
-    //     const formData = new FormData(els.deviceForm);
-    //     const data = Object.fromEntries(formData.entries());
-    //     const id = data.id;
-    //     delete data.id;
-    //     data.show_live_ping = document.getElementById('showLivePing').checked;
-
-    //     try {
-    //         if (id) {
-    //             const updatedDevice = await api.post('update_device', { id, updates: data });
-    //             const existingNode = state.nodes.get(id);
-    //             if (existingNode) {
-    //                 let label = updatedDevice.name;
-    //                 if (updatedDevice.show_live_ping && updatedDevice.status === 'online' && updatedDevice.last_avg_time !== null) {
-    //                     label += `\n${updatedDevice.last_avg_time}ms | TTL:${updatedDevice.last_ttl || 'N/A'}`;
-    //                 }
-
-    //                 const nodeUpdate = {
-    //                     id: updatedDevice.id,
-    //                     label: label,
-    //                     title: MapApp.utils.buildNodeTitle(updatedDevice),
-    //                     deviceData: updatedDevice,
-    //                     font: { ...existingNode.font, size: parseInt(updatedDevice.name_text_size) || 14 },
-    //                 };
-
-    //                 if (updatedDevice.icon_url) {
-    //                     Object.assign(nodeUpdate, {
-    //                         shape: 'image',
-    //                         image: updatedDevice.icon_url,
-    //                         size: (parseInt(updatedDevice.icon_size) || 50) / 2, // vis.js size is radius
-    //                         color: { border: MapApp.config.statusColorMap[updatedDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
-    //                         borderWidth: 3
-    //                     });
-    //                     delete nodeUpdate.icon;
-    //                 } else if (updatedDevice.type === 'box') {
-    //                     Object.assign(nodeUpdate, { shape: 'box' });
-    //                 } else {
-    //                     Object.assign(nodeUpdate, {
-    //                         shape: 'icon',
-    //                         image: null,
-    //                         icon: {
-    //                             ...(existingNode.icon || {}),
-    //                             face: "'Font Awesome 6 Free'", weight: "900",
-    //                             code: MapApp.config.iconMap[updatedDevice.type] || MapApp.config.iconMap.other,
-    //                             size: parseInt(updatedDevice.icon_size) || 50,
-    //                             color: MapApp.config.statusColorMap[updatedDevice.status] || MapApp.config.statusColorMap.unknown
-    //                         }
-    //                     });
-    //                 }
-                    
-    //                 state.nodes.update(nodeUpdate);
-
-    //                 if (existingNode.deviceData.ping_interval !== updatedDevice.ping_interval) {
-    //                     if (state.pingIntervals[id]) {
-    //                         clearInterval(state.pingIntervals[id]);
-    //                         delete state.pingIntervals[id];
-    //                     }
-    //                     if (updatedDevice.ping_interval > 0 && updatedDevice.ip) {
-    //                         state.pingIntervals[id] = setInterval(() => deviceManager.pingSingleDevice(id), updatedDevice.ping_interval * 1000);
-    //                     }
-    //                 }
-    //             }
-    //             window.notyf.success('Item updated.');
-    //         } else {
-    //             const numericFields = ['ping_interval', 'icon_size', 'name_text_size', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold'];
-    //             for (const key in data) {
-    //                 if (numericFields.includes(key) && data[key] === '') data[key] = null;
-    //             }
-    //             if (data.ip === '') data.ip = null;
-                
-    //             // Get current map center for new device placement
-    //             const viewPosition = state.network.getViewPosition();
-    //             const canvasPosition = state.network.canvas.DOMtoCanvas(viewPosition);
-
-    //             const newDevice = await api.post('create_device', { 
-    //                 ...data, 
-    //                 map_id: state.currentMapId,
-    //                 x: canvasPosition.x, // Add default X
-    //                 y: canvasPosition.y  // Add default Y
-    //             });
-                
-    //             const baseNode = {
-    //                 id: newDevice.id, label: newDevice.name, title: MapApp.utils.buildNodeTitle(newDevice),
-    //                 x: newDevice.x, y: newDevice.y,
-    //                 font: { color: 'white', size: parseInt(newDevice.name_text_size) || 14, multi: true },
-    //                 deviceData: newDevice
-    //             };
-
-    //             let visNode;
-    //             if (newDevice.icon_url) {
-    //                 visNode = { ...baseNode, shape: 'image', image: newDevice.icon_url, size: (parseInt(newDevice.icon_size) || 50) / 2, color: { border: MapApp.config.statusColorMap[newDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' }, borderWidth: 3 };
-    //             } else if (newDevice.type === 'box') {
-    //                 visNode = { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
-    //             } else {
-    //                 visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[newDevice.type] || MapApp.config.iconMap.other, size: parseInt(newDevice.icon_size) || 50, color: MapApp.config.statusColorMap[newDevice.status] || MapApp.config.statusColorMap.unknown } };
-    //             }
-
-    //             state.nodes.add(visNode);
-    //             window.notyf.success('Item created.');
-    //         }
-    //         closeModal('deviceModal');
-    //     } catch (error) {
-    //         console.error("Failed to save device:", error);
-    //         window.notyf.error(error.message || "An error occurred while saving.");
-    //     }
-    // });
-
-    // document.getElementById('icon_upload').addEventListener('change', async (e) => { // Removed
-    //     const file = e.target.files[0];
-    //     const deviceId = document.getElementById('deviceId').value;
-    //     if (!file) return;
-    //     if (!deviceId) {
-    //         window.notyf.error('Please save the item before uploading an icon.');
-    //         e.target.value = '';
-    //         return;
-    //     }
-    
-    //     const loader = document.getElementById('icon_upload_loader');
-    //     loader.classList.remove('hidden');
-    
-    //     const formData = new FormData();
-    //     formData.append('id', deviceId);
-    //     formData.append('iconFile', file);
-    
-    //     try {
-    //         const res = await fetch(`${MapApp.config.API_URL}?action=upload_device_icon`, {
-    //             method: 'POST',
-    //             body: formData
-    //         });
-    //         const result = await res.json();
-    //         if (result.success) {
-    //             document.getElementById('icon_url').value = result.url;
-    //             const previewImg = document.getElementById('icon_preview');
-    //             previewImg.src = result.url;
-    //             document.getElementById('icon_preview_wrapper').classList.remove('hidden');
-    //             window.notyf.success('Icon uploaded. Press Save to apply changes.');
-    //         } else {
-    //             throw new Error(result.error || 'Upload failed');
-    //         }
-    //     } catch (error) {
-    //         console.error('Icon upload failed:', error);
-    //         window.notyf.error(error.message);
-    //     } finally {
-    //         loader.classList.add('hidden');
-    //         e.target.value = '';
-    //     }
-    // });
-
     // Only admin can edit edges
     if (window.userRole === 'admin') {
         els.edgeForm.addEventListener('submit', async (e) => {
@@ -248,7 +85,6 @@ function initMap() {
             if (e.target.classList.contains('add-scanned-device-btn')) {
                 const { ip, name } = e.target.dataset;
                 closeModal('scanModal');
-                // MapApp.ui.openDeviceModal(null, { ip, name }); // Removed
                 window.notyf.info(`Device "${name}" (IP: ${ip}) copied to clipboard. Navigate to Add Device page to create it.`);
                 navigator.clipboard.writeText(JSON.stringify({ ip, name })).then(() => {
                     window.notyf.success('Device details copied to clipboard.');
@@ -402,8 +238,6 @@ function initMap() {
     }
 
     els.mapSelector.addEventListener('change', (e) => mapManager.switchMap(e.target.value));
-    // els.addDeviceBtn.addEventListener('click', () => MapApp.ui.openDeviceModal()); // Removed
-    // els.cancelBtn.addEventListener('click', () => closeModal('deviceModal')); // Removed
     
     // Only admin can add edges
     if (window.userRole === 'admin') {
@@ -418,7 +252,6 @@ function initMap() {
     els.cancelEdgeBtn.addEventListener('click', () => closeModal('edgeModal'));
     els.scanNetworkBtn.addEventListener('click', () => openModal('scanModal'));
     els.closeScanModal.addEventListener('click', () => closeModal('scanModal'));
-    // document.getElementById('deviceType').addEventListener('change', (e) => MapApp.ui.toggleDeviceModalFields(e.target.value)); // Removed
 
     // Place Device Modal Logic (Admin only)
     if (window.userRole === 'admin') {
@@ -470,7 +303,7 @@ function initMap() {
                     // Add the device to the map visually
                     const baseNode = {
                         id: updatedDevice.id, label: updatedDevice.name, title: MapApp.utils.buildNodeTitle(updatedDevice),
-                        x: updatedDevice.x, y: updatedPosition.y,
+                        x: updatedDevice.x, y: updatedDevice.y, // Corrected variable name
                         font: { color: 'white', size: parseInt(updatedDevice.name_text_size) || 14, multi: true },
                         deviceData: updatedDevice
                     };
@@ -592,7 +425,16 @@ function initMap() {
 
     // Initial Load
     (async () => {
-        els.liveRefreshToggle.checked = false;
+        // Set live refresh to ON by default for viewers
+        if (window.userRole === 'viewer') {
+            els.liveRefreshToggle.checked = true;
+            els.refreshStatusBtn.disabled = true; // Disable manual refresh button for viewers when live is on
+            deviceManager.performBulkRefresh(); // Initial refresh
+            state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
+        } else {
+            els.liveRefreshToggle.checked = false; // Default off for admin
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const mapToLoad = urlParams.get('map_id'); // Check for map_id in URL
         
@@ -604,10 +446,29 @@ function initMap() {
             await mapManager.switchMap(initialMapId);
             const deviceToEdit = urlParams.get('edit_device_id');
             if (deviceToEdit && state.nodes.get(deviceToEdit)) {
-                // MapApp.ui.openDeviceModal(deviceToEdit); // Removed
                 window.notyf.info('To edit a device, click the "Edit" option from its context menu.');
                 const newUrl = window.location.pathname + `?map_id=${initialMapId}`;
                 history.replaceState(null, '', newUrl);
+            }
+        }
+
+        // Disable modification buttons for viewers after initial load
+        if (window.userRole === 'viewer') {
+            els.newMapBtn.disabled = true;
+            els.renameMapBtn.disabled = true;
+            els.deleteMapBtn.disabled = true;
+            els.placeDeviceBtn.disabled = true;
+            els.addDeviceBtn.style.display = 'none'; // Hide link
+            els.addEdgeBtn.disabled = true;
+            els.exportBtn.disabled = true;
+            els.importBtn.disabled = true;
+            els.mapSettingsBtn.disabled = true;
+            els.scanNetworkBtn.disabled = true;
+            if (els.createFirstMapBtn) els.createFirstMapBtn.disabled = true; // If no maps exist
+            
+            const mapSelectionControls = document.querySelector('#map-selection .flex.gap-4');
+            if (mapSelectionControls) {
+                mapSelectionControls.insertAdjacentHTML('afterend', '<p class="text-red-400 text-sm mt-2">You do not have permission to manage maps or devices.</p>');
             }
         }
     })();

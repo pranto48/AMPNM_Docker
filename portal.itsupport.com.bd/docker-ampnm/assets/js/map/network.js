@@ -56,7 +56,10 @@ MapApp.network = {
                         <div class="context-menu-item" data-action="delete" data-id="${nodeId}" style="color: #ef4444;"><i class="fas fa-trash-alt fa-fw mr-2"></i>Delete</div>
                     `;
                 } else {
-                    menuItems += `<div class="context-menu-item text-slate-500">No actions available</div>`;
+                    menuItems += `<div class="context-menu-item" data-action="view-details" data-id="${nodeId}"><i class="fas fa-info-circle fa-fw mr-2"></i>View Details</div>`;
+                    if (node.deviceData.ip) {
+                        menuItems += `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>`;
+                    }
                 }
                 contextMenu.innerHTML = menuItems;
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
@@ -84,40 +87,53 @@ MapApp.network = {
         });
         contextMenu.addEventListener('click', async (e) => {
             const target = e.target.closest('.context-menu-item');
-            if (target && window.userRole === 'admin') { // Only admin can use context menu actions
+            if (target) {
                 const { action, id } = target.dataset;
                 closeContextMenu();
 
-                if (action === 'edit') {
-                    MapApp.ui.openDeviceModal(id);
-                } else if (action === 'ping') {
-                    const icon = document.createElement('i');
-                    icon.className = 'fas fa-spinner fa-spin';
-                    target.prepend(icon);
-                    MapApp.deviceManager.pingSingleDevice(id).finally(() => icon.remove());
-                } else if (action === 'copy') {
-                    await MapApp.mapManager.copyDevice(id);
-                } else if (action === 'delete') {
-                    if (confirm('Are you sure you want to delete this device?')) {
-                        await MapApp.api.post('delete_device', { id });
-                        window.notyf.success('Device deleted.');
-                        MapApp.state.nodes.remove(id);
-                    }
-                } else if (action === 'edit-edge') {
-                    MapApp.ui.openEdgeModal(id);
-                } else if (action === 'delete-edge') {
-                    if (confirm('Are you sure you want to delete this connection?')) {
-                        const result = await MapApp.api.post('delete_edge', { id });
-                        if (result.success) {
-                            window.notyf.success('Connection deleted.');
-                            MapApp.state.edges.remove(id);
-                        } else {
-                            window.notyf.error('Failed to delete connection.');
+                if (window.userRole === 'admin') {
+                    if (action === 'edit') {
+                        MapApp.ui.openDeviceModal(id);
+                    } else if (action === 'ping') {
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-spinner fa-spin';
+                        target.prepend(icon);
+                        MapApp.deviceManager.pingSingleDevice(id).finally(() => icon.remove());
+                    } else if (action === 'copy') {
+                        await MapApp.mapManager.copyDevice(id);
+                    } else if (action === 'delete') {
+                        if (confirm('Are you sure you want to delete this device?')) {
+                            await MapApp.api.post('delete_device', { id });
+                            window.notyf.success('Device deleted.');
+                            MapApp.state.nodes.remove(id);
+                        }
+                    } else if (action === 'edit-edge') {
+                        MapApp.ui.openEdgeModal(id);
+                    } else if (action === 'delete-edge') {
+                        if (confirm('Are you sure you want to delete this connection?')) {
+                            const result = await MapApp.api.post('delete_edge', { id });
+                            if (result.success) {
+                                window.notyf.success('Connection deleted.');
+                                MapApp.state.edges.remove(id);
+                            } else {
+                                window.notyf.error('Failed to delete connection.');
+                            }
                         }
                     }
+                } else { // Viewer role actions
+                    if (action === 'view-details') {
+                        // Implement a read-only details view for viewers if needed
+                        window.notyf.info('Viewer mode: Displaying read-only details.');
+                        // For now, just show a toast, but you could open a modal with device details
+                    } else if (action === 'ping') {
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-spinner fa-spin';
+                        target.prepend(icon);
+                        MapApp.deviceManager.pingSingleDevice(id).finally(() => icon.remove());
+                    } else {
+                        window.notyf.error('You do not have permission to perform this action.');
+                    }
                 }
-            } else if (target && window.userRole === 'viewer') {
-                window.notyf.error('You do not have permission to perform this action.');
             }
         });
     }
