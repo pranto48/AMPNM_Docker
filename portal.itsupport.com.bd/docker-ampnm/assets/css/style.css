@@ -68,16 +68,26 @@ button:hover, a.hoverable:hover {
     padding: 0.75rem 1rem; border-radius: 0.375rem;
     font-size: 0.875rem; font-weight: 500;
     color: #cbd5e1; /* slate-300 */
+    transition: all 0.3s ease; /* Smooth transitions for all properties */
 }
 .nav-link:hover {
     background-color: #334155; /* slate-700 */
     color: #ffffff;
-    transform: none;
+    transform: translateY(-2px) scale(1.02); /* Lift and slightly scale on hover */
 }
 #main-nav a.bg-slate-700 { /* Active link style */
     background-color: #1e293b;
     color: #22d3ee;
+    animation: pulse-active 1.5s infinite ease-in-out; /* Pulse animation for active link */
 }
+
+/* Keyframes for active link pulse */
+@keyframes pulse-active {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 211, 238, 0.4); }
+    50% { transform: scale(1.01); box-shadow: 0 0 8px rgba(34, 211, 238, 0.7); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 211, 238, 0.4); }
+}
+
 
 /* Map specific styles */
 #network-map-wrapper { position: relative; }
