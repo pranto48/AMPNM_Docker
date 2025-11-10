@@ -216,7 +216,9 @@ switch ($action) {
 
             $sql = "SELECT * FROM devices WHERE enabled = TRUE AND map_id = ? AND ip IS NOT NULL AND type != 'box'";
             $params = [$map_id];
-            if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+            // IMPORTANT: For viewers, do NOT filter by user_id here.
+            // Viewers should be able to ping all devices on a map they can see.
+            if ($user_role !== 'viewer') { 
                 $sql .= " AND user_id = ?";
                 $params[] = $current_user_id;
             }
