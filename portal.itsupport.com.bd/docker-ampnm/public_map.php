@@ -310,15 +310,18 @@ if ($map['background_image_url']) {
         }
 
         async function updateMapLive(nodesDataSet, edgesDataSet) {
+            console.log("Fetching live map data...");
             const mapId = <?= json_encode($map_id) ?>;
             const apiUrl = `http://192.168.20.5:2266/api.php?action=get_public_map_data&map_id=${mapId}`;
 
             try {
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
+                    console.error(`HTTP error! status: ${response.status}`);
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
+                console.log("Live map data fetched successfully:", data);
 
                 if (data && data.devices) {
                     const nodeUpdates = [];
