@@ -66,8 +66,11 @@ const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any): P
   return result as T; // Cast to T, assuming the data field or direct array is T
 };
 
-export const getDevices = async (): Promise<NetworkDevice[]> => {
-  const result = await callApi<{ devices: NetworkDevice[] }>('get_devices', 'GET');
+export const getDevices = async (mapId?: string, unmapped?: boolean): Promise<NetworkDevice[]> => {
+  const params = new URLSearchParams();
+  if (mapId) params.append('map_id', mapId);
+  if (unmapped) params.append('unmapped', 'true');
+  const result = await callApi<{ devices: NetworkDevice[] }>('get_devices', 'GET', undefined, params);
   return result.devices || [];
 };
 
@@ -87,7 +90,7 @@ export const addDevice = async (device: Omit<NetworkDevice, 'user_id' | 'status'
     name_text_size: device.name_text_size,
     icon_url: device.icon_url,
     warning_latency_threshold: device.warning_latency_threshold,
-    warning_packetloss_threshold: device.warning_packetloss_threshold,
+    warning_packetloss_threshold: device.warning_packetloss_threshold, // Corrected here
     critical_latency_threshold: device.critical_latency_threshold,
     critical_packetloss_threshold: device.critical_packetloss_threshold,
     show_live_ping: device.show_live_ping,
@@ -131,13 +134,13 @@ export const deleteDevice = async (id: string): Promise<{ success: boolean }> =>
   return result;
 };
 
-export const getEdges = async (): Promise<NetworkEdge[]> => {
-  const result = await callApi<{ edges: NetworkEdge[] }>('get_edges', 'GET');
+export const getEdges = async (mapId: string): Promise<NetworkEdge[]> => {
+  const result = await callApi<{ edges: NetworkEdge[] }>('get_edges', 'GET', undefined, { map_id: mapId });
   return result.edges || [];
 };
 
-export const addEdgeToDB = async (edge: { source: string; target: string }): Promise<NetworkEdge> => {
-  const result = await callApi<NetworkEdge>('create_edge', 'POST', { source_id: edge.source, target_id: edge.target, connection_type: 'cat5' });
+export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string }): Promise<NetworkEdge> => {
+  const result = await callApi<NetworkEdge>('create_edge', 'POST', { source_id: edge.source, target_id: edge.target, map_id: edge.map_id, connection_type: 'cat5' });
   return result;
 };
 
@@ -151,9 +154,10 @@ export const deleteEdgeFromDB = async (edgeId: string): Promise<{ success: boole
   return result;
 };
 
-export const importMap = async (mapData: MapData): Promise<{ success: boolean }> => {
+export const importMap = async (mapId: string, mapData: MapData): Promise<{ success: boolean }> => {
   // The PHP API expects 'devices' and 'edges' directly in the body
   const payload = {
+    map_id: mapId, // Pass map_id to the API
     devices: mapData.devices.map(d => ({
       ...d,
       ip: d.ip_address, // Map ip_address to ip for PHP
@@ -179,4 +183,53 @@ export const subscribeToDeviceChanges = (callback: (payload: any) => void) => {
     subscribe: () => {},
     removeChannel: () => {},
   };
+};
+
+// New function to fetch maps
+export interface MapOption {
+  id: string;
+  name: string;
+}
+
+export const getMaps = async (): Promise<MapOption[]> => {
+  const result = await callApi<MapOption[]>('get_maps', 'GET');
+  return result;
+};
+
+// Helper for callApi to handle URLSearchParams
+const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any, params?: URLSearchParams): Promise<T> => {
+  const options: RequestInit = {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  let url = `${LOCAL_API_URL}?action=${action}`;
+  if (params) {
+    url += `&${params.toString()}`;
+  }
+
+  const response = await fetch(url, options);
+  const result: ApiResponse<T> = await response.json();
+
+  if (!response.ok || result.error) {
+    throw new Error(result.error || `API call failed with status ${response.status}`);
+  }
+  // Depending on the API response structure, you might need to return result.data or result.devices etc.
+  // For get_maps, it returns an array directly, so we return result as T.
+  // For other actions, it might be wrapped in 'data' or 'devices' key.
+  // This needs careful handling based on each API endpoint's actual return.
+  // For now, assuming direct return for get_maps, and wrapped for others.
+  if (action === 'get_maps') {
+    return result as T; // get_maps returns array directly
+  } else if (action === 'get_devices') {
+    return (result as any).devices as T; // get_devices returns { devices: [...] }
+  } else if (action === 'get_edges') {
+    return (result as any).edges as T; // get_edges returns { edges: [...] }
+  }
+  return result as T; // Default for others
 };

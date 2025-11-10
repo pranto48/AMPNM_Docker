@@ -26,22 +26,23 @@ const EditDevicePage = () => {
     const fetchDevice = async () => {
       if (!id) {
         showError('Device ID is missing.');
-        navigate('/');
+        navigate('/devices'); // Navigate to devices list
         return;
       }
       try {
+        // Fetch all devices and find the one with the matching ID
         const devices = await getDevices();
         const foundDevice = devices.find((d: NetworkDevice) => d.id === id);
         if (foundDevice) {
           setDevice(foundDevice);
         } else {
           showError('Device not found.');
-          navigate('/');
+          navigate('/devices'); // Navigate to devices list
         }
       } catch (error) {
         console.error('Failed to fetch device:', error);
         showError('Failed to load device data.');
-        navigate('/');
+        navigate('/devices'); // Navigate to devices list
       } finally {
         setIsLoading(false);
       }
@@ -53,12 +54,15 @@ const EditDevicePage = () => {
     return null; // Render nothing if not authorized
   }
 
-  const handleSubmit = async (deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => {
+  const handleSubmit = async (deviceData: Omit<NetworkDevice, 'id' | 'user_id'>) => { // Adjusted type
     if (!id) return;
     try {
-      await updateDevice(id, deviceData);
+      await updateDevice(id, { 
+        ...deviceData,
+        map_id: deviceData.map_id || null, // Ensure map_id is passed, or null if unassigned
+      });
       showSuccess('Device updated successfully!');
-      navigate('/'); // Navigate back to the dashboard or map
+      navigate('/devices'); // Navigate back to the devices list
     } catch (error) {
       console.error('Failed to update device:', error);
       showError('Failed to update device.');
@@ -103,7 +107,7 @@ const EditDevicePage = () => {
     <div className="container mx-auto p-4">
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="icon" asChild>
-          <Link to="/">
+          <Link to="/devices">
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
