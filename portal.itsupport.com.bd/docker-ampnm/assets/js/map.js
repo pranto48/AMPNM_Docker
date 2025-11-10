@@ -449,11 +449,13 @@ function initMap() {
         // Set live refresh to ON by default for viewers
         if (window.userRole === 'viewer') {
             els.liveRefreshToggle.checked = true;
+            els.liveRefreshToggle.disabled = true; // Disable toggle for viewers
             els.refreshStatusBtn.disabled = true; // Disable manual refresh button for viewers when live is on
             deviceManager.performBulkRefresh(); // Initial refresh
             state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
         } else {
             els.liveRefreshToggle.checked = false; // Default off for admin
+            els.liveRefreshToggle.disabled = false; // Enable toggle for admin
         }
 
         const urlParams = new URLSearchParams(window.location.search);

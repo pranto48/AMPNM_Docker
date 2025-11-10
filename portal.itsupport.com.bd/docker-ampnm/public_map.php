@@ -238,25 +238,7 @@ if ($map['background_image_url']) {
             const fontWeight = '900'; // Solid icons
             const svg = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-                    <style>
-                        @font-face {
-                            font-family: '${fontFamily}';
-                            font-style: normal;
-                            font-weight: ${fontWeight};
-                            font-display: block;
-                            src: url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2') format('woff2'),
-                                 url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf') format('truetype');
-                        }
-                        .icon {
-                            font-family: '${fontFamily}';
-                            font-weight: ${fontWeight};
-                            font-size: ${size}px;
-                            fill: ${color};
-                            text-anchor: middle;
-                            dominant-baseline: central;
-                        }
-                    </style>
-                    <text x="50%" y="50%" class="icon">${iconCode}</text>
+                    <text x="50%" y="50%" style="font-family: '${fontFamily}'; font-weight: ${fontWeight}; font-size: ${size}px; fill: ${color}; text-anchor: middle; dominant-baseline: central;">${iconCode}</text>
                 </svg>
             `;
             return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
