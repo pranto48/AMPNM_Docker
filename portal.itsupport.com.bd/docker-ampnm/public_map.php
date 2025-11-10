@@ -1,6 +1,5 @@
 <?php
 require_once 'includes/functions.php'; // For getDbConnection
-require_once 'assets/js/map/utils.js'; // Include shared JS utilities for PHP to use generateFaSvgDataUrlJs
 
 $map_id = $_GET['map_id'] ?? null;
 
@@ -233,6 +232,18 @@ if ($map['background_image_url']) {
             cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16'
         };
 
+        // JavaScript equivalent of generateFaSvgDataUrl
+        function generateFaSvgDataUrlJs(iconCode, size, color) {
+            const fontFamily = 'Font Awesome 6 Free';
+            const fontWeight = '900'; // Solid icons
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                    <text x="50%" y="50%" style="font-family: '${fontFamily}'; font-weight: ${fontWeight}; font-size: ${size}px; fill: ${color}; text-anchor: middle; dominant-baseline: central;">${iconCode}</text>
+                </svg>
+            `;
+            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        }
+
         // Utility to build node title (copy from MapApp.utils.buildNodeTitle)
         function buildNodeTitle(deviceData) {
             let title = `${deviceData.name}<br>${deviceData.ip}<br>Status: ${deviceData.status}`;
@@ -332,7 +343,7 @@ if ($map['background_image_url']) {
                         } else {
                             // Use the new JavaScript function to generate SVG data URL
                             Object.assign(updatedNode, {
-                                image: MapApp.utils.generateFaSvgDataUrlJs(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color),
+                                image: generateFaSvgDataUrlJs(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color),
                                 size: parseInt(icon_size),
                                 color: { border: node_color, background: 'transparent' },
                                 borderWidth: 3
