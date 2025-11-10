@@ -8,15 +8,15 @@ if (!$map_id) {
 }
 
 // Construct the full HTTP URL for the API endpoint
-// Using the hardcoded IP and port as requested
-$api_url = "http://192.168.20.5:2266/api.php?action=get_public_map_data&map_id=" . urlencode($map_id);
+// Using localhost for internal server-side calls within the Docker container
+$api_url = "http://localhost:2266/api.php?action=get_public_map_data&map_id=" . urlencode($map_id);
 
 // Fetch map data using the public API endpoint
 $response = @file_get_contents($api_url); // Suppress warnings for file_get_contents
 
 if ($response === false) {
     $error = error_get_last();
-    die("Error loading map data from API: " . ($error['message'] ?? "Unknown error. Ensure the Docker app is running and accessible at http://192.168.20.5:2266."));
+    die("Error loading map data from API: " . ($error['message'] ?? "Unknown error. Ensure the Docker app is running and accessible at http://localhost:2266 from within the container."));
 }
 
 $data = json_decode($response, true);
@@ -312,7 +312,7 @@ if ($map['background_image_url']) {
         async function updateMapLive(nodesDataSet, edgesDataSet) {
             console.log("Fetching live map data...");
             const mapId = <?= json_encode($map_id) ?>;
-            const apiUrl = `http://192.168.20.5:2266/api.php?action=get_public_map_data&map_id=${mapId}`;
+            const apiUrl = `http://localhost:2266/api.php?action=get_public_map_data&map_id=${mapId}`; // Changed to localhost
 
             try {
                 const response = await fetch(apiUrl);
@@ -441,7 +441,8 @@ if ($map['background_image_url']) {
 
             // Start live updates
             updateMapLive(nodes, edges); // Initial call
-            setInterval(() => updateMapLive(nodes, edges), 15000); // Update every 15 seconds
+            setInterval(() => updateMapLive(nodes, edges), 1000); // Update every 1 second
+            console.log("Public map live refresh interval set to 1 second.");
 
             // Start edge animation
             updateAndAnimateEdges(nodes, edges);
