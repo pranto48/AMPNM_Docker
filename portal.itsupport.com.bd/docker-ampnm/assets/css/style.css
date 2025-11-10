@@ -118,3 +118,16 @@ button:hover, a.hoverable:hover {
 
 /* Notyf custom icon support */
 .notyf__icon i { font-size: 1.3em; margin: 0 auto; }
+
+/* NEW: Animated Background for Login Page */
+.animated-gradient-background {
+    background: linear-gradient(135deg, #1a202c, #2d3748, #3b82f6, #06b6d4, #1a202c);
+    background-size: 400% 400%;
+    animation: gradientAnimation 15s ease infinite;
+}
+
+@keyframes gradientAnimation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
