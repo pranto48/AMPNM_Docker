@@ -109,7 +109,15 @@ MapApp.mapManager = {
                 return { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
             }
 
-            return { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[d.type] || MapApp.config.iconMap.other, size: parseInt(d.icon_size) || 50, color: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown } };
+            // Use SVG data URL for Font Awesome icons
+            return { 
+                ...baseNode, 
+                shape: 'image', 
+                image: MapApp.utils.generateFaSvgDataUrlJs(MapApp.config.iconMap[d.type] || MapApp.config.iconMap.other, parseInt(d.icon_size) || 50, MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown),
+                size: (parseInt(d.icon_size) || 50), // vis.js size is diameter for image shape
+                color: { border: MapApp.config.statusColorMap[d.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
+                borderWidth: 3
+            };
         });
         MapApp.state.nodes.clear(); 
         MapApp.state.nodes.add(visNodes);
@@ -167,7 +175,14 @@ MapApp.mapManager = {
             } else if (createdDevice.type === 'box') {
                 visNode = { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
             } else {
-                visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown } };
+                visNode = { 
+                    ...baseNode, 
+                    shape: 'image', 
+                    image: MapApp.utils.generateFaSvgDataUrlJs(MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, parseInt(createdDevice.icon_size) || 50, MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown),
+                    size: (parseInt(createdDevice.icon_size) || 50), // vis.js size is diameter for image shape
+                    color: { border: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' },
+                    borderWidth: 3
+                };
             }
             MapApp.state.nodes.add(visNode);
         } catch (error) {
