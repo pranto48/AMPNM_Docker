@@ -53,6 +53,7 @@ foreach ($devices as $d) {
     $name_text_size = $d['name_text_size'] ?? 14;
     $node_color = $status_color_map[$status] ?? $status_color_map['unknown'];
 
+    // Build initial title for PHP render
     $title = "{$d['name']}<br>{$d['ip']}<br>Status: {$status}";
     if ($status === 'offline' && $d['last_ping_output']) {
         $lines = explode("\n", $d['last_ping_output']);
@@ -231,6 +232,36 @@ if ($map['background_image_url']) {
             cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16'
         };
 
+        // JavaScript equivalent of generateFaSvgDataUrl
+        function generateFaSvgDataUrlJs(iconCode, size, color) {
+            const fontFamily = 'Font Awesome 6 Free';
+            const fontWeight = '900'; // Solid icons
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                    <style>
+                        @font-face {
+                            font-family: '${fontFamily}';
+                            font-style: normal;
+                            font-weight: ${fontWeight};
+                            font-display: block;
+                            src: url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2') format('woff2'),
+                                 url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf') format('truetype');
+                        }
+                        .icon {
+                            font-family: '${fontFamily}';
+                            font-weight: ${fontWeight};
+                            font-size: ${size}px;
+                            fill: ${color};
+                            text-anchor: middle;
+                            dominant-baseline: central;
+                        }
+                    </style>
+                    <text x="50%" y="50%" class="icon">${iconCode}</text>
+                </svg>
+            `;
+            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        }
+
         // Utility to build node title (copy from MapApp.utils.buildNodeTitle)
         function buildNodeTitle(deviceData) {
             let title = `${deviceData.name}<br>${deviceData.ip}<br>Status: ${deviceData.status}`;
@@ -301,11 +332,8 @@ if ($map['background_image_url']) {
                         const node_color = statusColorMap[status] ?? statusColorMap.unknown;
 
                         let label = d.name;
-                        // DEBUG: Log values for live ping status
-                        console.log(`Device: ${d.name}, show_live_ping: ${d.show_live_ping}, status: ${status}, last_avg_time: ${d.last_avg_time}, last_ttl: ${d.last_ttl}`);
                         if ((d.show_live_ping ?? false) && status === 'online' && (d.last_avg_time ?? null) !== null) {
-                            label += `\n${d.last_avg_time}ms | TTL:${d.last_ttl}`;
-                            console.log(`  -> Live ping label added: ${label}`);
+                            label += `\n${d.last_avg_time}ms | TTL:${d.last_ttl || 'N/A'}`;
                         }
 
                         const updatedNode = {
@@ -328,9 +356,9 @@ if ($map['background_image_url']) {
                                 color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                             });
                         } else {
-                            // Use SVG data URL for Font Awesome icons
+                            // Use the new JavaScript function to generate SVG data URL
                             Object.assign(updatedNode, {
-                                image: generateFaSvgDataUrl(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color),
+                                image: generateFaSvgDataUrlJs(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color),
                                 size: parseInt(icon_size),
                                 color: { border: node_color, background: 'transparent' },
                                 borderWidth: 3
