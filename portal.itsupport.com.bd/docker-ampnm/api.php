@@ -74,7 +74,8 @@ try {
         'get_maps', 'get_devices', 'get_edges', 'get_dashboard_data', 'get_ping_history',
         'get_status_logs', 'get_device_details', 'get_device_uptime', 'get_public_map_data',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
-        'health'
+        'health',
+        'ping_all_devices' // NEW: Allow viewers to trigger bulk pings
     ];
 
     // If user is a 'viewer', restrict actions
@@ -90,10 +91,10 @@ try {
              echo json_encode(['error' => 'Forbidden: Viewers can only access devices/edges within a specific map.']);
              exit;
         }
-        // Viewers cannot perform POST requests except for specific cases if needed (none currently defined)
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Viewers cannot perform POST requests, EXCEPT for ping_all_devices
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'ping_all_devices') {
             http_response_code(403);
-            echo json_encode(['error' => 'Forbidden: Viewers cannot perform write operations.']);
+            echo json_encode(['error' => 'Forbidden: Viewers cannot perform write operations (except ping_all_devices).']);
             exit;
         }
     }
