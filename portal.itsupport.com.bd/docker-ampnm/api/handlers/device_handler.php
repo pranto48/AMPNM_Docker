@@ -1,6 +1,7 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
 
 // Placeholder for email notification function
 function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) {
@@ -20,8 +21,8 @@ function sendEmailNotification($pdo, $device, $oldStatus, $newStatus, $details) 
     }
 
     // Fetch subscriptions for this device and status change
-    $sqlSubscriptions = "SELECT recipient_email FROM device_email_subscriptions WHERE device_id = ? AND user_id = ?";
-    $paramsSubscriptions = [$device['id'], $_SESSION['user_id']];
+    $sqlSubscriptions = "SELECT recipient_email FROM device_email_subscriptions WHERE user_id = ? AND device_id = ?";
+    $paramsSubscriptions = [$_SESSION['user_id'], $device['id']];
 
     if ($newStatus === 'online') {
         $sqlSubscriptions .= " AND notify_on_online = TRUE";
@@ -213,8 +214,14 @@ switch ($action) {
             $map_id = $input['map_id'] ?? null;
             if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
 
-            $stmt = $pdo->prepare("SELECT * FROM devices WHERE enabled = TRUE AND map_id = ? AND user_id = ? AND ip IS NOT NULL AND type != 'box'");
-            $stmt->execute([$map_id, $current_user_id]);
+            $sql = "SELECT * FROM devices WHERE enabled = TRUE AND map_id = ? AND ip IS NOT NULL AND type != 'box'";
+            $params = [$map_id];
+            if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+                $sql .= " AND user_id = ?";
+                $params[] = $current_user_id;
+            }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             $updated_devices = [];
@@ -274,8 +281,14 @@ switch ($action) {
             $deviceId = $input['id'] ?? 0;
             if (!$deviceId) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
             
-            $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?");
-            $stmt->execute([$deviceId, $current_user_id]);
+            $sql = "SELECT * FROM devices WHERE id = ?";
+            $params = [$deviceId];
+            if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+                $sql .= " AND user_id = ?";
+                $params[] = $current_user_id;
+            }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$device) { http_response_code(404); echo json_encode(['error' => 'Device not found']); exit; }
@@ -321,8 +334,14 @@ switch ($action) {
         $deviceId = $_GET['id'] ?? 0;
         if (!$deviceId) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
         
-        $stmt = $pdo->prepare("SELECT ip FROM devices WHERE id = ? AND user_id = ?");
-        $stmt->execute([$deviceId, $current_user_id]);
+        $sql = "SELECT ip FROM devices WHERE id = ?";
+        $params = [$deviceId];
+        if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+            $sql .= " AND user_id = ?";
+            $params[] = $current_user_id;
+        }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $device = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$device || !$device['ip']) {
@@ -348,8 +367,15 @@ switch ($action) {
     case 'get_device_details':
         $deviceId = $_GET['id'] ?? 0;
         if (!$deviceId) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
-        $stmt = $pdo->prepare("SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id = ?");
-        $stmt->execute([$deviceId, $current_user_id]);
+        
+        $sql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ?";
+        $params = [$deviceId];
+        if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+            $sql .= " AND d.user_id = ?";
+            $params[] = $current_user_id;
+        }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $device = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$device) { http_response_code(404); echo json_encode(['error' => 'Device not found']); exit; }
         $history = [];
@@ -386,13 +412,25 @@ switch ($action) {
                     ORDER BY created_at DESC 
                     LIMIT 1
                 )
-            WHERE d.user_id = ?
+            WHERE 1=1
         ";
-        $params = [$current_user_id];
+        $params = [];
+
         if ($map_id) { 
             $sql .= " AND d.map_id = ?"; 
             $params[] = $map_id; 
+            // If map_id is provided, viewers can see all devices on that map
+            if ($user_role !== 'viewer') {
+                $sql .= " AND d.user_id = ?";
+                $params[] = $current_user_id;
+            }
+        } else {
+            // If no map_id is provided (e.g., on the main devices inventory page),
+            // viewers should only see devices they own. Admins see their own.
+            $sql .= " AND d.user_id = ?";
+            $params[] = $current_user_id;
         }
+
         if ($unmapped) {
             $sql .= " AND d.map_id IS NULL";
         }

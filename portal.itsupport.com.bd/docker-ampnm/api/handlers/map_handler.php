@@ -1,11 +1,26 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
 
 switch ($action) {
     case 'get_maps':
-        $stmt = $pdo->prepare("SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m WHERE m.user_id = ? ORDER BY m.created_at ASC");
-        $stmt->execute([$current_user_id, $current_user_id]);
+        $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m";
+        $params = [$current_user_id];
+
+        if ($user_role === 'viewer') {
+            // Viewers can see all maps, so remove the user_id filter for the main map list
+            $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id) as deviceCount FROM maps m";
+            $params = []; // No user_id filter for the main map list for viewers
+        } else {
+            // Admins and other roles only see their own maps
+            $sql .= " WHERE m.user_id = ?";
+            $params[] = $current_user_id;
+        }
+        $sql .= " ORDER BY m.created_at ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $maps = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($maps);
         break;
@@ -58,8 +73,17 @@ switch ($action) {
     case 'get_edges':
         $map_id = $_GET['map_id'] ?? null;
         if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
-        $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE map_id = ? AND user_id = ?");
-        $stmt->execute([$map_id, $current_user_id]);
+        
+        $sql = "SELECT * FROM device_edges WHERE map_id = ?";
+        $params = [$map_id];
+
+        if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+            $sql .= " AND user_id = ?";
+            $params[] = $current_user_id;
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $edges = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($edges);
         break;
