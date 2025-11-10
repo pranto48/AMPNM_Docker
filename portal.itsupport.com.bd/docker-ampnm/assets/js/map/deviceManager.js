@@ -72,7 +72,10 @@ MapApp.deviceManager = {
                     } else if (device.status === 'online' && (device.old_status === 'critical' || device.old_status === 'offline')) {
                         window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
                     } else {
-                        window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
+                        // Only show info toast for status changes if not a viewer, or if it's a significant change
+                        if (window.userRole !== 'viewer' || (device.status !== 'online' && device.status !== 'offline')) {
+                             window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
+                        }
                     }
                 }
 
@@ -95,7 +98,8 @@ MapApp.deviceManager = {
                 MapApp.state.nodes.update(nodeUpdates);
             }
 
-            if (statusChanges === 0 && result.updated_devices.length > 0) {
+            // Only show "All device statuses are stable" message for admin, not for viewers
+            if (statusChanges === 0 && result.updated_devices.length > 0 && window.userRole === 'admin') {
                 window.notyf.success({ message: 'All device statuses are stable.', duration: 2000 });
             }
 
