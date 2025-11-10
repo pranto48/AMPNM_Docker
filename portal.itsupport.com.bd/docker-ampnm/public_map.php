@@ -84,7 +84,7 @@ foreach ($devices as $d) {
     if ($d['icon_url']) {
         $node['shape'] = 'image';
         $node['image'] = $d['icon_url'];
-        $node['size'] = (int)$icon_size / 2; // vis.js size is radius
+        $node['size'] = (int)$icon_size; // vis.js size is diameter for image shape
         $node['color'] = ['border' => $node_color, 'background' => 'transparent'];
         $node['borderWidth'] = 3;
     } elseif ($d['type'] === 'box') {
@@ -93,13 +93,12 @@ foreach ($devices as $d) {
         $node['margin'] = 20;
         $node['level'] = -1;
     } else {
-        $node['shape'] = 'icon';
-        $node['icon'] = [
-            // Removed 'face' and 'weight' to rely on global CSS for Font Awesome
-            'code' => $icon_code,
-            'size' => (int)$icon_size,
-            'color' => $node_color
-        ];
+        // Use SVG data URL for Font Awesome icons
+        $node['shape'] = 'image';
+        $node['image'] = generateFaSvgDataUrl($icon_code, (int)$icon_size, $node_color);
+        $node['size'] = (int)$icon_size; // vis.js size is diameter for image shape
+        $node['color'] = ['border' => $node_color, 'background' => 'transparent'];
+        $node['borderWidth'] = 3;
     }
     $vis_nodes[] = $node;
 }
@@ -181,13 +180,11 @@ if ($map['background_image_url']) {
         .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
 
         /* Explicitly ensure Font Awesome font is used for vis.js icons */
+        /* These styles are now less critical for vis.js icons as we use SVG, but keep for general FA usage */
         .vis-network .vis-label {
             font-family: 'Inter', sans-serif !important; /* Keep Inter for labels */
         }
-        .vis-network .vis-icon {
-            font-family: 'Font Awesome 6 Free' !important; /* Force Font Awesome for icons */
-            font-weight: 900 !important; /* Ensure solid icons are used */
-        }
+        /* The .vis-icon class will no longer be used for our custom SVG icons */
     </style>
 </head>
 <body>
@@ -322,7 +319,7 @@ if ($map['background_image_url']) {
                         if (d.icon_url) {
                             Object.assign(updatedNode, {
                                 image: d.icon_url,
-                                size: parseInt(icon_size) / 2,
+                                size: parseInt(icon_size),
                                 color: { border: node_color, background: 'transparent' },
                                 borderWidth: 3
                             });
@@ -331,8 +328,12 @@ if ($map['background_image_url']) {
                                 color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                             });
                         } else {
+                            // Use SVG data URL for Font Awesome icons
                             Object.assign(updatedNode, {
-                                icon: { ...oldNode.icon, color: node_color, size: parseInt(icon_size) },
+                                image: generateFaSvgDataUrl(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color),
+                                size: parseInt(icon_size),
+                                color: { border: node_color, background: 'transparent' },
+                                borderWidth: 3
                             });
                         }
                         nodeUpdates.push(updatedNode);
@@ -383,12 +384,8 @@ if ($map['background_image_url']) {
                     color: { inherit: 'from' } // Use color defined in edge data
                 },
                 nodes: {
-                    shape: 'icon',
-                    icon: {
-                        // Removed 'face' and 'weight' from here as well
-                        size: 50,
-                        color: '#22c55e'
-                    },
+                    shape: 'image', // Default to image shape
+                    size: 50, // Default size, will be overridden by node data
                     color: {
                         border: '#22c55e',
                         background: '#1e293b',

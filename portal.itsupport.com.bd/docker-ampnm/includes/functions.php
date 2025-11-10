@@ -201,3 +201,50 @@ function checkHttpConnectivity($host) {
         'error' => $error
     ];
 }
+
+/**
+ * Generates a Font Awesome icon as an SVG data URL.
+ * This is a workaround for vis.js not always rendering Font Awesome icons correctly.
+ *
+ * @param string $iconCode The Font Awesome Unicode character (e.g., '\uf233' for server).
+ * @param int $size The desired size of the icon in pixels.
+ * @param string $color The color of the icon (e.g., '#ffffff').
+ * @return string The SVG data URL.
+ */
+function generateFaSvgDataUrl(string $iconCode, int $size, string $color): string {
+    // Ensure the icon code is properly escaped for XML
+    $escapedIconCode = htmlspecialchars($iconCode);
+
+    // Font Awesome 6 Free Solid font family
+    $fontFamily = 'Font Awesome 6 Free';
+    $fontWeight = '900'; // Solid icons
+
+    // Create SVG content
+    $svg = <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" width="{$size}" height="{$size}" viewBox="0 0 {$size} {$size}">
+    <style>
+        @font-face {
+            font-family: '{$fontFamily}';
+            font-style: normal;
+            font-weight: {$fontWeight};
+            font-display: block;
+            src: url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2') format('woff2'),
+                 url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf') format('truetype');
+        }
+        .icon {
+            font-family: '{$fontFamily}';
+            font-weight: {$fontWeight};
+            font-size: {$size}px;
+            fill: {$color};
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+    </style>
+    <text x="50%" y="50%" class="icon">{$escapedIconCode}</text>
+</svg>
+SVG;
+
+    // Encode SVG for data URL
+    $encodedSvg = rawurlencode($svg);
+    return "data:image/svg+xml;charset=utf-8,{$encodedSvg}";
+}
