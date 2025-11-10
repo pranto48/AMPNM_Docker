@@ -1,5 +1,5 @@
 function initEmailNotifications() {
-    const API_URL = 'api.php';
+    const API_URL = AppClient.config.API_URL; // Use AppClient.config
 
     const els = {
         smtpSettingsForm: document.getElementById('smtpSettingsForm'),
@@ -34,10 +34,7 @@ function initEmailNotifications() {
 
     let currentSelectedDeviceId = null;
 
-    const api = {
-        get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
-        post: (action, body = {}) => fetch(`${API_URL}?action=${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(res => res.json())
-    };
+    const api = AppClient.api; // Use AppClient.api
 
     // --- SMTP Settings Logic ---
     const loadSmtpSettings = async () => {

@@ -1,5 +1,5 @@
 function initUsers() {
-    const API_URL = 'api.php';
+    const API_URL = AppClient.config.API_URL; // Use AppClient.config
     const usersTableBody = document.getElementById('usersTableBody');
     const usersLoader = document.getElementById('usersLoader');
     const createUserForm = document.getElementById('createUserForm');
@@ -13,14 +13,7 @@ function initUsers() {
     const editUsernameDisplay = document.getElementById('edit_username_display');
     const editRoleSelect = document.getElementById('edit_role');
 
-    const api = {
-        get: (action) => fetch(`${API_URL}?action=${action}`).then(res => res.json()),
-        post: (action, body) => fetch(`${API_URL}?action=${action}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        }).then(res => res.json())
-    };
+    const api = AppClient.api; // Use AppClient.api
 
     const loadUsers = async () => {
         usersLoader.classList.remove('hidden');
