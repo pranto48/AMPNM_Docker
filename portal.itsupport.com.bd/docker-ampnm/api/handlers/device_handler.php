@@ -227,6 +227,7 @@ switch ($action) {
             $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             $updated_devices = [];
+            $processed_devices_count = 0;
 
             foreach ($devices as $device) {
                 $old_status = $device['status'];
@@ -265,6 +266,7 @@ switch ($action) {
                 $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ?";
                 $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $device['id']];
 
+                // Only add user_id filter if the user is NOT a viewer
                 if ($user_role !== 'viewer') {
                     $updateSql .= " AND user_id = ?";
                     $updateParams[] = $current_user_id;
@@ -282,9 +284,18 @@ switch ($action) {
                     'last_ttl' => $last_ttl,
                     'last_ping_output' => $check_output
                 ];
+                $processed_devices_count++;
             }
             
-            echo json_encode(['success' => true, 'updated_devices' => $updated_devices]);
+            $overall_success = ($processed_devices_count > 0);
+            $message = $overall_success ? "Checked {$processed_devices_count} devices." : "No pingable devices found on this map.";
+
+            echo json_encode([
+                'success' => $overall_success, 
+                'message' => $message,
+                'checked_count' => $processed_devices_count,
+                'updated_devices' => $updated_devices
+            ]);
         }
         break;
 
@@ -342,6 +353,7 @@ switch ($action) {
             $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ?";
             $updateParams = [$status, $last_seen, $last_avg_time, $last_ttl, $deviceId];
 
+            // Only add user_id filter if the user is NOT a viewer
             if ($user_role !== 'viewer') {
                 $updateSql .= " AND user_id = ?";
                 $updateParams[] = $current_user_id;
@@ -521,7 +533,8 @@ switch ($action) {
             $updateParams = $params;
             $updateParams[] = $id;
 
-            if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+            // Only add user_id filter if the user is NOT a viewer
+            if ($user_role !== 'viewer') {
                 $updateSql .= " AND user_id = ?";
                 $updateParams[] = $current_user_id;
             }
@@ -553,8 +566,15 @@ switch ($action) {
                 exit;
             }
 
-            $stmt = $pdo->prepare("SELECT * FROM devices WHERE ip = ? AND user_id = ?");
-            $stmt->execute([$ip_address, $current_user_id]);
+            // Select device without user_id filter for viewers
+            $sql = "SELECT * FROM devices WHERE ip = ?";
+            $params = [$ip_address];
+            if ($user_role !== 'viewer') {
+                $sql .= " AND user_id = ?";
+                $params[] = $current_user_id;
+            }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$device) {
@@ -575,6 +595,7 @@ switch ($action) {
             $updateSql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ?";
             $updateParams = [$status, $last_seen, $ip_address];
 
+            // Only add user_id filter if the user is NOT a viewer
             if ($user_role !== 'viewer') {
                 $updateSql .= " AND user_id = ?";
                 $updateParams[] = $current_user_id;
@@ -582,8 +603,15 @@ switch ($action) {
             $updateStmt = $pdo->prepare($updateSql);
             $updateStmt->execute($updateParams);
 
-            $stmt = $pdo->prepare("SELECT * FROM devices WHERE ip = ? AND user_id = ?");
-            $stmt->execute([$ip_address, $current_user_id]);
+            // Re-fetch the updated device to return
+            $fetchSql = "SELECT * FROM devices WHERE ip = ?";
+            $fetchParams = [$ip_address];
+            if ($user_role !== 'viewer') {
+                $fetchSql .= " AND user_id = ?";
+                $fetchParams[] = $current_user_id;
+            }
+            $stmt = $pdo->prepare($fetchSql);
+            $stmt->execute($fetchParams);
             $updated_device = $stmt->fetch(PDO::FETCH_ASSOC);
 
             echo json_encode($updated_device);

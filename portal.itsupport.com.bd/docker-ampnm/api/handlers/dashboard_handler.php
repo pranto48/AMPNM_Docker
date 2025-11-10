@@ -39,9 +39,16 @@ if ($action === 'get_dashboard_data') {
     $map_stats['offline'] = $map_stats['offline'] ?? 0;
     $map_stats['total'] = $map_stats['total'] ?? 0; // Ensure total is also set
 
-    // Get GLOBAL total devices for the user (this remains user-specific)
-    $stmt_global_total = $pdo->prepare("SELECT COUNT(*) as global_total FROM devices WHERE user_id = ?");
-    $stmt_global_total->execute([$current_user_id]);
+    // Get GLOBAL total devices for the user
+    // CRITICAL FIX: For viewers, count all devices in the system, not just those owned by them.
+    $sql_global_total = "SELECT COUNT(*) as global_total FROM devices";
+    $params_global_total = [];
+    if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+        $sql_global_total .= " WHERE user_id = ?";
+        $params_global_total[] = $current_user_id;
+    }
+    $stmt_global_total = $pdo->prepare($sql_global_total);
+    $stmt_global_total->execute($params_global_total);
     $global_total_devices = $stmt_global_total->fetch(PDO::FETCH_ASSOC)['global_total'] ?? 0;
 
 

@@ -42,8 +42,12 @@ MapApp.deviceManager = {
         
         try {
             const result = await MapApp.api.post('ping_all_devices', { map_id: MapApp.state.currentMapId });
-            if (!result.success || !result.updated_devices) {
-                throw new Error('Invalid response from server during bulk refresh.');
+            
+            if (!result.success) { // Check result.success explicitly
+                throw new Error(result.message || 'Failed to refresh device statuses due to an unknown server issue.');
+            }
+            if (!result.updated_devices) { // Still check for updated_devices array
+                throw new Error('Invalid response from server during bulk refresh: missing device data.');
             }
 
             let statusChanges = 0;
@@ -99,7 +103,7 @@ MapApp.deviceManager = {
 
         } catch (error) {
             console.error("An error occurred during the bulk refresh process:", error);
-            window.notyf.error("Failed to refresh device statuses.");
+            window.notyf.error(error.message || "Failed to refresh device statuses.");
             return 0;
         } finally {
             icon.classList.remove('fa-spin');
