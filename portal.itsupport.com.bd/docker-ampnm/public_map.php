@@ -94,12 +94,17 @@ foreach ($devices as $d) {
         $node['margin'] = 20;
         $node['level'] = -1;
     } else {
-        // Use SVG data URL for Font Awesome icons
-        $node['shape'] = 'image';
-        $node['image'] = generateFaSvgDataUrl($icon_code, (int)$icon_size, $node_color);
-        $node['size'] = (int)$icon_size; // vis.js size is diameter for image shape
-        $node['color'] = ['border' => $node_color, 'background' => 'transparent'];
-        $node['borderWidth'] = 3;
+        // Use vis.js native 'icon' shape for Font Awesome icons
+        $node['shape'] = 'icon';
+        $node['icon'] = [
+            'face' => 'Font Awesome 6 Free',
+            'weight' => '900', // Solid icons
+            'code' => $icon_code,
+            'size' => (int)$icon_size,
+            'color' => $node_color
+        ];
+        // vis.js handles size for 'icon' shape via icon.size, no need for top-level 'size'
+        unset($node['size']); 
     }
     $vis_nodes[] = $node;
 }
@@ -343,11 +348,18 @@ if ($map['background_image_url']) {
                         } else {
                             // Use the new JavaScript function to generate SVG data URL
                             Object.assign(updatedNode, {
-                                image: generateFaSvgDataUrlJs(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color),
-                                size: parseInt(icon_size),
-                                color: { border: node_color, background: 'transparent' },
-                                borderWidth: 3
+                                shape: 'icon', // Changed to 'icon'
+                                icon: { // Added icon object
+                                    face: 'Font Awesome 6 Free',
+                                    weight: '900',
+                                    code: iconMap[d.type] || iconMap.other,
+                                    size: parseInt(icon_size),
+                                    color: node_color
+                                }
                             });
+                            // Remove image-specific properties if using shape: 'icon'
+                            delete updatedNode.image;
+                            delete updatedNode.size;
                         }
                         nodeUpdates.push(updatedNode);
                     });
