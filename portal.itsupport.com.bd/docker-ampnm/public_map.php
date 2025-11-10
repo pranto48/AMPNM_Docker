@@ -43,7 +43,7 @@ foreach ($devices as $d) {
         'server' => '\uf233', 'router' => '\uf4d7', 'switch' => '\uf796', 'printer' => '\uf02f', 'nas' => '\uf0a0',
         'camera' => '\uf030', 'other' => '\uf108', 'firewall' => '\uf3ed', 'ipphone' => '\uf87d',
         'punchdevice' => '\uf2c2', 'wifi-router' => '\uf1eb', 'radio-tower' => '\uf519',
-        'rack' => '\uf1b3', 'laptop' => '\uf109', 'tablet' => '\uf3fa', 'mobile' => '\uf3cd', // Fixed: Added quotes
+        'rack' => '\uf1b3', 'laptop' => '\uf109', 'tablet' => '\uf3fa', 'mobile' => '\uf3cd',
         'cloud' => '\uf0c2', 'database' => '\uf1c0', 'box' => '\uf49e'
     ];
 
@@ -95,8 +95,7 @@ foreach ($devices as $d) {
     } else {
         $node['shape'] = 'icon';
         $node['icon'] = [
-            'face' => "'Font Awesome 6 Free'",
-            'weight' => "900",
+            // Removed 'face' and 'weight' to rely on global CSS for Font Awesome
             'code' => $icon_code,
             'size' => (int)$icon_size,
             'color' => $node_color
@@ -201,6 +200,13 @@ if ($map['background_image_url']) {
         </div>
     </header>
 
+    <!-- Temporary Font Awesome Test Element -->
+    <div style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: white; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+        <i class="fas fa-check-circle" style="font-size: 20px; color: green;"></i>
+        <span style="font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 20px; color: black;">&#xf233;</span>
+        <span style="margin-left: 5px; color: black; font-size: 12px;">FA Test</span>
+    </div>
+
     <div id="network-map-container"></div>
 
     <div id="status-legend">
@@ -221,7 +227,7 @@ if ($map['background_image_url']) {
             server: '\uf233', router: '\uf4d7', switch: '\uf796', printer: '\uf02f', nas: '\uf0a0',
             camera: '\uf030', other: '\uf108', firewall: '\uf3ed', ipphone: '\uf87d',
             punchdevice: '\uf2c2', 'wifi-router': '\uf1eb', 'radio-tower': '\uf519',
-            rack: '\uf1b3', 'laptop': '\uf109', 'tablet': '\uf3fa', 'mobile': '\uf3cd', // Fixed: Added quotes
+            rack: '\uf1b3', 'laptop': '\uf109', 'tablet': '\uf3fa', 'mobile': '\uf3cd',
             'cloud': '\uf0c2', 'database': '\uf1c0', 'box': '\uf49e'
         };
         const edgeColorMap = {
@@ -241,7 +247,7 @@ if ($map['background_image_url']) {
                     }
                 }
                 const sanitizedReason = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
+                title += `<br><small style='color: #fca5a5; font-family: monospace;'>${sanitizedReason}</small>`;
             }
             return title;
         }
@@ -379,8 +385,7 @@ if ($map['background_image_url']) {
                 nodes: {
                     shape: 'icon',
                     icon: {
-                        face: "'Font Awesome 6 Free'",
-                        weight: "900",
+                        // Removed 'face' and 'weight' from here as well
                         size: 50,
                         color: '#22c55e'
                     },
