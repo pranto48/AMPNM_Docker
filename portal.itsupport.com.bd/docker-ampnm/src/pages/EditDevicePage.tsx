@@ -14,8 +14,15 @@ const EditDevicePage = () => {
   const navigate = useNavigate();
   const [device, setDevice] = useState<NetworkDevice | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const userRole = (window as any).userRole || 'viewer'; // Get user role from global scope
 
   useEffect(() => {
+    if (userRole !== 'admin') {
+      showError('You do not have permission to edit devices.');
+      navigate('/'); // Redirect to dashboard
+      return;
+    }
+
     const fetchDevice = async () => {
       if (!id) {
         showError('Device ID is missing.');
@@ -40,7 +47,11 @@ const EditDevicePage = () => {
       }
     };
     fetchDevice();
-  }, [id, navigate]);
+  }, [id, navigate, userRole]);
+
+  if (userRole !== 'admin') {
+    return null; // Render nothing if not authorized
+  }
 
   const handleSubmit = async (deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => {
     if (!id) return;

@@ -27,12 +27,10 @@ import {
   updateEdgeInDB,
   importMap,
   MapData,
-  // subscribeToDeviceChanges // Removed Supabase subscription
 } from '@/services/networkDeviceService';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 // Declare SoundManager globally
@@ -157,36 +155,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     // Removed Supabase subscription for edges.
     // For real-time updates with PHP, you would need to implement a polling mechanism
     // or a different real-time solution.
-    // const handleEdgeInsert = (payload: any) => {
-    //   const newEdge = { 
-    //     id: payload.new.id, 
-    //     source: payload.new.source_id, 
-    //     target: payload.new.target_id, 
-    //     data: { connection_type: payload.new.connection_type } 
-    //   };
-    //   setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
-    // };
-    
-    // const handleEdgeUpdate = (payload: any) => {
-    //   setEdges((eds) => 
-    //     eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
-    //   );
-    // };
-    
-    // const handleEdgeDelete = (payload: any) => {
-    //   setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
-    // };
-
-    // const edgeChannel = supabase.channel('network-map-edge-changes');
-    // edgeChannel
-    //   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
-    //   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
-    //   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
-    //   .subscribe();
-
-    // return () => {
-    //   supabase.removeChannel(edgeChannel);
-    // };
   }, [setEdges]);
 
   // Implement polling for live status updates for all users

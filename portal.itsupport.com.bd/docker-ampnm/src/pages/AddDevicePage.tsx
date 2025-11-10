@@ -6,9 +6,22 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 
 const AddDevicePage = () => {
   const navigate = useNavigate();
+  const userRole = (window as any).userRole || 'viewer'; // Get user role from global scope
+
+  useEffect(() => {
+    if (userRole !== 'admin') {
+      showError('You do not have permission to add devices.');
+      navigate('/'); // Redirect to dashboard
+    }
+  }, [userRole, navigate]);
+
+  if (userRole !== 'admin') {
+    return null; // Render nothing if not authorized
+  }
 
   const handleSubmit = async (deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => {
     try {
