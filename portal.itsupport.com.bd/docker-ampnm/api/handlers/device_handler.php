@@ -214,9 +214,9 @@ switch ($action) {
             $map_id = $input['map_id'] ?? null;
             if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
 
-            $sql = "SELECT * FROM devices WHERE enabled = TRUE AND map_id = ? AND ip IS NOT NULL AND type != 'box'";
+            $sql = "SELECT * FROM devices WHERE enabled = TRUE AND map_id = ? AND ip IS NOT NULL AND ip != '' AND type != 'box'";
             $params = [$map_id];
-            // IMPORTANT: For viewers, do NOT filter by user_id here.
+            // IMPORTANT: For viewers, do NOT filter by user_id here when SELECTING devices.
             // Viewers should be able to ping all devices on a map they can see.
             if ($user_role !== 'viewer') { 
                 $sql .= " AND user_id = ?";
@@ -259,8 +259,18 @@ switch ($action) {
                 
                 logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
                 sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
-                $updateStmt = $pdo->prepare("UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ? AND user_id = ?");
-                $updateStmt->execute([$new_status, $last_seen, $last_avg_time, $last_ttl, $device['id'], $current_user_id]);
+                
+                // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
+                // This allows viewers to update the status of devices on shared maps.
+                $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ?";
+                $updateParams = [$new_status, $last_seen, $last_avg_time, $last_ttl, $device['id']];
+
+                if ($user_role !== 'viewer') {
+                    $updateSql .= " AND user_id = ?";
+                    $updateParams[] = $current_user_id;
+                }
+                $updateStmt = $pdo->prepare($updateSql);
+                $updateStmt->execute($updateParams);
 
                 $updated_devices[] = [
                     'id' => $device['id'],
@@ -285,6 +295,7 @@ switch ($action) {
             
             $sql = "SELECT * FROM devices WHERE id = ?";
             $params = [$deviceId];
+            // For viewers, do NOT filter by user_id here when SELECTING device.
             if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
                 $sql .= " AND user_id = ?";
                 $params[] = $current_user_id;
@@ -325,8 +336,18 @@ switch ($action) {
             
             logStatusChange($pdo, $deviceId, $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details); // Trigger email notification
-            $stmt = $pdo->prepare("UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ? AND user_id = ?");
-            $stmt->execute([$status, $last_seen, $last_avg_time, $last_ttl, $deviceId, $current_user_id]);
+            
+            // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
+            // This allows viewers to update the status of devices on shared maps.
+            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, last_avg_time = ?, last_ttl = ? WHERE id = ?";
+            $updateParams = [$status, $last_seen, $last_avg_time, $last_ttl, $deviceId];
+
+            if ($user_role !== 'viewer') {
+                $updateSql .= " AND user_id = ?";
+                $updateParams[] = $current_user_id;
+            }
+            $updateStmt = $pdo->prepare($updateSql);
+            $updateStmt->execute($updateParams);
             
             echo json_encode(['id' => $deviceId, 'status' => $status, 'last_seen' => $last_seen, 'last_avg_time' => $last_avg_time, 'last_ttl' => $last_ttl, 'last_ping_output' => $check_output]);
         }
@@ -495,11 +516,29 @@ switch ($action) {
                 }
             }
             if (empty($fields)) { http_response_code(400); echo json_encode(['error' => 'No valid fields to update']); exit; }
-            $params[] = $id; $params[] = $current_user_id;
-            $sql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
-            $stmt = $pdo->prepare($sql); $stmt->execute($params);
-            $stmt = $pdo->prepare("SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id = ?"); $stmt->execute([$id, $current_user_id]);
-            $device = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($device);
+            
+            $updateSql = "UPDATE devices SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            $updateParams = $params;
+            $updateParams[] = $id;
+
+            if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+                $updateSql .= " AND user_id = ?";
+                $updateParams[] = $current_user_id;
+            }
+            $stmt = $pdo->prepare($updateSql); 
+            $stmt->execute($updateParams);
+
+            // Re-fetch the device to return the updated data
+            $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ?";
+            $fetchParams = [$id];
+            if ($user_role !== 'viewer') {
+                $fetchSql .= " AND d.user_id = ?";
+                $fetchParams[] = $current_user_id;
+            }
+            $stmt = $pdo->prepare($fetchSql); 
+            $stmt->execute($fetchParams);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC); 
+            echo json_encode($device);
         }
         break;
 
@@ -531,9 +570,17 @@ switch ($action) {
             logStatusChange($pdo, $device['id'], $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details);
 
-            $sql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ? AND user_id = ?";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$status, $last_seen, $ip_address, $current_user_id]);
+            // CRITICAL FIX: Remove user_id filter from UPDATE if current user is a viewer.
+            // This allows viewers to update the status of devices on shared maps.
+            $updateSql = "UPDATE devices SET status = ?, last_seen = ?, updated_at = CURRENT_TIMESTAMP WHERE ip = ?";
+            $updateParams = [$status, $last_seen, $ip_address];
+
+            if ($user_role !== 'viewer') {
+                $updateSql .= " AND user_id = ?";
+                $updateParams[] = $current_user_id;
+            }
+            $updateStmt = $pdo->prepare($updateSql);
+            $updateStmt->execute($updateParams);
 
             $stmt = $pdo->prepare("SELECT * FROM devices WHERE ip = ? AND user_id = ?");
             $stmt->execute([$ip_address, $current_user_id]);
