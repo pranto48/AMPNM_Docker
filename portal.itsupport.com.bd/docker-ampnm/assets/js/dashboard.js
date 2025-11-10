@@ -109,24 +109,32 @@ function initDashboard() {
         }
     });
 
-    pingForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const host = pingHostInput.value.trim();
-        if (!host) return;
-
-        pingButton.disabled = true;
-        pingButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Pinging...';
-        pingResultContainer.classList.remove('hidden');
-        pingResultPre.textContent = `Pinging ${host}...`;
-
-        try {
-            const result = await api.post('manual_ping', { host });
-            pingResultPre.textContent = result.output || `Error: ${result.error || 'Unknown error'}`;
-        } catch (error) {
-            pingResultPre.textContent = `Failed to perform ping. Check API connection.`;
-        } finally {
-            pingButton.disabled = false;
-            pingButton.innerHTML = '<i class="fas fa-bolt mr-2"></i>Ping';
+    // Disable ping form for viewer role
+    if (window.userRole === 'viewer') {
+        if (pingForm) {
+            pingForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
+            pingForm.insertAdjacentHTML('afterend', '<p class="text-red-400 text-sm mt-2">You do not have permission to perform ping tests.</p>');
         }
-    });
+    } else {
+        pingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const host = pingHostInput.value.trim();
+            if (!host) return;
+
+            pingButton.disabled = true;
+            pingButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Pinging...';
+            pingResultContainer.classList.remove('hidden');
+            pingResultPre.textContent = `Pinging ${host}...`;
+
+            try {
+                const result = await api.post('manual_ping', { host });
+                pingResultPre.textContent = result.output || `Error: ${result.error || 'Unknown error'}`;
+            } catch (error) {
+                pingResultPre.textContent = `Failed to perform ping. Check API connection.`;
+            } finally {
+                pingButton.disabled = false;
+                pingButton.innerHTML = '<i class="fas fa-bolt mr-2"></i>Ping';
+            }
+        });
+    }
 }

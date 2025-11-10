@@ -38,6 +38,9 @@
             ]
         });
 
+        // Expose user role globally for client-side checks
+        window.userRole = '<?php echo $_SESSION['user_role'] ?? 'viewer'; ?>';
+
         const page = '<?php echo basename($_SERVER['PHP_SELF']); ?>';
         
         // Set active nav link

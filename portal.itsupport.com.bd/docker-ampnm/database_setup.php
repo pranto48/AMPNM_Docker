@@ -50,9 +50,26 @@ try {
         `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         `username` VARCHAR(50) NOT NULL UNIQUE,
         `password` VARCHAR(255) NOT NULL,
+        `role` ENUM('admin', 'viewer') DEFAULT 'admin', /* NEW: Add role column */
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     message("Table 'users' checked/created successfully.");
+
+    // Migration: Add role column if it doesn't exist
+    function columnExists($pdo, $db, $table, $column) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+        $stmt->execute([$db, $table, $column]);
+        return $stmt->fetchColumn() > 0;
+    }
+
+    if (!columnExists($pdo, $dbname, 'users', 'role')) {
+        $pdo->exec("ALTER TABLE `users` ADD COLUMN `role` ENUM('admin', 'viewer') DEFAULT 'admin' AFTER `password`;");
+        message("Migrated 'users' table: added 'role' column.");
+        // Set existing users to 'admin' role
+        $pdo->exec("UPDATE `users` SET `role` = 'admin' WHERE `role` IS NULL;");
+        message("Migrated existing users to 'admin' role.");
+    }
+
 
     // Step 2: Ensure admin user exists and set password from environment variable
     $admin_user = 'admin';
@@ -65,7 +82,7 @@ try {
 
     if (!$admin_data) {
         $admin_pass_hash = password_hash($admin_password, PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO `users` (username, password) VALUES (?, ?)")->execute([$admin_user, $admin_pass_hash]);
+        $pdo->prepare("INSERT INTO `users` (username, password, role) VALUES (?, ?, 'admin')")->execute([$admin_user, $admin_pass_hash]);
         $admin_id = $pdo->lastInsertId();
         message("Created default user 'admin'.");
         if ($is_default_password) {
@@ -217,12 +234,8 @@ try {
     }
 
     // Step 4: Schema migration section to handle upgrades
-    function columnExists($pdo, $db, $table, $column) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?");
-        $stmt->execute([$db, $table, $column]);
-        return $stmt->fetchColumn() > 0;
-    }
-
+    // columnExists function is defined above
+    
     if (!columnExists($pdo, $dbname, 'maps', 'user_id')) {
         $pdo->exec("ALTER TABLE `maps` ADD COLUMN `user_id` INT(6) UNSIGNED;");
         $updateStmt = $pdo->prepare("UPDATE `maps` SET user_id = ?");

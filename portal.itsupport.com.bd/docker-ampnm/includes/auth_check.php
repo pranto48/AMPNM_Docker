@@ -10,6 +10,24 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Ensure user_role is set in session. If not, fetch it from DB (e.g., after an upgrade)
+if (!isset($_SESSION['user_role'])) {
+    $pdo = getDbConnection();
+    $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    $_SESSION['user_role'] = $user_data['role'] ?? 'viewer'; // Default to viewer if not found
+}
+
+// --- Role-based page access control ---
+$current_page = basename($_SERVER['PHP_SELF']);
+$admin_only_pages = ['users.php', 'email_notifications.php', 'create-device.php', 'edit-device.php']; // Add other admin-only pages here
+
+if ($_SESSION['user_role'] !== 'admin' && in_array($current_page, $admin_only_pages)) {
+    header('Location: index.php'); // Redirect non-admins from admin-only pages
+    exit;
+}
+
 // --- External License Validation ---
 // This application's license key is now retrieved dynamically from the database.
 // The external verification service URL is defined in config.php (LICENSE_API_URL)
@@ -31,15 +49,19 @@ if (!$app_license_key) {
     $_SESSION['license_message'] = 'Application license key not configured.';
     $_SESSION['license_status_code'] = 'disabled';
     // Redirect to license setup if key is missing, even if logged in (shouldn't happen if bootstrap works)
-    header('Location: license_setup.php');
-    exit;
+    if ($current_page !== 'license_setup.php') { // Prevent redirect loop
+        header('Location: license_setup.php');
+        exit;
+    }
 }
 
 if (!$installation_id) {
     $_SESSION['license_message'] = 'Application installation ID not found. Please re-run database setup.';
     $_SESSION['license_status_code'] = 'disabled';
-    header('Location: database_setup.php'); // Redirect to setup to ensure ID is generated
-    exit;
+    if ($current_page !== 'database_setup.php') { // Prevent redirect loop
+        header('Location: database_setup.php'); // Redirect to setup to ensure ID is generated
+        exit;
+    }
 }
 
 // Check if grace period is active and has expired

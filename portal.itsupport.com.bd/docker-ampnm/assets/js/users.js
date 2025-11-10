@@ -4,6 +4,15 @@ function initUsers() {
     const usersLoader = document.getElementById('usersLoader');
     const createUserForm = document.getElementById('createUserForm');
 
+    // Edit Role Modal elements
+    const editRoleModal = document.getElementById('editRoleModal');
+    const closeEditRoleModal = document.getElementById('closeEditRoleModal');
+    const cancelEditRoleBtn = document.getElementById('cancelEditRoleBtn');
+    const editRoleForm = document.getElementById('editRoleForm');
+    const editUserId = document.getElementById('edit_user_id');
+    const editUsernameDisplay = document.getElementById('edit_username_display');
+    const editRoleSelect = document.getElementById('edit_role');
+
     const api = {
         get: (action) => fetch(`${API_URL}?action=${action}`).then(res => res.json()),
         post: (action, body) => fetch(`${API_URL}?action=${action}`, {
@@ -21,14 +30,19 @@ function initUsers() {
             usersTableBody.innerHTML = users.map(user => `
                 <tr class="border-b border-slate-700">
                     <td class="px-6 py-4 whitespace-nowrap text-white">${user.username}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-slate-400 capitalize">${user.role}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-slate-400">${new Date(user.created_at).toLocaleString()}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        ${user.username !== 'admin' ? `<button class="delete-user-btn text-red-500 hover:text-red-400" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-trash mr-2"></i>Delete</button>` : '<span class="text-slate-500">Cannot delete admin</span>'}
+                        ${user.username !== 'admin' ? `
+                            <button class="edit-role-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${user.id}" data-username="${user.username}" data-role="${user.role}"><i class="fas fa-user-tag mr-2"></i>Edit Role</button>
+                            <button class="delete-user-btn text-red-500 hover:text-red-400" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-trash mr-2"></i>Delete</button>
+                        ` : '<span class="text-slate-500">Admin User</span>'}
                     </td>
                 </tr>
             `).join('');
         } catch (error) {
             console.error('Failed to load users:', error);
+            window.notyf.error('Failed to load users.');
         } finally {
             usersLoader.classList.add('hidden');
         }
@@ -38,6 +52,7 @@ function initUsers() {
         e.preventDefault();
         const username = e.target.username.value;
         const password = e.target.password.value;
+        const role = e.target.role.value;
         if (!username || !password) return;
 
         const button = createUserForm.querySelector('button[type="submit"]');
@@ -45,7 +60,7 @@ function initUsers() {
         button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
 
         try {
-            const result = await api.post('create_user', { username, password });
+            const result = await api.post('create_user', { username, password, role });
             if (result.success) {
                 window.notyf.success('User created successfully.');
                 createUserForm.reset();
@@ -63,18 +78,61 @@ function initUsers() {
     });
 
     usersTableBody.addEventListener('click', async (e) => {
-        const button = e.target.closest('.delete-user-btn');
-        if (button) {
-            const { id, username } = button.dataset;
+        const deleteButton = e.target.closest('.delete-user-btn');
+        const editRoleButton = e.target.closest('.edit-role-btn');
+
+        if (deleteButton) {
+            const { id, username } = deleteButton.dataset;
             if (confirm(`Are you sure you want to delete user "${username}"?`)) {
-                const result = await api.post('delete_user', { id });
-                if (result.success) {
-                    window.notyf.success(`User "${username}" deleted.`);
-                    await loadUsers();
-                } else {
-                    window.notyf.error(`Error: ${result.error}`);
+                try {
+                    const result = await api.post('delete_user', { id });
+                    if (result.success) {
+                        window.notyf.success(`User "${username}" deleted.`);
+                        await loadUsers();
+                    } else {
+                        window.notyf.error(`Error: ${result.error}`);
+                    }
+                } catch (error) {
+                    window.notyf.error('An unexpected error occurred.');
+                    console.error(error);
                 }
             }
+        } else if (editRoleButton) {
+            const { id, username, role } = editRoleButton.dataset;
+            editUserId.value = id;
+            editUsernameDisplay.value = username;
+            editRoleSelect.value = role;
+            openModal('editRoleModal');
+        }
+    });
+
+    closeEditRoleModal.addEventListener('click', () => closeModal('editRoleModal'));
+    cancelEditRoleBtn.addEventListener('click', () => closeModal('editRoleModal'));
+
+    editRoleForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = editUserId.value;
+        const role = editRoleSelect.value;
+
+        const button = editRoleForm.querySelector('button[type="submit"]');
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+        try {
+            const result = await api.post('update_user_role', { id, role });
+            if (result.success) {
+                window.notyf.success('User role updated successfully.');
+                closeModal('editRoleModal');
+                await loadUsers();
+            } else {
+                window.notyf.error(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            window.notyf.error('An unexpected error occurred.');
+            console.error(error);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = 'Save Changes';
         }
     });
 

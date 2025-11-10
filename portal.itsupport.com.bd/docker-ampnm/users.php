@@ -21,6 +21,13 @@ include 'header.php';
                             <label for="new_password" class="block text-sm font-medium text-slate-300 mb-1">Password</label>
                             <input type="password" id="new_password" name="password" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
                         </div>
+                        <div>
+                            <label for="new_role" class="block text-sm font-medium text-slate-300 mb-1">Role</label>
+                            <select id="new_role" name="role" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                                <option value="viewer">Viewer</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
                         <button type="submit" class="w-full px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
                             <i class="fas fa-user-plus mr-2"></i>Create User
                         </button>
@@ -37,6 +44,7 @@ include 'header.php';
                             <thead class="border-b border-slate-700">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Username</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Role</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Created At</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>
                                 </tr>
@@ -45,10 +53,38 @@ include 'header.php';
                                 <!-- User rows will be inserted here by JavaScript -->
                             </tbody>
                         </table>
-                        <div id="usersLoader" class="text-center py-8"><div class="loader mx-auto"></div></div>
+                        <div id="usersLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Edit Role Modal -->
+    <div id="editRoleModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-white">Edit User Role</h2>
+                <button id="closeEditRoleModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <form id="editRoleForm" class="space-y-4">
+                <input type="hidden" id="edit_user_id">
+                <div>
+                    <label for="edit_username_display" class="block text-sm font-medium text-slate-400 mb-1">Username</label>
+                    <input type="text" id="edit_username_display" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white cursor-not-allowed" readonly>
+                </div>
+                <div>
+                    <label for="edit_role" class="block text-sm font-medium text-slate-400 mb-1">Role</label>
+                    <select id="edit_role" name="role" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        <option value="viewer">Viewer</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" id="cancelEditRoleBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 </main>

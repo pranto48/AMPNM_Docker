@@ -75,6 +75,7 @@ function initHistory() {
 
         } catch (error) {
             console.error('Failed to load history:', error);
+            window.notyf.error('Failed to load history data.');
         } finally {
             chartLoader.classList.add('hidden');
             tableLoader.classList.add('hidden');
@@ -82,17 +83,36 @@ function initHistory() {
     };
 
     const populateHostSelector = async () => {
-        const devices = await api.get('get_devices');
-        const hosts = [...new Set(devices.filter(d => d.ip).map(d => d.ip))].sort();
-        hostSelector.innerHTML = '<option value="">All Hosts</option>' + hosts.map(h => `<option value="${h}">${h}</option>`).join('');
+        try {
+            const devices = await api.get('get_devices');
+            const hosts = [...new Set(devices.devices.filter(d => d.ip).map(d => d.ip))].sort();
+            hostSelector.innerHTML = '<option value="">All Hosts</option>' + hosts.map(h => `<option value="${h}">${h}</option>`).join('');
+        } catch (error) {
+            console.error('Failed to load hosts for selector:', error);
+            window.notyf.error('Failed to load device IPs for history filter.');
+        }
     };
 
     filterForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const selectedHost = hostSelector.value;
-        exportLink.href = `export.php?host=${encodeURIComponent(selectedHost)}`;
+        if (window.userRole === 'admin') { // Only admin can export
+            exportLink.href = `export.php?host=${encodeURIComponent(selectedHost)}`;
+        }
         loadHistoryData(selectedHost);
     });
+
+    // Disable export link for viewer role
+    if (window.userRole === 'viewer') {
+        if (exportLink) {
+            exportLink.classList.add('opacity-50', 'cursor-not-allowed');
+            exportLink.removeAttribute('href');
+            exportLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.notyf.error('You do not have permission to export history.');
+            });
+        }
+    }
 
     populateHostSelector().then(() => {
         const initialHost = new URLSearchParams(window.location.search).get('host') || '';
