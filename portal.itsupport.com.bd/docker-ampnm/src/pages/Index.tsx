@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +16,8 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  // subscribeToDeviceChanges // Removed Supabase subscription
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
-// import { supabase } from "@/integrations/supabase/client"; // Removed Supabase import
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
@@ -28,24 +26,25 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentMapId, setCurrentMapId] = useState<string | undefined>(undefined); // New state for current map ID
 
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (mapId?: string) => {
+    setIsLoading(true);
     try {
-      const dbDevices = await getDevices();
-      // Map PHP API response to NetworkDevice interface
+      const dbDevices = await getDevices(mapId); // Pass mapId to getDevices
       const mappedDevices: NetworkDevice[] = dbDevices.map(d => ({
         id: d.id,
         name: d.name,
-        ip_address: d.ip, // PHP uses 'ip'
-        position_x: d.x, // PHP uses 'x'
-        position_y: d.y, // PHP uses 'y'
-        icon: d.type, // PHP uses 'type' for icon
+        ip_address: d.ip,
+        position_x: d.x,
+        position_y: d.y,
+        icon: d.type,
         status: d.status || 'unknown',
         ping_interval: d.ping_interval,
         icon_size: d.icon_size,
         name_text_size: d.name_text_size,
-        last_ping: d.last_seen, // PHP uses 'last_seen'
-        last_ping_result: d.status === 'online', // Derive from status
+        last_ping: d.last_seen,
+        last_ping_result: d.status === 'online',
         check_port: d.check_port,
         description: d.description,
         warning_latency_threshold: d.warning_latency_threshold,
@@ -63,21 +62,15 @@ const Index = () => {
     }
   }, []);
 
+  // Effect to update devices when currentMapId changes
   useEffect(() => {
-    fetchDevices();
-
-    // Removed Supabase subscription.
-    // For real-time updates with PHP, you would need to implement a polling mechanism
-    // or a different real-time solution (e.g., WebSockets with a custom PHP server).
-    // const channel = subscribeToDeviceChanges((payload) => {
-    //   console.log('Device change received:', payload);
-    //   fetchDevices();
-    // });
-
-    // return () => {
-    //   supabase.removeChannel(channel);
-    // };
-  }, [fetchDevices]);
+    if (currentMapId !== undefined) {
+      fetchDevices(currentMapId);
+    } else {
+      setDevices([]); // Clear devices if no map is selected
+      setIsLoading(false);
+    }
+  }, [currentMapId, fetchDevices]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
@@ -91,13 +84,11 @@ const Index = () => {
             const result = await performServerPing(device.ip_address, 1);
             const newStatus = result.success ? 'online' : 'offline';
             
-            // Update device status in database
             await updateDeviceStatusByIp(device.ip_address, newStatus);
             
             console.log(`Ping result for ${device.ip_address}: ${newStatus}`);
           } catch (error) {
             console.error(`Auto-ping failed for ${device.ip_address}:`, error);
-            // Update status to offline on error
             await updateDeviceStatusByIp(device.ip_address, 'offline');
           }
         }, device.ping_interval * 1000);
@@ -106,7 +97,6 @@ const Index = () => {
       }
     });
 
-    // Cleanup intervals on component unmount or devices change
     return () => {
       intervals.forEach(clearInterval);
     };
@@ -383,7 +373,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="map">
-            <NetworkMap devices={devices} onMapUpdate={fetchDevices} />
+            <NetworkMap devices={devices} onMapUpdate={setCurrentMapId} />
           </TabsContent>
         </Tabs>
 

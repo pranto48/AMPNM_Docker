@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, Download, Share2 } from 'lucide-react';
+import { PlusCircle, Upload, Download, Share2, RefreshCw, Search, Cog, Expand, Compress } from 'lucide-react';
 import {
   addDevice,
   updateDevice,
@@ -31,7 +31,10 @@ import {
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 // Declare SoundManager globally
 declare global {
@@ -42,13 +45,26 @@ declare global {
   }
 }
 
-const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
+interface MapOption {
+  id: string;
+  name: string;
+  background_color?: string;
+  background_image_url?: string;
+}
+
+const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: (mapId?: string) => void }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
   const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
+
+  const [maps, setMaps] = useState<MapOption[]>([]);
+  const [currentMapId, setCurrentMapId] = useState<string | undefined>(undefined);
+  const [liveRefreshEnabled, setLiveRefreshEnabled] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
 
   // Ref to store previous devices for status comparison
   const prevDevicesRef = useRef<NetworkDevice[]>([]);
@@ -58,6 +74,39 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const isAdmin = userRole === 'admin';
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
+
+  const fetchMaps = useCallback(async () => {
+    try {
+      const response = await fetch('api.php?action=get_maps');
+      const mapsData = await response.json();
+      if (mapsData && mapsData.length > 0) {
+        setMaps(mapsData);
+        // If no map is currently selected, or the current map is no longer in the list, select the first one
+        if (!currentMapId || !mapsData.some((m: MapOption) => m.id === currentMapId)) {
+          setCurrentMapId(mapsData[0].id);
+          onMapUpdate(mapsData[0].id); // Trigger parent update with new map ID
+        } else {
+          onMapUpdate(currentMapId); // Trigger parent update with current map ID
+        }
+      } else {
+        setMaps([]);
+        setCurrentMapId(undefined);
+        onMapUpdate(undefined); // No map selected
+      }
+    } catch (error) {
+      console.error('Failed to load maps:', error);
+      showError('Failed to load network maps.');
+    }
+  }, [currentMapId, onMapUpdate]);
+
+  useEffect(() => {
+    fetchMaps();
+  }, [fetchMaps]);
+
+  const handleMapChange = useCallback((mapId: string) => {
+    setCurrentMapId(mapId);
+    onMapUpdate(mapId); // Notify parent component of map change
+  }, [onMapUpdate]);
 
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
@@ -75,8 +124,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         if (device && device.ip_address) {
           await updateDevice(nodeId, { 
             status,
-            last_ping: new Date().toISOString(), // PHP uses last_seen
-            // last_ping_result: status === 'online' // Not directly stored in PHP
+            last_ping: new Date().toISOString(),
           });
         }
       } catch (error) {
@@ -95,7 +143,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     (device: NetworkDevice): Node => ({
       id: device.id!,
       type: 'device',
-      position: { x: device.position_x || 0, y: device.position_y || 0 }, // Ensure default position
+      position: { x: device.position_x || 0, y: device.position_y || 0 },
       data: {
         id: device.id,
         name: device.name,
@@ -127,21 +175,23 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     [handleStatusChange, navigate, isAdmin]
   );
 
-  // Update nodes when devices change
   useEffect(() => {
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
-  // Load edges and subscribe to edge changes
   useEffect(() => {
     const loadEdges = async () => {
+      if (!currentMapId) {
+        setEdges([]);
+        return;
+      }
       try {
-        const edgesData = await getEdges();
+        const edgesData = await getEdges(currentMapId);
         setEdges(
           edgesData.map((edge: any) => ({
             id: edge.id,
-            source: edge.source,
-            target: edge.target,
+            source: edge.source_id, // PHP API returns source_id, target_id
+            target: edge.target_id,
             data: { connection_type: edge.connection_type || 'cat5' },
           }))
         );
@@ -151,20 +201,21 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       }
     };
     loadEdges();
-
-    // Removed Supabase subscription for edges.
-    // For real-time updates with PHP, you would need to implement a polling mechanism
-    // or a different real-time solution.
-  }, [setEdges]);
+  }, [setEdges, currentMapId]);
 
   // Implement polling for live status updates for all users
   useEffect(() => {
-    const pollingInterval = setInterval(() => {
-      onMapUpdate(); // This fetches updated device data
-    }, 15000); // Poll every 15 seconds
+    let pollingInterval: NodeJS.Timeout | undefined;
+    if (liveRefreshEnabled && currentMapId) {
+      pollingInterval = setInterval(() => {
+        onMapUpdate(currentMapId);
+      }, 15000); // Poll every 15 seconds
+    }
 
-    return () => clearInterval(pollingInterval);
-  }, [onMapUpdate]);
+    return () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+    };
+  }, [liveRefreshEnabled, currentMapId, onMapUpdate]);
 
   // Effect to detect status changes and play sounds
   useEffect(() => {
@@ -175,7 +226,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       const newStatus = currentDevice.status;
 
       if (prevStatus && newStatus && prevStatus !== newStatus) {
-        // Play sound based on new status
         if (window.SoundManager) {
           if (newStatus === 'online' && (prevStatus === 'offline' || prevStatus === 'critical' || prevStatus === 'warning')) {
             window.SoundManager.play('online');
@@ -190,12 +240,9 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       }
     });
 
-    // Update ref for the next render
     prevDevicesRef.current = devices;
   }, [devices]);
 
-
-  // Style edges based on connection type and device status
   const styledEdges = useMemo(() => {
     return edges.map((edge) => {
       const sourceNode = nodes.find((n) => n.id === edge.source);
@@ -208,23 +255,23 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       let style: React.CSSProperties = { strokeWidth: 2 };
       
       if (isConnectionBroken) {
-        style.stroke = '#ef4444'; // Red for offline
+        style.stroke = '#ef4444';
       } else {
         switch (type) {
           case 'fiber': 
-            style.stroke = '#f97316'; // Orange
+            style.stroke = '#f97316';
             break;
           case 'wifi': 
-            style.stroke = '#38bdf8'; // Sky blue
+            style.stroke = '#38bdf8';
             style.strokeDasharray = '5, 5';
             break;
           case 'radio': 
-            style.stroke = '#84cc16'; // Lime green
+            style.stroke = '#84cc16';
             style.strokeDasharray = '2, 7';
             break;
           case 'cat5': 
           default: 
-            style.stroke = '#a78bfa'; // Violet
+            style.stroke = '#a78bfa';
             break;
         }
       }
@@ -245,7 +292,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         showError('You do not have permission to add connections.');
         return;
       }
-      // Optimistically add edge to UI
+      if (!currentMapId) {
+        showError('Please select a map first.');
+        return;
+      }
       const newEdge = { 
         id: `reactflow__edge-${params.source}${params.target}`, 
         source: params.source!, 
@@ -255,17 +305,15 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
       
       try {
-        // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target! });
+        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: currentMapId });
         showSuccess('Connection saved.');
       } catch (error) {
         console.error('Failed to save connection:', error);
         showError('Failed to save connection.');
-        // Revert UI update on failure
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges, isAdmin]
+    [setEdges, isAdmin, currentMapId]
   );
 
   const handleDelete = async (deviceId: string) => {
@@ -274,19 +322,16 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       return;
     }
     if (window.confirm('Are you sure you want to delete this device?')) {
-      // Optimistically remove from UI
       const originalNodes = nodes;
       setNodes((nds) => nds.filter((node) => node.id !== deviceId));
       
       try {
-        // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
-        onMapUpdate(); // Refresh parent component's device list
+        onMapUpdate(currentMapId);
       } catch (error) {
         console.error('Failed to delete device:', error);
         showError('Failed to delete device.');
-        // Revert UI update on failure
         setNodes(originalNodes);
       }
     }
@@ -344,18 +389,15 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       showError('You do not have permission to save connection changes.');
       return;
     }
-    // Optimistically update UI
     const originalEdges = edges;
     setEdges((eds) => eds.map(e => e.id === edgeId ? { ...e, data: { connection_type } } : e));
     
     try {
-      // Update in database
       await updateEdgeInDB(edgeId, { connection_type });
       showSuccess('Connection updated.');
     } catch (error) {
       console.error('Failed to update connection:', error);
       showError('Failed to update connection.');
-      // Revert UI update on failure
       setEdges(originalEdges);
     }
   };
@@ -363,6 +405,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const handleExport = async () => {
     if (!isAdmin) {
       showError('You do not have permission to export maps.');
+      return;
+    }
+    if (!currentMapId) {
+      showError('No map selected to export.');
       return;
     }
     const exportData: MapData = {
@@ -407,6 +453,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       showError('You do not have permission to import maps.');
       return;
     }
+    if (!currentMapId) {
+      showError('Please select a map to import into.');
+      return;
+    }
     importInputRef.current?.click();
   };
 
@@ -425,10 +475,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(mapData);
+        await importMap(currentMapId!, mapData); // Pass currentMapId
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
-        onMapUpdate(); // Refresh the map data
+        onMapUpdate(currentMapId); // Refresh the map data
       } catch (error: any) {
         dismissToast(toastId);
         console.error('Failed to import map:', error);
@@ -441,16 +491,11 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleShareMap = async () => {
-    // Share map is accessible to all roles, as it's just generating a public link.
-    const currentMapId = devices.length > 0 ? devices[0].map_id : null;
-
     if (!currentMapId) {
       showError('No map selected to share.');
       return;
     }
 
-    // Construct the shareable URL
-    // Using hardcoded IP and port as requested by the user
     const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${currentMapId}`;
 
     try {
@@ -462,73 +507,181 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     }
   };
 
+  const handleToggleFullscreen = () => {
+    if (!mapWrapperRef.current) return;
+
+    if (!document.fullscreenElement) {
+      mapWrapperRef.current.requestFullscreen().catch((err) => {
+        showError(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const currentMap = maps.find(m => m.id === currentMapId);
+  const backgroundStyle = currentMap?.background_image_url
+    ? { backgroundImage: `url(${currentMap.background_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : currentMap?.background_color
+    ? { backgroundColor: currentMap.background_color }
+    : { backgroundColor: '#1e293b' }; // Default if nothing set
+
   return (
-    <div style={{ height: '70vh', width: '100%' }} className="relative border rounded-lg bg-gray-900">
-      <ReactFlow
-        nodes={nodes}
-        edges={styledEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChangeHandler}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        onNodeDragStop={onNodeDragStop}
-        onEdgeClick={onEdgeClick}
-        fitView
-        fitViewOptions={{ padding: 0.1 }}
-        proOptions={{ hideAttribution: true }} // Hide React Flow attribution
-        nodesDraggable={isAdmin} // Only allow admins to drag nodes
-        nodesConnectable={isAdmin} // Only allow admins to connect nodes
-        elementsSelectable={isAdmin} // Only allow admins to select elements
-      >
-        <Controls />
-        <MiniMap 
-          nodeColor={(n) => {
-            switch (n.data.status) {
-              case 'online': return '#22c55e';
-              case 'offline': return '#ef4444';
-              default: return '#94a3b8';
-            }
-          }} 
-          nodeStrokeWidth={3} 
-          maskColor="rgba(15, 23, 42, 0.8)"
-        />
-        <Background gap={16} size={1} color="#444" />
-      </ReactFlow>
-      <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-        {isAdmin && (
-          <Button onClick={() => navigate('/add-device')} size="sm">
-            <PlusCircle className="h-4 w-4 mr-2" />Add Device
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="map-select" className="text-white">Select Map:</Label>
+          <Select value={currentMapId} onValueChange={handleMapChange}>
+            <SelectTrigger id="map-select" className="w-[200px]">
+              <SelectValue placeholder="Select a map" />
+            </SelectTrigger>
+            <SelectContent>
+              {maps.length === 0 ? (
+                <SelectItem value="no-maps" disabled>No maps available</SelectItem>
+              ) : (
+                maps.map((map) => (
+                  <SelectItem key={map.id} value={map.id}>
+                    {map.name}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <>
+              <Button onClick={() => console.log('New Map')} variant="outline" size="sm">New Map</Button>
+              <Button onClick={() => console.log('Rename Map')} variant="outline" size="sm">Rename Map</Button>
+              <Button onClick={() => console.log('Delete Map')} variant="destructive" size="sm">Delete Map</Button>
+            </>
+          )}
+          <Button onClick={handleShareMap} variant="outline" size="sm">
+            <Share2 className="h-4 w-4 mr-2" />Share Map
           </Button>
-        )}
-        {isAdmin && (
-          <Button onClick={handleExport} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />Export
-          </Button>
-        )}
-        {isAdmin && (
-          <Button onClick={handleImportClick} variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />Import
-          </Button>
-        )}
-        <input 
-          type="file" 
-          ref={importInputRef} 
-          onChange={handleFileChange} 
-          accept="application/json" 
-          className="hidden" 
-        />
-        <Button onClick={handleShareMap} variant="outline" size="sm">
-          <Share2 className="h-4 w-4 mr-2" />Share Map
-        </Button>
+        </div>
       </div>
-      {isEdgeEditorOpen && (
-        <EdgeEditorDialog 
-          isOpen={isEdgeEditorOpen} 
-          onClose={() => setIsEdgeEditorOpen(false)} 
-          onSave={handleSaveEdge} 
-          edge={editingEdge} 
-        />
-      )}
+
+      <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">{currentMap?.name || 'No Map Selected'}</h2>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => console.log('Scan Network')} variant="ghost" size="icon" title="Scan Network" disabled={!isAdmin}>
+              <Search className="h-5 w-5" />
+            </Button>
+            <Button onClick={() => onMapUpdate(currentMapId)} variant="ghost" size="icon" title="Refresh Device Statuses">
+              <RefreshCw className="h-5 w-5" />
+            </Button>
+            
+            <div className="flex items-center space-x-2 pl-2 ml-2 border-l border-slate-700">
+              <Label htmlFor="live-refresh-toggle" className="text-sm text-slate-400 select-none cursor-pointer">Live Status</Label>
+              <Switch
+                id="live-refresh-toggle"
+                checked={liveRefreshEnabled}
+                onCheckedChange={setLiveRefreshEnabled}
+              />
+            </div>
+
+            <div className="pl-2 ml-2 border-l border-slate-700 flex items-center gap-2">
+              {isAdmin && (
+                <>
+                  <Button onClick={() => console.log('Place Existing Device')} variant="ghost" size="icon" title="Place Existing Device">
+                    <PlusCircle className="h-5 w-5" />
+                  </Button>
+                  <Button onClick={() => navigate('/add-device')} variant="ghost" size="icon" title="Add New Device">
+                    <PlusCircle className="h-5 w-5" />
+                  </Button>
+                  <Button onClick={() => console.log('Add Connection')} variant="ghost" size="icon" title="Add Connection">
+                    <PlusCircle className="h-5 w-5" />
+                  </Button>
+                  <Button onClick={handleExport} variant="ghost" size="icon" title="Export Map">
+                    <Download className="h-5 w-5" />
+                  </Button>
+                  <Button onClick={handleImportClick} variant="ghost" size="icon" title="Import Map">
+                    <Upload className="h-5 w-5" />
+                  </Button>
+                  <input 
+                    type="file" 
+                    ref={importInputRef} 
+                    onChange={handleFileChange} 
+                    accept="application/json" 
+                    className="hidden" 
+                  />
+                  <Button onClick={() => console.log('Map Settings')} variant="ghost" size="icon" title="Map Settings">
+                    <Cog className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
+              <Button onClick={handleToggleFullscreen} variant="ghost" size="icon" title="Toggle Fullscreen">
+                {isFullScreen ? <Compress className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div ref={mapWrapperRef} style={{ height: '70vh', width: '100%', ...backgroundStyle }} className="relative border rounded-lg bg-gray-900">
+        {maps.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center p-4">
+            <h2 className="text-2xl font-bold mb-2">No Network Maps Available</h2>
+            <p className="text-lg mb-4">
+              {isAdmin ? 'Create a new map to start visualizing your network.' : 'Please ask an administrator to create a map.'}
+            </p>
+            {isAdmin && (
+              <Button onClick={() => console.log('Create First Map')} className="mt-4">Create First Map</Button>
+            )}
+          </div>
+        )}
+        {currentMapId && maps.length > 0 && (
+          <ReactFlow
+            nodes={nodes}
+            edges={styledEdges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChangeHandler}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            onNodeDragStop={onNodeDragStop}
+            onEdgeClick={onEdgeClick}
+            fitView
+            fitViewOptions={{ padding: 0.1 }}
+            proOptions={{ hideAttribution: true }}
+            nodesDraggable={isAdmin}
+            nodesConnectable={isAdmin}
+            elementsSelectable={isAdmin}
+          >
+            <Controls />
+            <MiniMap 
+              nodeColor={(n) => {
+                switch (n.data.status) {
+                  case 'online': return '#22c55e';
+                  case 'offline': return '#ef4444';
+                  default: return '#94a3b8';
+                }
+              }} 
+              nodeStrokeWidth={3} 
+              maskColor="rgba(15, 23, 42, 0.8)"
+            />
+            <Background gap={16} size={1} color="#444" />
+          </ReactFlow>
+        )}
+        {isEdgeEditorOpen && (
+          <EdgeEditorDialog 
+            isOpen={isEdgeEditorOpen} 
+            onClose={() => setIsEdgeEditorOpen(false)} 
+            onSave={handleSaveEdge} 
+            edge={editingEdge} 
+          />
+        )}
+      </div>
     </div>
   );
 };
