@@ -132,6 +132,25 @@ include 'header.php';
                         <div id="mapBgUploadLoader" class="hidden mt-2"><div class="loader inline-block w-4 h-4"></div><span class="ml-2 text-sm">Uploading...</span></div>
                     </div>
                 </div>
+                <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
+                    <h3 class="text-lg font-semibold text-white">Public View Settings</h3>
+                    <div>
+                        <label for="publicViewToggle" class="flex items-center text-sm font-medium text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="publicViewToggle" name="public_view_enabled" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
+                            <span class="ml-2">Enable Public View</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mt-1">Allow anyone with the link to view this map without logging in.</p>
+                    </div>
+                    <div id="publicViewLinkContainer" class="hidden space-y-2">
+                        <label class="block text-sm font-medium text-slate-400">Public Link:</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="publicViewLink" class="flex-grow bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm cursor-text" readonly>
+                            <button type="button" id="copyPublicLinkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex justify-between items-center mt-6">
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>
                     <div>

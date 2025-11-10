@@ -70,6 +70,8 @@ MapApp.mapManager = {
             mapEl.style.backgroundImage = currentMap.background_image_url ? `url(${currentMap.background_image_url})` : '';
             mapEl.style.backgroundSize = 'cover';
             mapEl.style.backgroundPosition = 'center';
+            // Update public view link display
+            MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
         }
         
         // Correctly extract the 'devices' array from the API response
@@ -171,6 +173,17 @@ MapApp.mapManager = {
         } catch (error) {
             console.error("Failed to copy device:", error);
             window.notyf.error("Could not copy the device.");
+        }
+    },
+
+    updatePublicViewLink: (mapId, isEnabled) => {
+        if (isEnabled) {
+            const publicLink = `http://192.168.20.5:2266/public_map.php?map_id=${mapId}`;
+            MapApp.ui.els.publicViewLink.value = publicLink;
+            MapApp.ui.els.publicViewLinkContainer.classList.remove('hidden');
+        } else {
+            MapApp.ui.els.publicViewLink.value = '';
+            MapApp.ui.els.publicViewLinkContainer.classList.add('hidden');
         }
     }
 };

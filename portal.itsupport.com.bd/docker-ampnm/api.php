@@ -18,14 +18,14 @@ try {
             exit;
         }
 
-        // Fetch map details
-        $stmt_map = $pdo->prepare("SELECT id, name, background_color, background_image_url FROM maps WHERE id = ?");
+        // Fetch map details, ENSURING public_view_enabled is TRUE
+        $stmt_map = $pdo->prepare("SELECT id, name, background_color, background_image_url, public_view_enabled FROM maps WHERE id = ? AND public_view_enabled = TRUE");
         $stmt_map->execute([$map_id]);
         $map = $stmt_map->fetch(PDO::FETCH_ASSOC);
 
         if (!$map) {
             http_response_code(404);
-            echo json_encode(['error' => 'Map not found.']);
+            echo json_encode(['error' => 'Map not found or not enabled for public view.']);
             exit;
         }
 

@@ -5,12 +5,12 @@ $user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
 
 switch ($action) {
     case 'get_maps':
-        $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m";
+        $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id AND user_id = ?) as deviceCount FROM maps m";
         $params = [$current_user_id];
 
         if ($user_role === 'viewer') {
             // Viewers can see all maps, so remove the user_id filter for the main map list
-            $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id) as deviceCount FROM maps m";
+            $sql = "SELECT m.id, m.name, m.type, m.background_color, m.background_image_url, m.public_view_enabled, m.updated_at as lastModified, (SELECT COUNT(*) FROM devices WHERE map_id = m.id) as deviceCount FROM maps m";
             $params = []; // No user_id filter for the main map list for viewers
         } else {
             // Admins and other roles only see their own maps
@@ -31,7 +31,7 @@ switch ($action) {
             if (empty($name)) { http_response_code(400); echo json_encode(['error' => 'Name is required']); exit; }
             $stmt = $pdo->prepare("INSERT INTO maps (user_id, name, type) VALUES (?, ?, ?)"); $stmt->execute([$current_user_id, $name, $type]);
             $lastId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare("SELECT id, name, type, updated_at as lastModified, 0 as deviceCount FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT id, name, type, public_view_enabled, updated_at as lastModified, 0 as deviceCount FROM maps WHERE id = ? AND user_id = ?"); $stmt->execute([$lastId, $current_user_id]);
             $map = $stmt->fetch(PDO::FETCH_ASSOC); echo json_encode($map);
         }
         break;
@@ -42,12 +42,17 @@ switch ($action) {
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Map ID and updates are required']); exit; }
             
-            $allowed_fields = ['name', 'background_color', 'background_image_url'];
+            $allowed_fields = ['name', 'background_color', 'background_image_url', 'public_view_enabled'];
             $fields = []; $params = [];
             foreach ($updates as $key => $value) {
                 if (in_array($key, $allowed_fields)) {
                     $fields[] = "$key = ?";
-                    $params[] = ($value === '') ? null : $value;
+                    // Handle boolean conversion for public_view_enabled
+                    if ($key === 'public_view_enabled') {
+                        $params[] = (bool)$value;
+                    } else {
+                        $params[] = ($value === '') ? null : $value;
+                    }
                 }
             }
 

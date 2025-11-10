@@ -45,6 +45,11 @@ MapApp.ui = {
             placeDeviceList: document.getElementById('placeDeviceList'),
             placeDeviceLoader: document.getElementById('placeDeviceLoader'),
             shareMapBtn: document.getElementById('shareMapBtn'),
+            // NEW Public View Elements
+            publicViewToggle: document.getElementById('publicViewToggle'),
+            publicViewLinkContainer: document.getElementById('publicViewLinkContainer'),
+            publicViewLink: document.getElementById('publicViewLink'),
+            copyPublicLinkBtn: document.getElementById('copyPublicLinkBtn'),
         };
     },
 

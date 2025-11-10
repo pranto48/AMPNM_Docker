@@ -340,6 +340,8 @@ function initMap() {
                 document.getElementById('mapBgColor').value = currentMap.background_color || '#1e293b';
                 document.getElementById('mapBgColorHex').value = currentMap.background_color || '#1e293b';
                 document.getElementById('mapBgImageUrl').value = currentMap.background_image_url || '';
+                els.publicViewToggle.checked = currentMap.public_view_enabled;
+                MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
                 openModal('mapSettingsModal');
             }
         });
@@ -350,11 +352,30 @@ function initMap() {
         document.getElementById('mapBgColorHex').addEventListener('input', (e) => {
             document.getElementById('mapBgColor').value = e.target.value;
         });
+
+        els.publicViewToggle.addEventListener('change', () => {
+            MapApp.mapManager.updatePublicViewLink(state.currentMapId, els.publicViewToggle.checked);
+        });
+
+        els.copyPublicLinkBtn.addEventListener('click', async () => {
+            const publicLink = els.publicViewLink.value;
+            if (publicLink) {
+                try {
+                    await navigator.clipboard.writeText(publicLink);
+                    window.notyf.success('Public link copied to clipboard!');
+                } catch (err) {
+                    console.error('Failed to copy public link:', err);
+                    window.notyf.error('Failed to copy public link. Please copy manually.');
+                }
+            }
+        });
+
         els.mapSettingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const updates = {
                 background_color: document.getElementById('mapBgColorHex').value,
-                background_image_url: document.getElementById('mapBgImageUrl').value
+                background_image_url: document.getElementById('mapBgImageUrl').value,
+                public_view_enabled: els.publicViewToggle.checked
             };
             try {
                 await api.post('update_map', { id: state.currentMapId, updates });
@@ -369,12 +390,12 @@ function initMap() {
         });
         els.resetMapBgBtn.addEventListener('click', async () => {
             try {
-                const updates = { background_color: null, background_image_url: null };
+                const updates = { background_color: null, background_image_url: null, public_view_enabled: false };
                 await api.post('update_map', { id: state.currentMapId, updates });
                 await mapManager.loadMaps();
                 await mapManager.switchMap(state.currentMapId);
                 closeModal('mapSettingsModal');
-                window.notyf.success('Map background reset to default.');
+                window.notyf.success('Map background and public view reset to default.');
             } catch (error) {
                 console.error("Failed to reset map background:", error);
                 window.notyf.error(error.message || "Could not reset map background.");

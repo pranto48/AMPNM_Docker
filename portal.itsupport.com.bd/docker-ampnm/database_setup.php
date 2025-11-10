@@ -124,6 +124,7 @@ try {
             `background_color` VARCHAR(20) NULL,
             `background_image_url` VARCHAR(255) NULL,
             `is_default` BOOLEAN DEFAULT FALSE,
+            `public_view_enabled` BOOLEAN DEFAULT FALSE, /* NEW COLUMN */
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
@@ -279,6 +280,11 @@ try {
     if (!columnExists($pdo, $dbname, 'devices', 'description')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `description` TEXT NULL AFTER `type`;");
         message("Upgraded 'devices' table: added 'description' column.");
+    }
+    // NEW MIGRATION: Add public_view_enabled to maps table
+    if (!columnExists($pdo, $dbname, 'maps', 'public_view_enabled')) {
+        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `public_view_enabled` BOOLEAN DEFAULT FALSE AFTER `is_default`;");
+        message("Migrated `maps` table: added `public_view_enabled` column.");
     }
 
 
