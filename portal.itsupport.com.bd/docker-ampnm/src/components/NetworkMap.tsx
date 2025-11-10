@@ -35,6 +35,15 @@ import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast
 // import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
+// Declare SoundManager globally
+declare global {
+  interface Window {
+    SoundManager: {
+      play: (soundName: string) => void;
+    };
+  }
+}
+
 const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -42,6 +51,9 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate(); // Initialize useNavigate
+
+  // Ref to store previous devices for status comparison
+  const prevDevicesRef = useRef<NetworkDevice[]>([]);
 
   // Get user role from global scope
   const userRole = (window as any).userRole || 'viewer';
@@ -185,6 +197,34 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
     return () => clearInterval(pollingInterval);
   }, [onMapUpdate]);
+
+  // Effect to detect status changes and play sounds
+  useEffect(() => {
+    const prevDevicesMap = new Map(prevDevicesRef.current.map(d => [d.id, d.status]));
+
+    devices.forEach(currentDevice => {
+      const prevStatus = prevDevicesMap.get(currentDevice.id);
+      const newStatus = currentDevice.status;
+
+      if (prevStatus && newStatus && prevStatus !== newStatus) {
+        // Play sound based on new status
+        if (window.SoundManager) {
+          if (newStatus === 'online' && (prevStatus === 'offline' || prevStatus === 'critical' || prevStatus === 'warning')) {
+            window.SoundManager.play('online');
+          } else if (newStatus === 'warning') {
+            window.SoundManager.play('warning');
+          } else if (newStatus === 'critical') {
+            window.SoundManager.play('critical');
+          } else if (newStatus === 'offline') {
+            window.SoundManager.play('offline');
+          }
+        }
+      }
+    });
+
+    // Update ref for the next render
+    prevDevicesRef.current = devices;
+  }, [devices]);
 
 
   // Style edges based on connection type and device status
