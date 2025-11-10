@@ -72,10 +72,12 @@ MapApp.mapManager = {
             mapEl.style.backgroundPosition = 'center';
         }
         
-        const [deviceData, edgeData] = await Promise.all([
+        // Correctly extract the 'devices' array from the API response
+        const [deviceResponse, edgeData] = await Promise.all([
             MapApp.api.get('get_devices', { map_id: mapId }), 
             MapApp.api.get('get_edges', { map_id: mapId })
         ]);
+        const deviceData = deviceResponse.devices || []; // Extract the array here
         
         const visNodes = deviceData.map(d => {
             let label = d.name;
@@ -147,24 +149,23 @@ MapApp.mapManager = {
             const createdDevice = await MapApp.api.post('create_device', newDeviceData);
             window.notyf.success(`Device "${originalDevice.name}" copied.`);
             
-            const visNode = {
+            const baseNode = {
                 id: createdDevice.id,
                 label: createdDevice.name,
                 title: MapApp.utils.buildNodeTitle(createdDevice),
                 x: createdDevice.x,
                 y: createdDevice.y, // Corrected variable name
-                shape: 'icon',
-                icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown },
                 font: { color: 'white', size: parseInt(createdDevice.name_text_size) || 14, multi: true },
                 deviceData: createdDevice
             };
-            if (createdDevice.type === 'box') {
-                Object.assign(visNode, {
-                    shape: 'box',
-                    color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
-                    margin: 20,
-                    level: -1
-                });
+
+            let visNode;
+            if (createdDevice.icon_url) {
+                visNode = { ...baseNode, shape: 'image', image: createdDevice.icon_url, size: (parseInt(createdDevice.icon_size) || 50) / 2, color: { border: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' }, borderWidth: 3 };
+            } else if (createdDevice.type === 'box') {
+                visNode = { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
+            } else {
+                visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown } };
             }
             MapApp.state.nodes.add(visNode);
         } catch (error) {
