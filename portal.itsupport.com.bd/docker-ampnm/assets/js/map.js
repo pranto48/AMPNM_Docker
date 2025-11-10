@@ -268,37 +268,27 @@ function initMap() {
         }
     }
 
-    // Only admin can refresh status and toggle live refresh
-    if (window.userRole === 'admin') {
-        els.refreshStatusBtn.addEventListener('click', async () => {
-            els.refreshStatusBtn.disabled = true;
-            await deviceManager.performBulkRefresh();
-            if (!els.liveRefreshToggle.checked) els.refreshStatusBtn.disabled = false;
-        });
+    // Refresh Status button logic (now for all roles)
+    els.refreshStatusBtn.addEventListener('click', async () => {
+        els.refreshStatusBtn.disabled = true;
+        await deviceManager.performBulkRefresh();
+        if (!els.liveRefreshToggle.checked) els.refreshStatusBtn.disabled = false;
+    });
 
-        els.liveRefreshToggle.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                window.notyf.info(`Live status enabled. Updating every ${MapApp.config.REFRESH_INTERVAL_SECONDS} seconds.`);
-                els.refreshStatusBtn.disabled = true;
-                deviceManager.performBulkRefresh();
-                state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
-            } else {
-                if (state.globalRefreshIntervalId) clearInterval(state.globalRefreshIntervalId);
-                state.globalRefreshIntervalId = null;
-                els.refreshStatusBtn.disabled = false;
-                window.notyf.info('Live status disabled.');
-            }
-        });
-    } else {
-        // Disable refresh buttons and toggle for viewers
-        if (els.refreshStatusBtn) els.refreshStatusBtn.disabled = true;
-        if (els.liveRefreshToggle) els.liveRefreshToggle.disabled = true;
-        // Add a message for viewers
-        const refreshControls = els.refreshStatusBtn.closest('.flex.items-center.gap-2');
-        if (refreshControls) {
-            refreshControls.insertAdjacentHTML('afterend', '<p class="text-red-400 text-sm mt-2">You do not have permission to refresh device statuses.</p>');
+    // Live Refresh toggle logic (now for all roles)
+    els.liveRefreshToggle.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            window.notyf.info(`Live status enabled. Updating every ${MapApp.config.REFRESH_INTERVAL_SECONDS} seconds.`);
+            els.refreshStatusBtn.disabled = true;
+            deviceManager.performBulkRefresh();
+            state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
+        } else {
+            if (state.globalRefreshIntervalId) clearInterval(state.globalRefreshIntervalId);
+            state.globalRefreshIntervalId = null;
+            els.refreshStatusBtn.disabled = false;
+            window.notyf.info('Live status disabled.');
         }
-    }
+    });
 
     // Only admin can export/import map
     if (window.userRole === 'admin') {
@@ -480,7 +470,7 @@ function initMap() {
                     // Add the device to the map visually
                     const baseNode = {
                         id: updatedDevice.id, label: updatedDevice.name, title: MapApp.utils.buildNodeTitle(updatedDevice),
-                        x: updatedDevice.x, y: updatedDevice.y,
+                        x: updatedDevice.x, y: updatedPosition.y,
                         font: { color: 'white', size: parseInt(updatedDevice.name_text_size) || 14, multi: true },
                         deviceData: updatedDevice
                     };
