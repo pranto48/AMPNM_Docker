@@ -27,13 +27,11 @@ import {
   updateEdgeInDB,
   importMap,
   MapData,
-  // subscribeToDeviceChanges // Removed Supabase subscription
 } from '@/services/networkDeviceService';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-// import { supabase } from '@/integrations/supabase/client'; // Removed Supabase import
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from 'react-router-dom';
 
 // Declare SoundManager globally
 declare global {
@@ -41,6 +39,7 @@ declare global {
     SoundManager: {
       play: (soundName: string) => void;
     };
+    userRole: string; // Declare userRole
   }
 }
 
@@ -50,13 +49,10 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
   const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
   const importInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate(); // Initialize useNavigate
-
-  // Ref to store previous devices for status comparison
-  const prevDevicesRef = useRef<NetworkDevice[]>([]);
+  const navigate = useNavigate();
 
   // Get user role from global scope
-  const userRole = (window as any).userRole || 'viewer';
+  const userRole = window.userRole || 'viewer';
   const isAdmin = userRole === 'admin';
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
@@ -78,7 +74,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           await updateDevice(nodeId, { 
             status,
             last_ping: new Date().toISOString(), // PHP uses last_seen
-            // last_ping_result: status === 'online' // Not directly stored in PHP
           });
         }
       } catch (error) {
@@ -108,7 +103,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         icon_size: device.icon_size,
         name_text_size: device.name_text_size,
         last_ping: device.last_ping,
-        last_ping_result: device.last_ping_result,
+        last_ping_result: device.status === 'online', // Derive from status
         onEdit: (id: string) => {
           if (!isAdmin) {
             showError('You do not have permission to edit devices.');
@@ -134,7 +129,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
-  // Load edges and subscribe to edge changes
+  // Load edges
   useEffect(() => {
     const loadEdges = async () => {
       try {
@@ -142,8 +137,8 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         setEdges(
           edgesData.map((edge: any) => ({
             id: edge.id,
-            source: edge.source,
-            target: edge.target,
+            source: edge.source_id, // PHP uses source_id
+            target: edge.target_id, // PHP uses target_id
             data: { connection_type: edge.connection_type || 'cat5' },
           }))
         );
@@ -153,40 +148,6 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       }
     };
     loadEdges();
-
-    // Removed Supabase subscription for edges.
-    // For real-time updates with PHP, you would need to implement a polling mechanism
-    // or a different real-time solution.
-    // const handleEdgeInsert = (payload: any) => {
-    //   const newEdge = { 
-    //     id: payload.new.id, 
-    //     source: payload.new.source_id, 
-    //     target: payload.new.target_id, 
-    //     data: { connection_type: payload.new.connection_type } 
-    //   };
-    //   setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
-    // };
-    
-    // const handleEdgeUpdate = (payload: any) => {
-    //   setEdges((eds) => 
-    //     eds.map(e => e.id === payload.new.id ? { ...e, data: { connection_type: payload.new.connection_type } } : e)
-    //   );
-    // };
-    
-    // const handleEdgeDelete = (payload: any) => {
-    //   setEdges((eds) => eds.filter((e) => e.id !== payload.old.id));
-    // };
-
-    // const edgeChannel = supabase.channel('network-map-edge-changes');
-    // edgeChannel
-    //   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'network_edges' }, handleEdgeInsert)
-    //   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'network_edges' }, handleEdgeUpdate)
-    //   .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'network_edges' }, handleEdgeDelete)
-    //   .subscribe();
-
-    // return () => {
-    //   supabase.removeChannel(edgeChannel);
-    // };
   }, [setEdges]);
 
   // Implement polling for live status updates for all users
@@ -197,6 +158,9 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
     return () => clearInterval(pollingInterval);
   }, [onMapUpdate]);
+
+  // Ref to store previous devices for status comparison
+  const prevDevicesRef = useRef<NetworkDevice[]>([]);
 
   // Effect to detect status changes and play sounds
   useEffect(() => {
@@ -288,7 +252,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       
       try {
         // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target! });
+        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: devices[0]?.map_id || '1' }); // Assuming map_id 1 if not set
         showSuccess('Connection saved.');
       } catch (error) {
         console.error('Failed to save connection:', error);
@@ -297,7 +261,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges, isAdmin]
+    [setEdges, isAdmin, devices]
   );
 
   const handleDelete = async (deviceId: string) => {
@@ -457,7 +421,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(mapData);
+        await importMap(mapData, devices[0]?.map_id || '1'); // Pass current map_id
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data

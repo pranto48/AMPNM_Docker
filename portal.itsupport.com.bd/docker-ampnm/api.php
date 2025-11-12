@@ -75,7 +75,9 @@ try {
         'get_status_logs', 'get_device_details', 'get_device_uptime', 'get_public_map_data',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
         'health',
-        'ping_all_devices' // NEW: Allow viewers to trigger bulk pings
+        // Removed 'ping_all_devices' from viewer_allowed_actions
+        // Removed 'check_device' from viewer_allowed_actions
+        // Removed 'update_device_status_by_ip' from viewer_allowed_actions
     ];
 
     // If user is a 'viewer', restrict actions
@@ -91,10 +93,10 @@ try {
              echo json_encode(['error' => 'Forbidden: Viewers can only access devices/edges within a specific map.']);
              exit;
         }
-        // Viewers cannot perform POST requests, EXCEPT for ping_all_devices
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'ping_all_devices') {
+        // Viewers cannot perform POST requests
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             http_response_code(403);
-            echo json_encode(['error' => 'Forbidden: Viewers cannot perform write operations (except ping_all_devices).']);
+            echo json_encode(['error' => 'Forbidden: Viewers cannot perform write operations.']);
             exit;
         }
     }
@@ -104,7 +106,7 @@ try {
     $deviceActions = ['get_devices', 'create_device', 'update_device', 'delete_device', 'get_device_details', 'check_device', 'check_all_devices_globally', 'ping_all_devices', 'get_device_uptime', 'upload_device_icon', 'import_devices', 'update_device_status_by_ip'];
     $mapActions = ['get_maps', 'create_map', 'delete_map', 'get_edges', 'create_edge', 'update_edge', 'delete_edge', 'import_map', 'update_map', 'upload_map_background'];
     $dashboardActions = ['get_dashboard_data'];
-    $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role']; // Added update_user_role
+    $userActions = ['get_users', 'create_user', 'delete_user', 'update_user_role'];
     $logActions = ['get_status_logs'];
     $notificationActions = ['get_smtp_settings', 'save_smtp_settings', 'get_device_subscriptions', 'save_device_subscription', 'delete_device_subscription', 'get_all_devices_for_subscriptions'];
 

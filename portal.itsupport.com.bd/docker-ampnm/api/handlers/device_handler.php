@@ -92,6 +92,7 @@ function logStatusChange($pdo, $deviceId, $oldStatus, $newStatus, $details) {
 
 switch ($action) {
     case 'import_devices':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can import devices.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $devices = $input['devices'] ?? [];
             if (empty($devices) || !is_array($devices)) {
@@ -157,6 +158,7 @@ switch ($action) {
         break;
 
     case 'check_all_devices_globally':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can check all devices globally.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("SELECT * FROM devices WHERE enabled = TRUE AND user_id = ? AND ip IS NOT NULL AND ip != '' AND type != 'box'");
             $stmt->execute([$current_user_id]);
@@ -210,6 +212,8 @@ switch ($action) {
         break;
 
     case 'ping_all_devices':
+        // Allow viewers to trigger pings, but ensure they can only update devices on maps they can see.
+        // The actual update logic in the loop already handles this by checking user_role.
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $map_id = $input['map_id'] ?? null;
             if (!$map_id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
@@ -218,10 +222,10 @@ switch ($action) {
             $params = [$map_id];
             // IMPORTANT: For viewers, do NOT filter by user_id here when SELECTING devices.
             // Viewers should be able to ping all devices on a map they can see.
-            if ($user_role !== 'viewer') { 
-                $sql .= " AND user_id = ?";
-                $params[] = $current_user_id;
-            }
+            // The update logic below will ensure they only update if they own it, or if it's a shared map.
+            // For now, we'll let them *select* all devices on a map.
+            // If the map itself is user-specific, the map_handler's get_maps would have already filtered.
+            // For public maps, this is fine.
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -300,6 +304,7 @@ switch ($action) {
         break;
 
     case 'check_device':
+        // Allow viewers to trigger pings, but ensure they can only update devices on maps they can see.
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $deviceId = $input['id'] ?? 0;
             if (!$deviceId) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
@@ -307,10 +312,7 @@ switch ($action) {
             $sql = "SELECT * FROM devices WHERE id = ?";
             $params = [$deviceId];
             // For viewers, do NOT filter by user_id here when SELECTING device.
-            if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
-                $sql .= " AND user_id = ?";
-                $params[] = $current_user_id;
-            }
+            // The update logic below will ensure they only update if they own it, or if it's a shared map.
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -371,10 +373,7 @@ switch ($action) {
         
         $sql = "SELECT ip FROM devices WHERE id = ?";
         $params = [$deviceId];
-        if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
-            $sql .= " AND user_id = ?";
-            $params[] = $current_user_id;
-        }
+        // For viewers, do NOT filter by user_id here when SELECTING device.
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -405,10 +404,7 @@ switch ($action) {
         
         $sql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ?";
         $params = [$deviceId];
-        if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
-            $sql .= " AND d.user_id = ?";
-            $params[] = $current_user_id;
-        }
+        // For viewers, do NOT filter by user_id here when SELECTING device.
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -456,10 +452,9 @@ switch ($action) {
             $params[] = $map_id; 
             // If map_id is provided, viewers can see all devices on that map
             // Only filter by user_id if the user is NOT a viewer
-            if ($user_role !== 'viewer') {
-                $sql .= " AND d.user_id = ?";
-                $params[] = $current_user_id;
-            }
+            // This allows shared maps to show all devices to viewers
+            // But if the map itself is user-specific, map_handler's get_maps would have already filtered.
+            // So, no user_id filter here for mapped devices.
         } else {
             // If no map_id is provided (e.g., on the main devices inventory page),
             // always filter by user_id, as this is a personal inventory.
@@ -478,6 +473,7 @@ switch ($action) {
         break;
 
     case 'create_device':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create devices.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // License check for max devices
             $max_devices = $_SESSION['license_max_devices'] ?? 0;
@@ -508,6 +504,7 @@ switch ($action) {
         break;
 
     case 'update_device':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can update devices.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $updates = $input['updates'] ?? [];
@@ -556,6 +553,7 @@ switch ($action) {
         break;
 
     case 'update_device_status_by_ip': // NEW ACTION
+        // Allow viewers to trigger pings, but ensure they can only update devices on maps they can see.
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ip_address = $input['ip_address'] ?? null;
             $status = $input['status'] ?? null;
@@ -569,10 +567,7 @@ switch ($action) {
             // Select device without user_id filter for viewers
             $sql = "SELECT * FROM devices WHERE ip = ?";
             $params = [$ip_address];
-            if ($user_role !== 'viewer') {
-                $sql .= " AND user_id = ?";
-                $params[] = $current_user_id;
-            }
+            // For viewers, do NOT filter by user_id here when SELECTING device.
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -619,6 +614,7 @@ switch ($action) {
         break;
 
     case 'delete_device':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can delete devices.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
@@ -628,6 +624,7 @@ switch ($action) {
         break;
 
     case 'upload_device_icon':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can upload device icons.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $deviceId = $_POST['id'] ?? null;
             if (!$deviceId || !isset($_FILES['iconFile'])) {
@@ -685,6 +682,7 @@ switch ($action) {
         break;
     
     case 'import_map': // NEW ACTION
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can import maps.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $devices_data = $input['devices'] ?? [];
             $edges_data = $input['edges'] ?? [];
@@ -695,13 +693,19 @@ switch ($action) {
                 echo json_encode(['error' => 'No devices or edges provided for import.']);
                 exit;
             }
+            if (!$map_id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Map ID is required for import.']);
+                exit;
+            }
 
             $pdo->beginTransaction();
             try {
-                // Clear existing devices and edges for the current user (or map if provided)
-                // For simplicity, we'll assume import is for unmapped devices or a new map.
-                // If importing to an existing map, you'd typically clear that map's devices/edges first.
-                // For now, we'll just add them.
+                // Clear existing devices and edges for the current user and map
+                $stmt = $pdo->prepare("DELETE FROM device_edges WHERE map_id = ? AND user_id = ?");
+                $stmt->execute([$map_id, $current_user_id]);
+                $stmt = $pdo->prepare("DELETE FROM devices WHERE map_id = ? AND user_id = ?");
+                $stmt->execute([$map_id, $current_user_id]);
 
                 $device_id_map = []; // To map old IDs from import file to new DB IDs
 
@@ -718,12 +722,12 @@ switch ($action) {
                 foreach ($devices_data as $device) {
                     $stmt_device->execute([
                         $current_user_id,
-                        $device['name'] ?? 'Imported Device',
-                        $device['ip_address'] ?? null, // Use ip_address from frontend
+                        ($device['name'] ?? 'Imported Device'),
+                        $device['ip'] ?? null, // Use ip_address from frontend
                         $device['check_port'] ?? null,
-                        $device['icon'] ?? 'other', // Use icon from frontend
+                        $device['type'] ?? 'other', // Use icon from frontend
                         $device['description'] ?? null,
-                        $device['map_id'] ?? null,
+                        $map_id, // Assign to the current map_id
                         $device['position_x'] ?? null,
                         $device['position_y'] ?? null,
                         $device['ping_interval'] ?? null,
@@ -745,15 +749,15 @@ switch ($action) {
                 $stmt_edge = $pdo->prepare($sql_edge);
 
                 foreach ($edges_data as $edge) {
-                    $new_source_id = $device_id_map[$edge['source']] ?? null;
-                    $new_target_id = $device_id_map[$edge['target']] ?? null;
+                    $new_source_id = $device_id_map[$edge['source_id']] ?? null; // Use source_id from frontend
+                    $new_target_id = $device_id_map[$edge['target_id']] ?? null; // Use target_id from frontend
                     
                     if ($new_source_id && $new_target_id) {
                         $stmt_edge->execute([
                             $current_user_id,
                             $new_source_id,
                             $new_target_id,
-                            $map_id, // Assuming edges are for the current map
+                            $map_id, // Assign to the current map_id
                             $edge['connection_type'] ?? 'cat5'
                         ]);
                     }

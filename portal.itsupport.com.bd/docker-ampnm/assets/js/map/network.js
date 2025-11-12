@@ -103,29 +103,37 @@ MapApp.network = {
                         await MapApp.mapManager.copyDevice(id);
                     } else if (action === 'delete') {
                         if (confirm('Are you sure you want to delete this device?')) {
-                            await MapApp.api.post('delete_device', { id });
-                            window.notyf.success('Device deleted.');
-                            MapApp.state.nodes.remove(id);
+                            try {
+                                await MapApp.api.post('delete_device', { id });
+                                window.notyf.success('Device deleted.');
+                                MapApp.state.nodes.remove(id);
+                            } catch (error) {
+                                window.notyf.error(error.message || 'Failed to delete device.');
+                            }
                         }
                     } else if (action === 'edit-edge') {
                         MapApp.ui.openEdgeModal(id);
                     } else if (action === 'delete-edge') {
                         if (confirm('Are you sure you want to delete this connection?')) {
-                            const result = await MapApp.api.post('delete_edge', { id });
-                            if (result.success) {
-                                window.notyf.success('Connection deleted.');
-                                MapApp.state.edges.remove(id);
-                            } else {
-                                window.notyf.error('Failed to delete connection.');
+                            try {
+                                const result = await MapApp.api.post('delete_edge', { id });
+                                if (result.success) {
+                                    window.notyf.success('Connection deleted.');
+                                    MapApp.state.edges.remove(id);
+                                } else {
+                                    window.notyf.error(result.error || 'Failed to delete connection.');
+                                }
+                            } catch (error) {
+                                window.notyf.error(error.message || 'Failed to delete connection.');
                             }
                         }
                     }
                 } else { // Viewer role actions
                     if (action === 'view-details') {
-                        // Implement a read-only details view for viewers if needed
-                        window.notyf.info('Viewer mode: Displaying read-only details.');
                         // For now, just show a toast, but you could open a modal with device details
+                        window.notyf.info('Viewer mode: Displaying read-only details (feature not fully implemented for viewers).');
                     } else if (action === 'ping') {
+                        // Viewers can trigger pings, but the server-side API will handle the actual status update.
                         const icon = document.createElement('i');
                         icon.className = 'fas fa-spinner fa-spin';
                         target.prepend(icon);

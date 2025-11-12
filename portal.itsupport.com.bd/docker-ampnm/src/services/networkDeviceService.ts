@@ -36,9 +36,10 @@ export interface NetworkDevice {
 
 export interface NetworkEdge {
   id?: string;
-  source: string;
-  target: string;
+  source_id: string; // Changed to source_id
+  target_id: string; // Changed to target_id
   connection_type: string;
+  map_id?: string; // Added map_id
 }
 
 export interface MapData {
@@ -136,8 +137,8 @@ export const getEdges = async (): Promise<NetworkEdge[]> => {
   return result.edges || [];
 };
 
-export const addEdgeToDB = async (edge: { source: string; target: string }): Promise<NetworkEdge> => {
-  const result = await callApi<NetworkEdge>('create_edge', 'POST', { source_id: edge.source, target_id: edge.target, connection_type: 'cat5' });
+export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string }): Promise<NetworkEdge> => {
+  const result = await callApi<NetworkEdge>('create_edge', 'POST', { source_id: edge.source, target_id: edge.target, map_id: edge.map_id, connection_type: 'cat5' });
   return result;
 };
 
@@ -151,17 +152,18 @@ export const deleteEdgeFromDB = async (edgeId: string): Promise<{ success: boole
   return result;
 };
 
-export const importMap = async (mapData: MapData): Promise<{ success: boolean }> => {
+export const importMap = async (mapData: MapData, map_id: string): Promise<{ success: boolean }> => {
   // The PHP API expects 'devices' and 'edges' directly in the body
   const payload = {
+    map_id: map_id, // Pass the current map_id for the import
     devices: mapData.devices.map(d => ({
       ...d,
       ip: d.ip_address, // Map ip_address to ip for PHP
       type: d.icon, // Map icon to type for PHP
     })),
     edges: mapData.edges.map(e => ({
-      source_id: e.source,
-      target_id: e.target,
+      source_id: e.source, // Map source to source_id for PHP
+      target_id: e.target, // Map target to target_id for PHP
       connection_type: e.connection_type,
     })),
   };

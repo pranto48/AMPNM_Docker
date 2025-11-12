@@ -26,6 +26,7 @@ switch ($action) {
         break;
 
     case 'create_map':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create maps.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = $input['name'] ?? ''; $type = $input['type'] ?? 'lan';
             if (empty($name)) { http_response_code(400); echo json_encode(['error' => 'Name is required']); exit; }
@@ -37,6 +38,7 @@ switch ($action) {
         break;
 
     case 'update_map':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can update maps.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $updates = $input['updates'] ?? [];
@@ -67,6 +69,7 @@ switch ($action) {
         break;
 
     case 'delete_map':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can delete maps.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Map ID is required']); exit; }
@@ -82,11 +85,8 @@ switch ($action) {
         $sql = "SELECT * FROM device_edges WHERE map_id = ?";
         $params = [$map_id];
 
-        if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
-            $sql .= " AND user_id = ?";
-            $params[] = $current_user_id;
-        }
-
+        // For viewers, do NOT filter by user_id here when SELECTING edges.
+        // This allows shared maps to show all edges to viewers.
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $edges = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -94,6 +94,7 @@ switch ($action) {
         break;
 
     case 'create_edge':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can create edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
@@ -107,6 +108,7 @@ switch ($action) {
         break;
 
     case 'update_edge':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can update edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             $connection_type = $input['connection_type'] ?? 'cat5';
@@ -121,6 +123,7 @@ switch ($action) {
         break;
 
     case 'delete_edge':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can delete edges.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
@@ -131,6 +134,7 @@ switch ($action) {
         break;
     
     case 'import_map':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can import maps.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $map_id = $input['map_id'] ?? null;
             $devices = $input['devices'] ?? [];
@@ -181,8 +185,8 @@ switch ($action) {
                 $sql = "INSERT INTO device_edges (user_id, source_id, target_id, map_id, connection_type) VALUES (?, ?, ?, ?, ?)";
                 $stmt = $pdo->prepare($sql);
                 foreach ($edges as $edge) {
-                    $new_source_id = $device_id_map[$edge['from']] ?? null;
-                    $new_target_id = $device_id_map[$edge['to']] ?? null;
+                    $new_source_id = $device_id_map[$edge['source_id']] ?? null;
+                    $new_target_id = $device_id_map[$edge['target_id']] ?? null;
                     if ($new_source_id && $new_target_id) {
                         $stmt->execute([$current_user_id, $new_source_id, $new_target_id, $map_id, $edge['connection_type'] ?? 'cat5']);
                     }
@@ -198,6 +202,7 @@ switch ($action) {
         break;
     
     case 'upload_map_background':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can upload map backgrounds.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mapId = $_POST['map_id'] ?? null;
             if (!$mapId || !isset($_FILES['backgroundFile'])) {

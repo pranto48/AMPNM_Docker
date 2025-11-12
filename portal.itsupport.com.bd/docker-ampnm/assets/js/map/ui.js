@@ -65,6 +65,10 @@ MapApp.ui = {
     },
 
     openEdgeModal: (edgeId) => {
+        if (window.userRole !== 'admin') {
+            window.notyf.error('You do not have permission to edit connections.');
+            return;
+        }
         const edge = MapApp.state.edges.get(edgeId);
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || 'cat5';

@@ -138,7 +138,11 @@ function initMap() {
                 id: node.id,
                 ...node.deviceData
             }));
-            const edges = state.edges.get({ fields: ['from', 'to', 'connection_type'] });
+            const edges = state.edges.get({ fields: ['from', 'to', 'connection_type'] }).map(edge => ({
+                source_id: edge.from, // Map 'from' to 'source_id'
+                target_id: edge.to,   // Map 'to' to 'target_id'
+                connection_type: edge.connection_type
+            }));
             const exportData = { devices, edges };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
             const downloadAnchorNode = document.createElement('a');

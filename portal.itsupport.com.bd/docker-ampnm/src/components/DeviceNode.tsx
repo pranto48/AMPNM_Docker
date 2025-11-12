@@ -32,6 +32,13 @@ import { performServerPing, parsePingOutput } from '@/services/pingService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { showError } from '@/utils/toast';
 
+// Declare userRole globally
+declare global {
+  interface Window {
+    userRole: string;
+  }
+}
+
 const iconMap: { [key: string]: React.ComponentType<any> } = {
   server: Server,
   router: Router,
@@ -59,7 +66,14 @@ const DeviceNode = ({ data }: { data: any }) => {
   const [pingResult, setPingResult] = useState<{ time: number; loss: number } | null>(null);
   const [isPinging, setIsPinging] = useState(false);
 
+  const userRole = window.userRole || 'viewer';
+  const isAdmin = userRole === 'admin';
+
   const handlePing = async () => {
+    if (!isAdmin) {
+      showError('You do not have permission to perform ping tests.');
+      return;
+    }
     if (!data.ip_address) return;
     
     setIsPinging(true);
@@ -133,7 +147,7 @@ const DeviceNode = ({ data }: { data: any }) => {
             <Button 
               size="sm" 
               onClick={handlePing} 
-              disabled={isPinging || !data.ip_address}
+              disabled={isPinging || !data.ip_address || !isAdmin}
               className="h-7 text-xs"
             >
               <Activity className={`mr-1 h-3 w-3 ${isPinging ? 'animate-spin' : ''}`} />
@@ -149,25 +163,27 @@ const DeviceNode = ({ data }: { data: any }) => {
             )}
           </div>
         </CardContent>
-        <div className="absolute top-1 right-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => data.onEdit(data.id)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => data.onDelete(data.id)} className="text-red-500">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {isAdmin && (
+          <div className="absolute top-1 right-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => data.onEdit(data.id)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => data.onDelete(data.id)} className="text-red-500">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </Card>
     </>
   );

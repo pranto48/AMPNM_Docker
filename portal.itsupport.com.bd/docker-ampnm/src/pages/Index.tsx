@@ -16,11 +16,16 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  // subscribeToDeviceChanges // Removed Supabase subscription
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
-// import { supabase } from "@/integrations/supabase/client"; // Removed Supabase import
 import { Skeleton } from "@/components/ui/skeleton";
+
+// Declare userRole globally
+declare global {
+  interface Window {
+    userRole: string;
+  }
+}
 
 const Index = () => {
   const [networkStatus, setNetworkStatus] = useState<boolean>(true);
@@ -28,6 +33,9 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const userRole = window.userRole || 'viewer';
+  const isAdmin = userRole === 'admin';
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -65,52 +73,43 @@ const Index = () => {
 
   useEffect(() => {
     fetchDevices();
-
-    // Removed Supabase subscription.
-    // For real-time updates with PHP, you would need to implement a polling mechanism
-    // or a different real-time solution (e.g., WebSockets with a custom PHP server).
-    // const channel = subscribeToDeviceChanges((payload) => {
-    //   console.log('Device change received:', payload);
-    //   fetchDevices();
-    // });
-
-    // return () => {
-    //   supabase.removeChannel(channel);
-    // };
   }, [fetchDevices]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
     const intervals: NodeJS.Timeout[] = [];
     
-    devices.forEach((device) => {
-      if (device.ping_interval && device.ping_interval > 0 && device.ip_address) {
-        const intervalId = setInterval(async () => {
-          try {
-            console.log(`Auto-pinging ${device.ip_address}`);
-            const result = await performServerPing(device.ip_address, 1);
-            const newStatus = result.success ? 'online' : 'offline';
-            
-            // Update device status in database
-            await updateDeviceStatusByIp(device.ip_address, newStatus);
-            
-            console.log(`Ping result for ${device.ip_address}: ${newStatus}`);
-          } catch (error) {
-            console.error(`Auto-ping failed for ${device.ip_address}:`, error);
-            // Update status to offline on error
-            await updateDeviceStatusByIp(device.ip_address, 'offline');
-          }
-        }, device.ping_interval * 1000);
-        
-        intervals.push(intervalId);
-      }
-    });
+    // Only admins can have auto-ping functionality
+    if (isAdmin) {
+      devices.forEach((device) => {
+        if (device.ping_interval && device.ping_interval > 0 && device.ip_address) {
+          const intervalId = setInterval(async () => {
+            try {
+              console.log(`Auto-pinging ${device.ip_address}`);
+              const result = await performServerPing(device.ip_address, 1);
+              const newStatus = result.success ? 'online' : 'offline';
+              
+              // Update device status in database
+              await updateDeviceStatusByIp(device.ip_address, newStatus);
+              
+              console.log(`Ping result for ${device.ip_address}: ${newStatus}`);
+            } catch (error) {
+              console.error(`Auto-ping failed for ${device.ip_address}:`, error);
+              // Update status to offline on error
+              await updateDeviceStatusByIp(device.ip_address, 'offline');
+            }
+          }, device.ping_interval * 1000);
+          
+          intervals.push(intervalId);
+        }
+      });
+    }
 
     // Cleanup intervals on component unmount or devices change
     return () => {
       intervals.forEach(clearInterval);
     };
-  }, [devices]);
+  }, [devices, isAdmin]);
 
   const checkNetworkStatus = useCallback(async () => {
     try {
@@ -123,6 +122,10 @@ const Index = () => {
   }, []);
 
   const handleCheckAllDevices = async () => {
+    if (!isAdmin) {
+      showError('You do not have permission to check all devices.');
+      return;
+    }
     setIsCheckingDevices(true);
     const toastId = showLoading(`Pinging ${devices.length} devices...`);
     try {
@@ -291,7 +294,7 @@ const Index = () => {
                 </Button>
                 <Button 
                   onClick={handleCheckAllDevices} 
-                  disabled={isCheckingDevices || isLoading}
+                  disabled={isCheckingDevices || isLoading || !isAdmin}
                   variant="outline"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${isCheckingDevices ? 'animate-spin' : ''}`} />
@@ -363,11 +366,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="ping">
-            <PingTest />
+            {isAdmin ? <PingTest /> : <p className="text-red-400 text-center py-8">You do not have permission to perform browser ping tests.</p>}
           </TabsContent>
           
           <TabsContent value="server-ping">
-            <ServerPingTest />
+            {isAdmin ? <ServerPingTest /> : <p className="text-red-400 text-center py-8">You do not have permission to perform server ping tests.</p>}
           </TabsContent>
           
           <TabsContent value="status">
@@ -375,7 +378,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="scanner">
-            <NetworkScanner />
+            {isAdmin ? <NetworkScanner /> : <p className="text-red-400 text-center py-8">You do not have permission to scan the network.</p>}
           </TabsContent>
           
           <TabsContent value="history">

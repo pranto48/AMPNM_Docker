@@ -11,7 +11,7 @@ function initDashboard() {
     const offlineCountEl = document.getElementById('offlineCount');
     const recentActivityListEl = document.getElementById('recentActivityList');
     const noRecentActivityMessage = document.getElementById('noRecentActivityMessage');
-    const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
+    // const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
     let statusChart = null;
 
     const pingForm = document.getElementById('pingForm');
