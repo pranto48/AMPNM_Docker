@@ -14,7 +14,7 @@ MapApp.network = {
                 enabled: window.userRole === 'admin', // Enable manipulation only for admin
                 addEdge: async (edgeData, callback) => { 
                     if (window.userRole !== 'admin') {
-                        window.notyf.error('You do not have permission to add connections.');
+                        // No error message needed, as the button is disabled for viewers
                         callback(null); // Cancel adding edge
                         return;
                     }
@@ -138,9 +138,8 @@ MapApp.network = {
                         icon.className = 'fas fa-spinner fa-spin';
                         target.prepend(icon);
                         MapApp.deviceManager.pingSingleDevice(id).finally(() => icon.remove());
-                    } else {
-                        window.notyf.error('You do not have permission to perform this action.');
                     }
+                    // Removed the generic error message for viewer actions, as specific actions are handled or disabled.
                 }
             }
         });

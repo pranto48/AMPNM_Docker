@@ -307,7 +307,7 @@ function initMap() {
                     // Add the device to the map visually
                     const baseNode = {
                         id: updatedDevice.id, label: updatedDevice.name, title: MapApp.utils.buildNodeTitle(updatedDevice),
-                        x: updatedDevice.x, y: updatedDevice.y, // Corrected variable name
+                        x: updatedDevice.x, y: updatedUpdatedDevice.y, // Corrected variable name
                         font: { color: 'white', size: parseInt(updatedDevice.name_text_size) || 14, multi: true },
                         deviceData: updatedDevice
                     };

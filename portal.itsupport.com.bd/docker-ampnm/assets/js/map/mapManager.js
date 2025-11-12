@@ -3,7 +3,7 @@ window.MapApp = window.MapApp || {};
 MapApp.mapManager = {
     createMap: async () => {
         if (window.userRole !== 'admin') {
-            window.notyf.error('You do not have permission to create maps.');
+            // No error message needed, as the button is disabled for viewers
             return;
         }
         const name = prompt("Enter a name for the new map:");
@@ -129,7 +129,7 @@ MapApp.mapManager = {
 
     copyDevice: async (deviceId) => {
         if (window.userRole !== 'admin') {
-            window.notyf.error('You do not have permission to copy devices.');
+            // No error message needed, as the context menu item is hidden for viewers
             return;
         }
         const nodeToCopy = MapApp.state.nodes.get(deviceId);

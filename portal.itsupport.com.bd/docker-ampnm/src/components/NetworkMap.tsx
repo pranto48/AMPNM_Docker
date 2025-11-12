@@ -60,7 +60,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
       if (!isAdmin) {
-        showError('You do not have permission to change device status.');
+        // No error message needed, as the ping button is disabled for viewers
         return;
       }
       // Optimistically update UI
@@ -105,18 +105,16 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         last_ping: device.last_ping,
         last_ping_result: device.status === 'online', // Derive from status
         onEdit: (id: string) => {
-          if (!isAdmin) {
-            showError('You do not have permission to edit devices.');
-            return;
+          // No error message needed, as the dropdown item is hidden for viewers
+          if (isAdmin) {
+            navigate(`/edit-device/${id}`);
           }
-          navigate(`/edit-device/${id}`);
         },
         onDelete: (id: string) => {
-          if (!isAdmin) {
-            showError('You do not have permission to delete devices.');
-            return;
+          // No error message needed, as the dropdown item is hidden for viewers
+          if (isAdmin) {
+            handleDelete(id);
           }
-          handleDelete(id);
         },
         onStatusChange: handleStatusChange,
       },
@@ -238,7 +236,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const onConnect = useCallback(
     async (params: Connection) => {
       if (!isAdmin) {
-        showError('You do not have permission to add connections.');
+        // No error message needed, as nodesConnectable is false for viewers
         return;
       }
       // Optimistically add edge to UI
@@ -266,7 +264,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleDelete = async (deviceId: string) => {
     if (!isAdmin) {
-      showError('You do not have permission to delete devices.');
+      // No error message needed, as the dropdown item is hidden for viewers
       return;
     }
     if (window.confirm('Are you sure you want to delete this device?')) {
@@ -291,7 +289,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
       if (!isAdmin) {
-        showError('You do not have permission to move devices.');
+        // No error message needed, as nodesDraggable is false for viewers
         return;
       }
       try {
@@ -310,7 +308,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       changes.forEach(async (change) => {
         if (change.type === 'remove') {
           if (!isAdmin) {
-            showError('You do not have permission to delete connections.');
+            // No error message needed, as elementsSelectable is false for viewers
             return;
           }
           try {
@@ -328,7 +326,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
     if (!isAdmin) {
-      showError('You do not have permission to edit connections.');
+      // No error message needed, as elementsSelectable is false for viewers
       return;
     }
     setEditingEdge(edge);
@@ -337,7 +335,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleSaveEdge = async (edgeId: string, connectionType: string) => {
     if (!isAdmin) {
-      showError('You do not have permission to save connection changes.');
+      // No error message needed, as the dialog is not opened for viewers
       return;
     }
     // Optimistically update UI
@@ -358,7 +356,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleExport = async () => {
     if (!isAdmin) {
-      showError('You do not have permission to export maps.');
+      // No error message needed, as the button is hidden for viewers
       return;
     }
     const exportData: MapData = {
@@ -400,7 +398,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleImportClick = () => {
     if (!isAdmin) {
-      showError('You do not have permission to import maps.');
+      // No error message needed, as the button is hidden for viewers
       return;
     }
     importInputRef.current?.click();
@@ -408,7 +406,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAdmin) {
-      showError('You do not have permission to import maps.');
+      // No error message needed, as the button is hidden for viewers
       return;
     }
     const file = event.target.files?.[0];
@@ -517,7 +515,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           <Share2 className="h-4 w-4 mr-2" />Share Map
         </Button>
       </div>
-      {isEdgeEditorOpen && (
+      {isEdgeEditorOpen && isAdmin && ( // Only open for admin
         <EdgeEditorDialog 
           isOpen={isEdgeEditorOpen} 
           onClose={() => setIsEdgeEditorOpen(false)} 

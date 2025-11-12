@@ -71,7 +71,7 @@ const DeviceNode = ({ data }: { data: any }) => {
 
   const handlePing = async () => {
     if (!isAdmin) {
-      showError('You do not have permission to perform ping tests.');
+      // No error message needed, as the button is disabled for viewers
       return;
     }
     if (!data.ip_address) return;
