@@ -251,10 +251,14 @@ MapApp.network = {
                         window.notyf.success('Connection saved.');
                         // Update edgeData with the ID from the database
                         edgeData.id = newEdge.id;
-                        edgeData.connection_type = newEdge.connection_type;
+                        edgeData.connection_type = newEdge.connection_type; // This is important!
                         edgeData.label = newEdge.connection_type; // Set label for vis.js
                         callback(edgeData); // Let vis.js add the edge to the dataset
                         MapApp.state.network.disableEditMode(); // Exit add edge mode
+                        
+                        // Automatically open edit modal for the new edge
+                        MapApp.ui.openEdgeModal(newEdge.id);
+
                     } catch (error) {
                         console.error('Failed to save connection:', error);
                         window.notyf.error(error.message || 'Failed to save connection.');
