@@ -355,7 +355,8 @@ function initMap() {
             downloadAnchorNode.setAttribute("download", `${mapName.replace(/\s+/g, '_')}_export.json`);
             document.body.appendChild(downloadAnchorNode);
             downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             window.notyf.success('Map exported successfully.');
         });
 
@@ -721,17 +722,17 @@ function initMap() {
         }
 
         if (window.userRole === 'viewer') {
-            els.newMapBtn.disabled = true;
-            els.renameMapBtn.disabled = true;
-            els.deleteMapBtn.disabled = true;
-            els.placeDeviceBtn.disabled = true;
-            if (els.addDeviceBtn) els.addDeviceBtn.style.display = 'none';
-            els.addEdgeBtn.disabled = true;
-            els.exportBtn.disabled = true;
-            els.importBtn.disabled = true;
-            els.mapSettingsBtn.disabled = true;
-            els.scanNetworkBtn.disabled = true;
+            if (els.newMapBtn) els.newMapBtn.disabled = true;
             if (els.createFirstMapBtn) els.createFirstMapBtn.disabled = true;
+            if (els.renameMapBtn) els.renameMapBtn.disabled = true;
+            if (els.deleteMapBtn) els.deleteMapBtn.disabled = true;
+            if (els.placeDeviceBtn) els.placeDeviceBtn.disabled = true;
+            if (els.addDeviceBtn) els.addDeviceBtn.style.display = 'none';
+            if (els.addEdgeBtn) els.addEdgeBtn.disabled = true;
+            if (els.exportBtn) els.exportBtn.disabled = true;
+            if (els.importBtn) els.importBtn.disabled = true;
+            if (els.mapSettingsBtn) els.mapSettingsBtn.disabled = true;
+            if (els.scanNetworkBtn) els.scanNetworkBtn.disabled = true;
             
             const mapSelectionControls = document.querySelector('#map-selection .flex.gap-4');
             if (mapSelectionControls) {
