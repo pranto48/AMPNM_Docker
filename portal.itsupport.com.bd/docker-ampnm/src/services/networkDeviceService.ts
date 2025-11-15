@@ -9,6 +9,7 @@ interface ApiResponse<T> {
   devices?: T[];
   edges?: T[];
   maps?: T[]; // Added for maps
+  url?: string; // For upload responses
 }
 
 export interface NetworkDevice {
@@ -54,6 +55,11 @@ export interface Map {
   deviceCount: number;
 }
 
+export interface MapData {
+  devices: NetworkDevice[];
+  edges: NetworkEdge[];
+}
+
 const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any, params?: Record<string, string>): Promise<T> => {
   const options: RequestInit = {
     method: method,
@@ -89,6 +95,45 @@ const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any, pa
 export const getMaps = async (): Promise<Map[]> => {
   const result = await callApi<{ maps: Map[] }>('get_maps', 'GET');
   return result as unknown as Map[]; // Cast to Map[]
+};
+
+export const createMap = async (name: string, type: string = 'lan'): Promise<Map> => {
+  const result = await callApi<Map>('create_map', 'POST', { name, type });
+  return result;
+};
+
+export const updateMap = async (id: string, updates: Partial<Map>): Promise<{ success: boolean }> => {
+  const payload: { [key: string]: any } = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.background_color !== undefined) payload.background_color = updates.background_color;
+  if (updates.background_image_url !== undefined) payload.background_image_url = updates.background_image_url;
+  if (updates.public_view_enabled !== undefined) payload.public_view_enabled = updates.public_view_enabled;
+
+  const result = await callApi<{ success: boolean }>('update_map', 'POST', { id, updates: payload });
+  return result;
+};
+
+export const deleteMap = async (id: string): Promise<{ success: boolean }> => {
+  const result = await callApi<{ success: boolean }>('delete_map', 'POST', { id });
+  return result;
+};
+
+export const uploadMapBackground = async (mapId: string, file: File): Promise<{ success: boolean; url: string }> => {
+  const formData = new FormData();
+  formData.append('map_id', mapId);
+  formData.append('backgroundFile', file);
+
+  // Special handling for file uploads as they don't use JSON content type
+  const response = await fetch(`${LOCAL_API_URL}?action=upload_map_background`, {
+    method: 'POST',
+    body: formData,
+  });
+  const result: ApiResponse<{ url: string }> = await response.json();
+
+  if (!response.ok || result.error) {
+    throw new Error(result.error || `API call failed with status ${response.status}`);
+  }
+  return { success: true, url: result.url! };
 };
 
 export const getDevices = async (mapId?: string): Promise<NetworkDevice[]> => {

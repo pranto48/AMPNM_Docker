@@ -15,7 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, Download, Share2 } from 'lucide-react';
+import { PlusCircle, Upload, Download, Share2, MapPin, Edit, Trash2, Settings, Plus, RefreshCw } from 'lucide-react';
 import {
   addDevice,
   updateDevice,
@@ -27,11 +27,29 @@ import {
   updateEdgeInDB,
   importMap,
   MapData,
+  getMaps,
+  Map,
+  createMap,
+  updateMap,
+  deleteMap,
 } from '@/services/networkDeviceService';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
+import { MapSettingsDialog } from './MapSettingsDialog'; // Import the new dialog
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Declare SoundManager globally
 declare global {
@@ -45,15 +63,19 @@ declare global {
 
 interface NetworkMapProps {
   devices: NetworkDevice[];
-  onMapUpdate: () => void;
-  selectedMapId: string;
+  onMapUpdate: (mapId?: string) => void; // Modified to accept mapId
+  selectedMapId: string | undefined; // Now optional
+  setSelectedMapId: (mapId: string | undefined) => void; // New prop to update parent
 }
 
-const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) => {
+const NetworkMap = ({ devices, onMapUpdate, selectedMapId, setSelectedMapId }: NetworkMapProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
   const [editingEdge, setEditingEdge] = useState<Edge | undefined>(undefined);
+  const [maps, setMaps] = useState<Map[]>([]);
+  const [isMapSettingsOpen, setIsMapSettingsOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -63,29 +85,53 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
+  const currentMap = useMemo(() => {
+    return maps.find((map) => map.id === selectedMapId);
+  }, [maps, selectedMapId]);
+
+  const fetchMaps = useCallback(async () => {
+    try {
+      const fetchedMaps = await getMaps();
+      setMaps(fetchedMaps);
+      if (fetchedMaps.length > 0 && !selectedMapId) {
+        setSelectedMapId(fetchedMaps[0].id);
+      } else if (fetchedMaps.length === 0) {
+        setSelectedMapId(undefined);
+      }
+    } catch (error) {
+      console.error('Failed to fetch maps:', error);
+      showError('Failed to load maps.');
+    }
+  }, [selectedMapId, setSelectedMapId]);
+
+  useEffect(() => {
+    fetchMaps();
+  }, [fetchMaps]);
+
+  // Trigger parent's onMapUpdate when selectedMapId changes
+  useEffect(() => {
+    onMapUpdate(selectedMapId);
+  }, [selectedMapId, onMapUpdate]);
+
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
       if (!isAdmin) {
-        // No error message needed, as the ping button is disabled for viewers
         return;
       }
-      // Optimistically update UI
       setNodes((nds) =>
         nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status } } : node))
       );
       try {
-        // Update in database
         const device = devices.find(d => d.id === nodeId);
         if (device && device.ip_address) {
           await updateDevice(nodeId, { 
             status,
-            last_ping: new Date().toISOString(), // PHP uses last_seen
+            last_ping: new Date().toISOString(),
           });
         }
       } catch (error) {
         console.error('Failed to update device status in DB:', error);
         showError('Failed to update device status.');
-        // Revert UI update on failure
         setNodes((nds) =>
           nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status: device?.status || 'unknown' } } : node))
         );
@@ -98,7 +144,7 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
     (device: NetworkDevice): Node => ({
       id: device.id!,
       type: 'device',
-      position: { x: device.position_x || 0, y: device.position_y || 0 }, // Ensure default position
+      position: { x: device.position_x || 0, y: device.position_y || 0 },
       data: {
         id: device.id,
         name: device.name,
@@ -109,7 +155,7 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         icon_size: device.icon_size,
         name_text_size: device.name_text_size,
         last_ping: device.last_ping,
-        last_ping_result: device.status === 'online', // Derive from status
+        last_ping_result: device.status === 'online',
         check_port: device.check_port,
         description: device.description,
         warning_latency_threshold: device.warning_latency_threshold,
@@ -118,20 +164,18 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         critical_packetloss_threshold: device.critical_packetloss_threshold,
         show_live_ping: device.show_live_ping,
         map_id: device.map_id,
-        onEdit: (id: string) => navigate(`/edit-device/${id}`), // Pass navigate function
-        onDelete: handleDelete, // Pass delete handler
-        onStatusChange: handleStatusChange, // Pass status change handler
+        onEdit: (id: string) => navigate(`/edit-device/${id}`),
+        onDelete: handleDelete,
+        onStatusChange: handleStatusChange,
       },
     }),
     [handleStatusChange, navigate, isAdmin]
   );
 
-  // Update nodes when devices change
   useEffect(() => {
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
-  // Function to load edges from DB
   const loadEdges = useCallback(async () => {
     if (!selectedMapId) {
       setEdges([]);
@@ -142,8 +186,8 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       setEdges(
         edgesData.map((edge: any) => ({
           id: edge.id,
-          source: edge.source_id, // PHP uses source_id
-          target: edge.target_id, // PHP uses target_id
+          source: edge.source_id,
+          target: edge.target_id,
           data: { connection_type: edge.connection_type || 'cat5' },
         }))
       );
@@ -153,25 +197,21 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
     }
   }, [setEdges, selectedMapId]);
 
-  // Load edges initially and when selectedMapId changes
   useEffect(() => {
     loadEdges();
   }, [loadEdges]);
 
-  // Implement polling for live status updates for all users
   useEffect(() => {
     const pollingInterval = setInterval(() => {
-      onMapUpdate(); // This fetches updated device data
-      loadEdges(); // Also refresh edges
-    }, 15000); // Poll every 15 seconds
+      onMapUpdate(selectedMapId);
+      loadEdges();
+    }, 15000);
 
     return () => clearInterval(pollingInterval);
-  }, [onMapUpdate, loadEdges]);
+  }, [onMapUpdate, loadEdges, selectedMapId]);
 
-  // Ref to store previous devices for status comparison
   const prevDevicesRef = useRef<NetworkDevice[]>([]);
 
-  // Effect to detect status changes and play sounds
   useEffect(() => {
     const prevDevicesMap = new Map(prevDevicesRef.current.map(d => [d.id, d.status]));
 
@@ -180,7 +220,6 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       const newStatus = currentDevice.status;
 
       if (prevStatus && newStatus && prevStatus !== newStatus) {
-        // Play sound based on new status
         if (window.SoundManager) {
           if (newStatus === 'online' && (prevStatus === 'offline' || prevStatus === 'critical' || prevStatus === 'warning')) {
             window.SoundManager.play('online');
@@ -195,12 +234,9 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       }
     });
 
-    // Update ref for the next render
     prevDevicesRef.current = devices;
   }, [devices]);
 
-
-  // Style edges based on connection type and device status
   const styledEdges = useMemo(() => {
     return edges.map((edge) => {
       const sourceNode = nodes.find((n) => n.id === edge.source);
@@ -213,23 +249,23 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       let style: React.CSSProperties = { strokeWidth: 2 };
       
       if (isConnectionBroken) {
-        style.stroke = '#ef4444'; // Red for offline
+        style.stroke = '#ef4444';
       } else {
         switch (type) {
           case 'fiber': 
-            style.stroke = '#f97316'; // Orange
+            style.stroke = '#f97316';
             break;
           case 'wifi': 
-            style.stroke = '#38bdf8'; // Sky blue
+            style.stroke = '#38bdf8';
             style.strokeDasharray = '5, 5';
             break;
           case 'radio': 
-            style.stroke = '#84cc16'; // Lime green
+            style.stroke = '#84cc16';
             style.strokeDasharray = '2, 7';
             break;
           case 'cat5': 
           default: 
-            style.stroke = '#a78bfa'; // Violet
+            style.stroke = '#a78bfa';
             break;
         }
       }
@@ -246,7 +282,6 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
 
   const onConnect = useCallback(
     async (params: Connection) => {
-      console.log('onConnect triggered. isAdmin:', isAdmin, 'selectedMapId:', selectedMapId); // Debug log
       if (!isAdmin) {
         showError('You do not have permission to create connections.');
         return;
@@ -257,10 +292,9 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       }
       
       try {
-        // Save to database
         await addEdgeToDB({ source: params.source!, target: params.target!, map_id: selectedMapId, connection_type: 'cat5' });
         showSuccess('Connection saved.');
-        loadEdges(); // Re-fetch all edges to ensure consistency
+        loadEdges();
       } catch (error) {
         console.error('Failed to save connection:', error);
         showError('Failed to save connection.');
@@ -276,11 +310,10 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
     }
     if (window.confirm('Are you sure you want to delete this device?')) {
       try {
-        // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
-        onMapUpdate(); // Refresh parent component's device list
-        loadEdges(); // Also refresh edges as they might be affected
+        onMapUpdate(selectedMapId);
+        loadEdges();
       } catch (error) {
         console.error('Failed to delete device:', error);
         showError('Failed to delete device.');
@@ -316,7 +349,7 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
           try {
             await deleteEdgeFromDB(change.id);
             showSuccess('Connection deleted.');
-            loadEdges(); // Re-fetch all edges to ensure consistency
+            loadEdges();
           } catch (error) {
             console.error('Failed to delete connection:', error);
             showError('Failed to delete connection.');
@@ -328,7 +361,6 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
   );
 
   const onEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
-    console.log('Edge clicked:', edge, 'isAdmin:', isAdmin); // Debug log
     if (!isAdmin) {
       showError('You do not have permission to edit connections.');
       return;
@@ -344,10 +376,9 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
     }
     
     try {
-      // Update in database
       await updateEdgeInDB(edgeId, { connection_type: connectionType });
       showSuccess('Connection updated.');
-      loadEdges(); // Re-fetch all edges to ensure consistency
+      loadEdges();
     } catch (error) {
       console.error('Failed to update connection:', error);
       showError('Failed to update connection.');
@@ -425,11 +456,11 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
         
-        await importMap(mapData, selectedMapId); // Pass current map_id
+        await importMap(mapData, selectedMapId);
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
-        onMapUpdate(); // Refresh the map data
-        loadEdges(); // Also refresh edges
+        onMapUpdate(selectedMapId);
+        loadEdges();
       } catch (error: any) {
         dismissToast(toastId);
         console.error('Failed to import map:', error);
@@ -442,14 +473,11 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
   };
 
   const handleShareMap = async () => {
-    // Share map is accessible to all roles, as it's just generating a public link.
     if (!selectedMapId) {
       showError('No map selected to share.');
       return;
     }
 
-    // Construct the shareable URL
-    // Using hardcoded IP and port as requested by the user
     const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${selectedMapId}`;
 
     try {
@@ -461,73 +489,243 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
     }
   };
 
+  const handleCreateMap = async () => {
+    if (!isAdmin) {
+      showError('You do not have permission to create maps.');
+      return;
+    }
+    const mapName = prompt('Enter a name for the new map:');
+    if (mapName && mapName.trim() !== '') {
+      const toastId = showLoading('Creating map...');
+      try {
+        const newMap = await createMap(mapName.trim());
+        dismissToast(toastId);
+        showSuccess(`Map "${newMap.name}" created!`);
+        await fetchMaps(); // Refresh maps list
+        setSelectedMapId(newMap.id); // Select the new map
+      } catch (error: any) {
+        dismissToast(toastId);
+        console.error('Failed to create map:', error);
+        showError(error.message || 'Failed to create map.');
+      }
+    } else if (mapName !== null) {
+      showError('Map name cannot be empty.');
+    }
+  };
+
+  const handleRenameMap = async () => {
+    if (!isAdmin || !selectedMapId || !currentMap) {
+      showError('You do not have permission or no map is selected.');
+      return;
+    }
+    const newName = prompt('Enter a new name for the map:', currentMap.name);
+    if (newName && newName.trim() !== '' && newName !== currentMap.name) {
+      const toastId = showLoading('Renaming map...');
+      try {
+        await updateMap(selectedMapId, { name: newName.trim() });
+        dismissToast(toastId);
+        showSuccess(`Map renamed to "${newName}"!`);
+        await fetchMaps(); // Refresh maps list
+      } catch (error: any) {
+        dismissToast(toastId);
+        console.error('Failed to rename map:', error);
+        showError(error.message || 'Failed to rename map.');
+      }
+    } else if (newName !== null && newName.trim() === '') {
+      showError('Map name cannot be empty.');
+    }
+  };
+
+  const handleDeleteMap = async () => {
+    if (!isAdmin || !selectedMapId) {
+      showError('You do not have permission or no map is selected.');
+      return;
+    }
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteMap = async () => {
+    if (!selectedMapId) return;
+    const toastId = showLoading('Deleting map...');
+    try {
+      await deleteMap(selectedMapId);
+      dismissToast(toastId);
+      showSuccess('Map deleted successfully!');
+      setIsDeleteConfirmOpen(false);
+      await fetchMaps(); // Refresh maps list
+      // setSelectedMapId will be updated by fetchMaps if there are other maps
+    } catch (error: any) {
+      dismissToast(toastId);
+      console.error('Failed to delete map:', error);
+      showError(error.message || 'Failed to delete map.');
+    }
+  };
+
+  const handleOpenMapSettings = () => {
+    if (!isAdmin || !selectedMapId) {
+      showError('You do not have permission or no map is selected.');
+      return;
+    }
+    setIsMapSettingsOpen(true);
+  };
+
+  const handleMapSettingsUpdated = useCallback(() => {
+    fetchMaps(); // Re-fetch maps to get updated settings
+  }, [fetchMaps]);
+
   return (
-    <div style={{ height: '70vh', width: '100%' }} className="relative border rounded-lg bg-gray-900">
-      <ReactFlow
-        nodes={nodes}
-        edges={styledEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChangeHandler}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        onNodeDragStop={onNodeDragStop}
-        onEdgeClick={onEdgeClick}
-        fitView
-        fitViewOptions={{ padding: 0.1 }}
-        proOptions={{ hideAttribution: true }} // Hide React Flow attribution
-        nodesDraggable={isAdmin} // Only allow admins to drag nodes
-        nodesConnectable={isAdmin} // Only allow admins to connect nodes
-        elementsSelectable={isAdmin} // Only allow admins to select elements
-      >
-        <Controls />
-        <MiniMap 
-          nodeColor={(n) => {
-            switch (n.data.status) {
-              case 'online': return '#22c55e';
-              case 'offline': return '#ef4444';
-              default: return '#94a3b8';
-            }
-          }} 
-          nodeStrokeWidth={3} 
-          maskColor="rgba(15, 23, 42, 0.8)"
-        />
-        <Background gap={16} size={1} color="#444" />
-      </ReactFlow>
-      <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-xl font-bold">Current Map:</h2>
+        <Select value={selectedMapId || ''} onValueChange={setSelectedMapId} disabled={maps.length === 0}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select a map" />
+          </SelectTrigger>
+          <SelectContent>
+            {maps.length === 0 ? (
+              <SelectItem value="no-maps" disabled>No maps available</SelectItem>
+            ) : (
+              maps.map((map) => (
+                <SelectItem key={map.id} value={map.id}>
+                  {map.name}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+
         {isAdmin && (
-          <Button onClick={() => navigate('/add-device')} size="sm">
-            <PlusCircle className="h-4 w-4 mr-2" />Add Device
-          </Button>
+          <>
+            <Button onClick={handleCreateMap} size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-2" />New Map
+            </Button>
+            <Button onClick={handleRenameMap} size="sm" variant="outline" disabled={!selectedMapId}>
+              <Edit className="h-4 w-4 mr-2" />Rename
+            </Button>
+            <Button onClick={handleDeleteMap} size="sm" variant="destructive" disabled={!selectedMapId}>
+              <Trash2 className="h-4 w-4 mr-2" />Delete
+            </Button>
+            <Button onClick={handleOpenMapSettings} size="sm" variant="outline" disabled={!selectedMapId}>
+              <Settings className="h-4 w-4 mr-2" />Settings
+            </Button>
+          </>
         )}
-        {isAdmin && (
-          <Button onClick={handleExport} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />Export
-          </Button>
-        )}
-        {isAdmin && (
-          <Button onClick={handleImportClick} variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />Import
-          </Button>
-        )}
-        <input 
-          type="file" 
-          ref={importInputRef} 
-          onChange={handleFileChange} 
-          accept="application/json" 
-          className="hidden" 
-        />
-        <Button onClick={handleShareMap} variant="outline" size="sm">
-          <Share2 className="h-4 w-4 mr-2" />Share Map
-        </Button>
       </div>
-      {isEdgeEditorOpen && isAdmin && editingEdge && ( // Only open for admin and if an edge is selected
-        <EdgeEditorDialog 
-          isOpen={isEdgeEditorOpen} 
-          onClose={() => setIsEdgeEditorOpen(false)} 
-          onSave={handleSaveEdge} 
-          edge={editingEdge} 
-        />
+
+      {selectedMapId ? (
+        <div 
+          style={{ 
+            height: '70vh', 
+            width: '100%', 
+            backgroundImage: currentMap?.background_image_url ? `url(${currentMap.background_image_url})` : 'none',
+            backgroundColor: currentMap?.background_color || '#1e293b',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }} 
+          className="relative border rounded-lg"
+        >
+          <ReactFlow
+            nodes={nodes}
+            edges={styledEdges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChangeHandler}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            onNodeDragStop={onNodeDragStop}
+            onEdgeClick={onEdgeClick}
+            fitView
+            fitViewOptions={{ padding: 0.1 }}
+            proOptions={{ hideAttribution: true }}
+            nodesDraggable={isAdmin}
+            nodesConnectable={isAdmin}
+            elementsSelectable={isAdmin}
+          >
+            <Controls />
+            <MiniMap 
+              nodeColor={(n) => {
+                switch (n.data.status) {
+                  case 'online': return '#22c55e';
+                  case 'offline': return '#ef4444';
+                  default: return '#94a3b8';
+                }
+              }} 
+              nodeStrokeWidth={3} 
+              maskColor="rgba(15, 23, 42, 0.8)"
+            />
+            <Background gap={16} size={1} color="#444" />
+          </ReactFlow>
+          <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+            {isAdmin && (
+              <Button onClick={() => navigate('/add-device')} size="sm">
+                <PlusCircle className="h-4 w-4 mr-2" />Add Device
+              </Button>
+            )}
+            {isAdmin && (
+              <Button onClick={handleExport} variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />Export
+              </Button>
+            )}
+            {isAdmin && (
+              <Button onClick={handleImportClick} variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />Import
+              </Button>
+            )}
+            <input 
+              type="file" 
+              ref={importInputRef} 
+              onChange={handleFileChange} 
+              accept="application/json" 
+              className="hidden" 
+            />
+            <Button onClick={handleShareMap} variant="outline" size="sm">
+              <Share2 className="h-4 w-4 mr-2" />Share Map
+            </Button>
+          </div>
+          {isEdgeEditorOpen && isAdmin && editingEdge && (
+            <EdgeEditorDialog 
+              isOpen={isEdgeEditorOpen} 
+              onClose={() => setIsEdgeEditorOpen(false)} 
+              onSave={handleSaveEdge} 
+              edge={editingEdge} 
+            />
+          )}
+          {isMapSettingsOpen && isAdmin && currentMap && (
+            <MapSettingsDialog
+              isOpen={isMapSettingsOpen}
+              onClose={() => setIsMapSettingsOpen(false)}
+              currentMap={currentMap}
+              onMapUpdated={handleMapSettingsUpdated}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-16 border rounded-lg bg-gray-800">
+          <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">
+            No map selected. {isAdmin ? 'Create a new map or select an existing one.' : 'Please ask an admin to create a map.'}
+          </p>
+          {isAdmin && (
+            <Button onClick={handleCreateMap} className="mt-4">
+              <Plus className="h-4 w-4 mr-2" />Create First Map
+            </Button>
+          )}
+        </div>
       )}
+
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the "{currentMap?.name}" map and all associated devices and connections.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMap} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

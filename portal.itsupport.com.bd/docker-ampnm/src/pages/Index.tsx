@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,13 +33,15 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMapId, setSelectedMapId] = useState<string | undefined>(undefined); // State for selected map
 
   const userRole = window.userRole || 'viewer';
   const isAdmin = userRole === 'admin';
 
-  const fetchDevices = useCallback(async () => {
+  const fetchDevices = useCallback(async (mapId?: string) => {
+    setIsLoading(true);
     try {
-      const dbDevices = await getDevices();
+      const dbDevices = await getDevices(mapId); // Fetch devices for the selected map
       // Map PHP API response to NetworkDevice interface
       const mappedDevices: NetworkDevice[] = dbDevices.map(d => ({
         id: d.id,
@@ -72,8 +74,8 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+    fetchDevices(selectedMapId); // Fetch devices when selectedMapId changes
+  }, [fetchDevices, selectedMapId]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
@@ -386,7 +388,12 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="map">
-            <NetworkMap devices={devices} onMapUpdate={fetchDevices} />
+            <NetworkMap 
+              devices={devices} 
+              onMapUpdate={fetchDevices} 
+              selectedMapId={selectedMapId}
+              setSelectedMapId={setSelectedMapId}
+            />
           </TabsContent>
         </Tabs>
 

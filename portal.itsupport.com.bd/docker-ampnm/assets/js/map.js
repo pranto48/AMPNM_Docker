@@ -1,4 +1,9 @@
 function initMap() {
+    // This PHP-rendered map.js is now largely deprecated for map management.
+    // The React component NetworkMap.tsx handles map selection, creation, editing, and deletion.
+    // This file will primarily ensure the legacy vis.js map still renders if accessed directly,
+    // but its interactive features are limited.
+
     // Initialize all modules
     MapApp.ui.cacheElements();
 
@@ -37,7 +42,7 @@ function initMap() {
         window.cleanup = null;
     };
 
-    // Event Listeners Setup
+    // Event Listeners Setup (simplified for legacy PHP map)
     // Only admin can edit edges
     if (window.userRole === 'admin') {
         els.edgeForm.addEventListener('submit', async (e) => {
@@ -307,7 +312,7 @@ function initMap() {
                     // Add the device to the map visually
                     const baseNode = {
                         id: updatedDevice.id, label: updatedDevice.name, title: MapApp.utils.buildNodeTitle(updatedDevice),
-                        x: updatedDevice.x, y: updatedUpdatedDevice.y, // Corrected variable name
+                        x: updatedDevice.x, y: updatedDevice.y, // Corrected variable name
                         font: { color: 'white', size: parseInt(updatedDevice.name_text_size) || 14, multi: true },
                         deviceData: updatedDevice
                     };
