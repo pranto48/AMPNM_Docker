@@ -64,6 +64,15 @@ MapApp.ui = {
         }).join('');
     },
 
+    openDeviceModal: (deviceId) => {
+        if (window.userRole !== 'admin') {
+            window.notyf.error('You do not have permission to edit devices.');
+            return;
+        }
+        // Redirect to the PHP edit-device page
+        window.location.href = `edit-device.php?id=${deviceId}`;
+    },
+
     openEdgeModal: (edgeId) => {
         if (window.userRole !== 'admin') {
             window.notyf.error('You do not have permission to edit connections.');
