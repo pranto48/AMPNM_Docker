@@ -38,7 +38,7 @@ $is_admin = ($user_role === 'admin');
                             <span class="ml-2 text-sm">Live Refresh</span>
                         </label>
                         <?php if ($is_admin): ?>
-                            <a href="create-device.php" id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</a>
+                            <button id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</button>
                             <button id="placeDeviceBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-map-pin mr-2"></i>Place Device</button>
                             <button id="addEdgeBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-link mr-2"></i>Add Connection</button>
                             <button id="scanNetworkBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-wifi mr-2"></i>Scan Network</button>
@@ -90,6 +90,49 @@ $is_admin = ($user_role === 'admin');
                 <div class="flex justify-end gap-4">
                     <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="addDeviceModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold text-white">Add New Device</h2>
+                <button onclick="closeModal('addDeviceModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <form id="addDeviceForm" class="space-y-4">
+                <input type="hidden" id="addDeviceMapId" name="map_id">
+                <div>
+                    <label for="addDeviceName" class="block text-sm font-medium text-slate-400 mb-1">Device Name</label>
+                    <input type="text" id="addDeviceName" name="name" placeholder="e.g., Main Router" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" required>
+                </div>
+                <div>
+                    <label for="addDeviceIp" class="block text-sm font-medium text-slate-400 mb-1">IP Address (Optional)</label>
+                    <input type="text" id="addDeviceIp" name="ip" placeholder="e.g., 192.168.1.1" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label for="addDeviceType" class="block text-sm font-medium text-slate-400 mb-1">Type (Icon)</label>
+                    <select id="addDeviceType" name="type" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        <?php
+                        $device_types = [
+                            'box' => 'Box (Group)', 'camera' => 'CC Camera', 'cloud' => 'Cloud', 'database' => 'Database',
+                            'firewall' => 'Firewall', 'ipphone' => 'IP Phone', 'laptop' => 'Laptop/PC', 'mobile' => 'Mobile Phone',
+                            'nas' => 'NAS', 'rack' => 'Networking Rack', 'printer' => 'Printer', 'punchdevice' => 'Punch Device',
+                            'radio-tower' => 'Radio Tower', 'router' => 'Router', 'server' => 'Server', 'switch' => 'Switch',
+                            'tablet' => 'Tablet', 'wifi-router' => 'WiFi Router', 'other' => 'Other'
+                        ];
+                        foreach ($device_types as $value => $label) {
+                            echo "<option value=\"{$value}\">{$label}</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-4">
+                    <button type="button" onclick="closeModal('addDeviceModal')" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
+                        <i class="fas fa-plus mr-2"></i>Add Device
+                    </button>
                 </div>
             </form>
         </div>
@@ -208,7 +251,7 @@ $is_admin = ($user_role === 'admin');
             <p id="inputModalMessage" class="text-slate-300 mb-4">Please enter the required information:</p>
             <input type="text" id="inputModalField" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 text-white mb-6">
             <div class="flex justify-end gap-4">
-                <button type="button" id="inputModalCancelBtn" onclick="closeModal('inputModal')" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                <button type="button" id="inputModalCancelBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
                 <button type="button" id="inputModalConfirmBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Submit</button>
             </div>
         </div>
