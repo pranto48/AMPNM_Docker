@@ -43,7 +43,13 @@ declare global {
   }
 }
 
-const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
+interface NetworkMapProps {
+  devices: NetworkDevice[];
+  onMapUpdate: () => void;
+  selectedMapId: string;
+}
+
+const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
@@ -104,19 +110,14 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         name_text_size: device.name_text_size,
         last_ping: device.last_ping,
         last_ping_result: device.status === 'online', // Derive from status
-        onEdit: (id: string) => {
-          // No error message needed, as the dropdown item is hidden for viewers
-          if (isAdmin) {
-            navigate(`/edit-device/${id}`);
-          }
-        },
-        onDelete: (id: string) => {
-          // No error message needed, as the dropdown item is hidden for viewers
-          if (isAdmin) {
-            handleDelete(id);
-          }
-        },
-        onStatusChange: handleStatusChange,
+        check_port: device.check_port,
+        description: device.description,
+        warning_latency_threshold: device.warning_latency_threshold,
+        warning_packetloss_threshold: device.warning_packetloss_threshold,
+        critical_latency_threshold: device.critical_latency_threshold,
+        critical_packetloss_threshold: device.critical_packetloss_threshold,
+        show_live_ping: device.show_live_ping,
+        map_id: device.map_id,
       },
     }),
     [handleStatusChange, navigate, isAdmin]
@@ -127,11 +128,15 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
-  // Load edges
+  // Load edges for the selected map
   useEffect(() => {
     const loadEdges = async () => {
+      if (!selectedMapId) {
+        setEdges([]);
+        return;
+      }
       try {
-        const edgesData = await getEdges();
+        const edgesData = await getEdges(selectedMapId);
         setEdges(
           edgesData.map((edge: any) => ({
             id: edge.id,
@@ -146,7 +151,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       }
     };
     loadEdges();
-  }, [setEdges]);
+  }, [setEdges, selectedMapId]); // Depend on selectedMapId
 
   // Implement polling for live status updates for all users
   useEffect(() => {
@@ -235,8 +240,13 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onConnect = useCallback(
     async (params: Connection) => {
+      console.log('onConnect triggered. isAdmin:', isAdmin, 'selectedMapId:', selectedMapId); // Debug log
       if (!isAdmin) {
-        // No error message needed, as nodesConnectable is false for viewers
+        showError('You do not have permission to create connections.');
+        return;
+      }
+      if (!selectedMapId) {
+        showError('No map selected. Cannot create connection.');
         return;
       }
       // Optimistically add edge to UI
@@ -250,7 +260,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       
       try {
         // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: devices[0]?.map_id || '1' }); // Assuming map_id 1 if not set
+        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: selectedMapId });
         showSuccess('Connection saved.');
       } catch (error) {
         console.error('Failed to save connection:', error);
@@ -259,12 +269,12 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges, isAdmin, devices]
+    [setEdges, isAdmin, selectedMapId]
   );
 
   const handleDelete = async (deviceId: string) => {
     if (!isAdmin) {
-      // No error message needed, as the dropdown item is hidden for viewers
+      showError('You do not have permission to delete devices.');
       return;
     }
     if (window.confirm('Are you sure you want to delete this device?')) {
@@ -289,7 +299,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
       if (!isAdmin) {
-        // No error message needed, as nodesDraggable is false for viewers
+        showError('You do not have permission to drag nodes.');
         return;
       }
       try {
@@ -308,7 +318,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       changes.forEach(async (change) => {
         if (change.type === 'remove') {
           if (!isAdmin) {
-            // No error message needed, as elementsSelectable is false for viewers
+            showError('You do not have permission to delete connections.');
             return;
           }
           try {
@@ -324,18 +334,19 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     [onEdgesChange, isAdmin]
   );
 
-  const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
+  const onEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    console.log('Edge clicked:', edge, 'isAdmin:', isAdmin); // Debug log
     if (!isAdmin) {
-      // No error message needed, as elementsSelectable is false for viewers
+      showError('You do not have permission to edit connections.');
       return;
     }
     setEditingEdge(edge);
     setIsEdgeEditorOpen(true);
-  };
+  }, [isAdmin]);
 
   const handleSaveEdge = async (edgeId: string, connectionType: string) => {
     if (!isAdmin) {
-      // No error message needed, as the dialog is not opened for viewers
+      showError('You do not have permission to save connection changes.');
       return;
     }
     // Optimistically update UI
@@ -356,7 +367,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleExport = async () => {
     if (!isAdmin) {
-      // No error message needed, as the button is hidden for viewers
+      showError('You do not have permission to export maps.');
       return;
     }
     const exportData: MapData = {
@@ -398,7 +409,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleImportClick = () => {
     if (!isAdmin) {
-      // No error message needed, as the button is hidden for viewers
+      showError('You do not have permission to import maps.');
       return;
     }
     importInputRef.current?.click();
@@ -406,12 +417,17 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAdmin) {
-      // No error message needed, as the button is hidden for viewers
+      showError('You do not have permission to import maps.');
       return;
     }
     const file = event.target.files?.[0];
     if (!file) return;
     if (!window.confirm('Are you sure you want to import this map? This will overwrite your current map.')) return;
+    if (!selectedMapId) {
+      showError('No map selected. Cannot import map data.');
+      if (importInputRef.current) importInputRef.current.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -419,7 +435,8 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(mapData, devices[0]?.map_id || '1'); // Pass current map_id
+        
+        await importMap(mapData, selectedMapId); // Pass current map_id
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data
@@ -436,16 +453,14 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleShareMap = async () => {
     // Share map is accessible to all roles, as it's just generating a public link.
-    const currentMapId = devices.length > 0 ? devices[0].map_id : null;
-
-    if (!currentMapId) {
+    if (!selectedMapId) {
       showError('No map selected to share.');
       return;
     }
 
     // Construct the shareable URL
     // Using hardcoded IP and port as requested by the user
-    const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${currentMapId}`;
+    const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${selectedMapId}`;
 
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -515,7 +530,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           <Share2 className="h-4 w-4 mr-2" />Share Map
         </Button>
       </div>
-      {isEdgeEditorOpen && isAdmin && ( // Only open for admin
+      {isEdgeEditorOpen && isAdmin && editingEdge && ( // Only open for admin and if an edge is selected
         <EdgeEditorDialog 
           isOpen={isEdgeEditorOpen} 
           onClose={() => setIsEdgeEditorOpen(false)} 
