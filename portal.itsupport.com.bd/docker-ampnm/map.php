@@ -13,42 +13,44 @@ $is_admin = ($user_role === 'admin');
             <div class="flex items-center justify-between mb-4">
                 <h1 class="text-3xl font-bold text-white">Network Map</h1>
                 <div class="flex gap-4">
-                    <select id="mapSelector" class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 w-48"></select>
-                    <?php if ($is_admin): ?>
-                        <button id="newMapBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>New Map</button>
-                        <button id="renameMapBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-edit mr-2"></i>Rename</button>
-                        <button id="deleteMapBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><i class="fas fa-trash mr-2"></i>Delete</button>
-                        <button id="mapSettingsBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-cog mr-2"></i>Settings</button>
-                    <?php endif; ?>
+                    <select id="mapSelector" class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500"></select>
+                    <button id="newMapBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-plus mr-2"></i>New Map</button>
+                    <button id="renameMapBtn" class="px-4 py-2 bg-yellow-600/80 text-white rounded-lg hover:bg-yellow-700" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-edit mr-2"></i>Rename Map</button>
+                    <button id="deleteMapBtn" class="px-4 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-700" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-trash mr-2"></i>Delete Map</button>
                     <button id="shareMapBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i class="fas fa-share-alt mr-2"></i>Share Map</button>
                 </div>
             </div>
         </div>
 
-        <div id="map-container" class=""> <!-- Removed 'hidden' class -->
+        <div id="map-container" class="hidden">
             <div id="map-controls" class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 mb-6">
                 <div class="flex items-center justify-between">
                     <h2 id="currentMapName" class="text-xl font-semibold text-white"></h2>
                     <div class="flex items-center gap-2">
-                        <button id="refreshStatusBtn" class="px-4 py-2 bg-green-600/50 text-green-300 rounded-lg hover:bg-green-600/80" title="Refresh All Device Statuses">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                        <label class="flex items-center text-slate-400">
-                            <input type="checkbox" id="liveRefreshToggle" class="form-checkbox h-5 w-5 text-cyan-600 rounded border-slate-500 bg-slate-700 focus:ring-cyan-500">
-                            <span class="ml-2 text-sm">Live Refresh</span>
-                        </label>
-                        <?php if ($is_admin): ?>
-                            <button id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</button>
-                            <button id="placeDeviceBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-map-pin mr-2"></i>Place Device</button>
-                            <button id="addEdgeBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-link mr-2"></i>Add Connection</button>
-                            <button id="scanNetworkBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-wifi mr-2"></i>Scan Network</button>
-                            <button id="exportBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-export mr-2"></i>Export Map</button>
-                            <input type="file" id="importFile" class="hidden" accept="application/json">
-                            <button id="importBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-file-import mr-2"></i>Import Map</button>
-                        <?php endif; ?>
-                        <button id="fullscreenBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500" title="Toggle Fullscreen">
-                            <i class="fas fa-expand"></i>
-                        </button>
+                        <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-search"></i></button>
+                        <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
+                        
+                        <div class="flex items-center space-x-2 pl-2 ml-2 border-l border-slate-700">
+                            <label for="liveRefreshToggle" class="text-sm text-slate-400 select-none cursor-pointer">Live Status</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="liveRefreshToggle" class="sr-only peer" <?= $is_admin ? '' : 'disabled checked' ?>>
+                                <div class="w-11 h-6 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                            </label>
+                            <?php if (!$is_admin): ?>
+                                <span class="text-xs text-slate-500">(Always On)</span>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="pl-2 ml-2 border-l border-slate-700 flex items-center gap-2">
+                            <button id="placeDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Place Existing Device" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-download"></i></button>
+                            <a href="create-device.php" id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device" <?= $is_admin ? '' : 'style="display:none;"' ?>><i class="fas fa-plus"></i></a>
+                            <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
+                            <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
+                            <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
+                            <input type="file" id="importFile" class="hidden" accept=".json">
+                            <button id="mapSettingsBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Map Settings" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-cog"></i></button>
+                            <button id="fullscreenBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -70,190 +72,114 @@ $is_admin = ($user_role === 'admin');
     </div>
 
     <!-- Modals -->
-    <div id="edgeModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-semibold text-white">Edit Connection</h2>
-                <button onclick="closeModal('edgeModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <form id="edgeForm" class="space-y-4">
-                <input type="hidden" id="edgeId">
-                <div>
-                    <label for="connectionType" class="block text-sm font-medium text-slate-400 mb-1">Connection Type</label>
-                    <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                        <option value="cat5">CAT5/Ethernet</option>
-                        <option value="fiber">Fiber Optic</option>
-                        <option value="wifi">Wi-Fi</option>
-                        <option value="radio">Radio Link</option>
-                    </select>
-                </div>
-                <div class="flex justify-end gap-4">
-                    <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- The old deviceModal HTML is removed as it's replaced by React components -->
 
-    <div id="addDeviceModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-semibold text-white">Add New Device</h2>
-                <button onclick="closeModal('addDeviceModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <form id="addDeviceForm" class="space-y-4">
-                <input type="hidden" id="addDeviceMapId" name="map_id">
-                <div>
-                    <label for="addDeviceName" class="block text-sm font-medium text-slate-400 mb-1">Device Name</label>
-                    <input type="text" id="addDeviceName" name="name" placeholder="e.g., Main Router" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" required>
-                </div>
-                <div>
-                    <label for="addDeviceIp" class="block text-sm font-medium text-slate-400 mb-1">IP Address (Optional)</label>
-                    <input type="text" id="addDeviceIp" name="ip" placeholder="e.g., 192.168.1.1" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                </div>
-                <div>
-                    <label for="addDeviceType" class="block text-sm font-medium text-slate-400 mb-1">Type (Icon)</label>
-                    <select id="addDeviceType" name="type" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                        <?php
-                        $device_types = [
-                            'box' => 'Box (Group)', 'camera' => 'CC Camera', 'cloud' => 'Cloud', 'database' => 'Database',
-                            'firewall' => 'Firewall', 'ipphone' => 'IP Phone', 'laptop' => 'Laptop/PC', 'mobile' => 'Mobile Phone',
-                            'nas' => 'NAS', 'rack' => 'Networking Rack', 'printer' => 'Printer', 'punchdevice' => 'Punch Device',
-                            'radio-tower' => 'Radio Tower', 'router' => 'Router', 'server' => 'Server', 'switch' => 'Switch',
-                            'tablet' => 'Tablet', 'wifi-router' => 'WiFi Router', 'other' => 'Other'
-                        ];
-                        foreach ($device_types as $value => $label) {
-                            echo "<option value=\"{$value}\">{$label}</option>";
-                        }
-                        ?>
-                    </select>
-                </div>
-                <div class="flex justify-end gap-4">
-                    <button type="button" onclick="closeModal('addDeviceModal')" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
-                        <i class="fas fa-plus mr-2"></i>Add Device
-                    </button>
+    <div id="edgeModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h2 class="text-xl font-semibold text-white mb-4">Edit Connection</h2>
+            <form id="edgeForm">
+                <input type="hidden" id="edgeId">
+                <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    <option value="cat5">CAT5 Cable</option><option value="fiber">Fiber Optic</option><option value="wifi">WiFi</option><option value="radio">Radio</option>
+                </select>
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="scanModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-2xl border border-slate-700">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-semibold text-white">Network Scanner</h2>
+                <h2 class="text-xl font-semibold text-white">Scan Network for Devices</h2>
                 <button id="closeScanModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
             </div>
-            <form id="scanForm" class="flex gap-2 mb-4">
-                <input type="text" id="subnetInput" placeholder="e.g., 192.168.1.0/24" value="192.168.1.0/24" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-search mr-2"></i>Scan</button>
-            </form>
-            <div id="scanInitialMessage" class="text-center text-slate-500 py-4">
-                Enter a subnet (e.g., 192.168.1.0/24) and click Scan to find devices.
+            <div class="bg-slate-900/50 p-4 rounded-lg border border-slate-700 mb-4">
+                <form id="scanForm" class="flex flex-col sm:flex-row gap-4">
+                    <input type="text" id="subnetInput" placeholder="e.g., 192.168.1.0/24" value="192.168.1.0/24" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    <button type="submit" id="startScanBtn" class="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
+                        <i class="fas fa-search mr-2"></i>Start Scan
+                    </button>
+                </form>
             </div>
-            <div id="scanLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
-            <div id="scanResults" class="max-h-60 overflow-y-auto space-y-2"></div>
-        </div>
-    </div>
-
-    <div id="placeDeviceModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-semibold text-white">Place Unassigned Device</h2>
-                <button id="closePlaceDeviceModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <p class="text-slate-400 mb-4">Select a device to place it on the current map.</p>
-            <div id="placeDeviceLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
-            <div id="placeDeviceList" class="max-h-60 overflow-y-auto">
-                <!-- Unassigned devices will be loaded here -->
+            <div id="scanResultWrapper" class="max-h-96 overflow-y-auto">
+                <div id="scanLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div><p class="mt-2 text-slate-400">Scanning... this may take a moment.</p></div>
+                <div id="scanResults"></div>
+                <div id="scanInitialMessage" class="text-center py-8 text-slate-500">
+                    <i class="fas fa-network-wired text-4xl mb-4"></i>
+                    <p>Enter a subnet and start the scan to discover devices.</p>
+                    <p class="text-sm mt-2">(Requires <a href="https://nmap.org/" target="_blank" class="text-cyan-400 hover:underline">nmap</a> to be installed on the server)</p>
+                </div>
             </div>
         </div>
     </div>
 
     <div id="mapSettingsModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-semibold text-white">Map Settings</h2>
-                <button id="closeMapSettingsModal" onclick="closeModal('mapSettingsModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <form id="mapSettingsForm" class="space-y-4">
-                <div>
-                    <label for="mapBgColor" class="block text-sm font-medium text-slate-400 mb-1">Background Color</label>
-                    <div class="flex items-center gap-2">
-                        <input type="color" id="mapBgColor" value="#1e293b" class="h-10 w-14 p-1 cursor-pointer">
-                        <input type="text" id="mapBgColorHex" name="background_color" value="#1e293b" placeholder="#1e293b" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
+            <h2 class="text-xl font-semibold text-white mb-4">Map Appearance Settings</h2>
+            <form id="mapSettingsForm">
+                <div class="space-y-4">
+                    <div>
+                        <label for="mapBgColor" class="block text-sm font-medium text-slate-400 mb-1">Background Color</label>
+                        <div class="flex items-center gap-2">
+                            <input type="color" id="mapBgColor" name="background_color" class="p-1 h-10 w-14 block bg-slate-900 border border-slate-600 cursor-pointer rounded-lg" value="#1e293b">
+                            <input type="text" id="mapBgColorHex" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        </div>
                     </div>
-                </div>
-                <div>
-                    <label for="mapBgImageUrl" class="block text-sm font-medium text-slate-400 mb-1">Background Image URL</label>
-                    <div class="flex items-center gap-2">
-                        <input type="text" id="mapBgImageUrl" name="background_image_url" placeholder="Leave blank for no image" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                        <button type="button" id="clearMapBgImageUrlBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"><i class="fas fa-times"></i></button>
+                    <div>
+                        <label for="mapBgImageUrl" class="block text-sm font-medium text-slate-400 mb-1">Background Image URL</label>
+                        <input type="text" id="mapBgImageUrl" name="background_image_url" placeholder="Leave blank for no image" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
                     </div>
-                </div>
-                <div class="text-center text-slate-500 text-sm">OR</div>
-                <div>
-                    <label for="mapBgUpload" class="block text-sm font-medium text-slate-400 mb-1">Upload Background Image</label>
-                    <input type="file" id="mapBgUpload" accept="image/*" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600/20 file:text-cyan-300">
-                    <div id="mapBgUploadLoader" class="text-center py-2 hidden">
-                        <i class="fas fa-spinner fa-spin text-cyan-400 text-xl"></i>
-                        <span class="ml-2 text-slate-300">Uploading...</span>
+                    <div class="text-center text-slate-500 text-sm">OR</div>
+                    <div>
+                        <label for="mapBgUpload" class="block text-sm font-medium text-slate-400 mb-1">Upload Background Image</label>
+                        <input type="file" id="mapBgUpload" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600/20 file:text-cyan-300 hover:file:bg-cyan-600/40">
+                        <div id="mapBgUploadLoader" class="hidden mt-2"><div class="loader inline-block w-4 h-4"></div><span class="ml-2 text-sm">Uploading...</span></div>
                     </div>
                 </div>
                 <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
                     <h3 class="text-lg font-semibold text-white">Public View Settings</h3>
-                    <label class="flex items-center text-sm font-medium text-slate-400">
-                        <input type="checkbox" id="publicViewToggle" name="public_view_enabled" class="form-checkbox h-5 w-5 text-cyan-600 rounded border-slate-500 bg-slate-700 focus:ring-cyan-500">
-                        <span class="ml-2">Enable Public View</span>
-                    </label>
-                    <p class="text-sm text-slate-500">Allow anyone with the link to view this map without logging in.</p>
-                    <div id="publicViewLinkContainer" class="space-y-2 hidden">
-                        <label for="publicViewLink" class="block text-sm font-medium text-slate-400 mb-1">Public Link:</label>
+                    <div>
+                        <label for="publicViewToggle" class="flex items-center text-sm font-medium text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="publicViewToggle" name="public_view_enabled" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
+                            <span class="ml-2">Enable Public View</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mt-1">Allow anyone with the link to view this map without logging in.</p>
+                    </div>
+                    <div id="publicViewLinkContainer" class="hidden space-y-2">
+                        <label class="block text-sm font-medium text-slate-400">Public Link:</label>
                         <div class="flex items-center gap-2">
-                            <input type="text" id="publicViewLink" readonly class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white">
-                            <button type="button" id="copyPublicLinkBtn" class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i class="fas fa-copy"></i></button>
+                            <input type="text" id="publicViewLink" class="flex-grow bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm cursor-text" readonly>
+                            <button type="button" id="copyPublicLinkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="flex justify-between items-center gap-4 mt-6">
-                    <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><i class="fas fa-undo mr-2"></i>Reset to Default</button>
-                    <div class="flex gap-2">
-                        <button type="button" id="cancelMapSettingsBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                        <button type="submit" id="saveMapSettingsBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
+                <div class="flex justify-between items-center mt-6">
+                    <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Reset to Default</button>
+                    <div>
+                        <button type="button" id="cancelMapSettingsBtn" class="px-4 py-2 bg-slate-600 text-slate-300 rounded-lg hover:bg-slate-500 mr-2">Close</button>
+                        <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
-
-    <!-- Custom Confirmation Modal -->
-    <div id="confirmModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
+    
+    <!-- Place Device Modal -->
+    <div id="placeDeviceModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
             <div class="flex items-center justify-between mb-4">
-                <h2 id="confirmModalTitle" class="text-xl font-semibold text-white">Confirm Action</h2>
-                <button onclick="closeModal('confirmModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+                <h2 class="text-xl font-semibold text-white">Place an Existing Device</h2>
+                <button id="closePlaceDeviceModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
             </div>
-            <p id="confirmModalMessage" class="text-slate-300 mb-6">Are you sure you want to proceed?</p>
-            <div class="flex justify-end gap-4">
-                <button type="button" id="confirmModalCancelBtn" onclick="closeModal('confirmModal')" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                <button type="button" id="confirmModalConfirmBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Confirm</button>
+            <div id="placeDeviceList" class="max-h-96 overflow-y-auto">
+                <!-- Unmapped devices will be listed here -->
             </div>
-        </div>
-    </div>
-
-    <!-- Custom Input Modal -->
-    <div id="inputModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
-            <div class="flex items-center justify-between mb-4">
-                <h2 id="inputModalTitle" class="text-xl font-semibold text-white">Enter Value</h2>
-                <button onclick="closeModal('inputModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <p id="inputModalMessage" class="text-slate-300 mb-4">Please enter the required information:</p>
-            <input type="text" id="inputModalField" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 text-white mb-6">
-            <div class="flex justify-end gap-4">
-                <button type="button" id="inputModalCancelBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                <button type="button" id="inputModalConfirmBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Submit</button>
-            </div>
+            <div id="placeDeviceLoader" class="text-center py-8 hidden"><div class="loader mx-auto"></div></div>
         </div>
     </div>
 </main>

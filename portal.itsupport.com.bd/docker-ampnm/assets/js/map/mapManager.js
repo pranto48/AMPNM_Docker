@@ -6,7 +6,7 @@ MapApp.mapManager = {
             // No error message needed, as the button is disabled for viewers
             return;
         }
-        const name = await MapApp.ui.showInput("Create New Map", "Enter a name for the new map:", "");
+        const name = prompt("Enter a name for the new map:");
         if (name === null) { // User clicked cancel
             window.notyf.info("Map creation cancelled.");
             return; // Stop execution if prompt is cancelled

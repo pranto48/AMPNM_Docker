@@ -100,9 +100,8 @@ switch ($action) {
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$current_user_id, $input['source_id'], $input['target_id'], $input['map_id'], $input['connection_type'] ?? 'cat5']);
             $lastId = $pdo->lastInsertId();
-            // Admin can create edges, so return the created edge
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ?");
-            $stmt->execute([$lastId]);
+            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
+            $stmt->execute([$lastId, $current_user_id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($edge);
         }
@@ -114,12 +113,10 @@ switch ($action) {
             $id = $input['id'] ?? null;
             $connection_type = $input['connection_type'] ?? 'cat5';
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            // Removed user_id filter to allow admin to update any edge on the map
-            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ? WHERE id = ?");
-            $stmt->execute([$connection_type, $id]);
-            // Return the updated edge (without user_id filter)
-            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $pdo->prepare("UPDATE device_edges SET connection_type = ? WHERE id = ? AND user_id = ?");
+            $stmt->execute([$connection_type, $id, $current_user_id]);
+            $stmt = $pdo->prepare("SELECT * FROM device_edges WHERE id = ? AND user_id = ?");
+            $stmt->execute([$id, $current_user_id]);
             $edge = $stmt->fetch(PDO::FETCH_ASSOC);
             echo json_encode($edge);
         }
@@ -130,9 +127,8 @@ switch ($action) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $input['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Edge ID is required']); exit; }
-            // Removed user_id filter to allow admin to delete any edge on the map
-            $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $pdo->prepare("DELETE FROM device_edges WHERE id = ? AND user_id = ?");
+            $stmt->execute([$id, $current_user_id]);
             echo json_encode(['success' => true]);
         }
         break;
