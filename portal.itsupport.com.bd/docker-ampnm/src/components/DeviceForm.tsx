@@ -11,6 +11,7 @@ import { NetworkDevice, NetworkEdge } from '@/services/networkDeviceService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { Plus, XCircle } from 'lucide-react';
+import { useEffect } from 'react'; // Import useEffect for debugging
 
 const connectionTypes = ['cat5', 'fiber', 'wifi', 'radio'];
 
@@ -100,6 +101,18 @@ export const DeviceForm = ({
       device.id !== currentDeviceId &&
       !fields.some((field) => field.target_device_id === device.id)
   );
+
+  // Debugging logs
+  useEffect(() => {
+    console.log('--- DeviceForm Debugging ---');
+    console.log('allDevices:', allDevices);
+    console.log('currentDeviceId:', currentDeviceId);
+    console.log('selectedMapId:', selectedMapId);
+    console.log('fields (current connections in form):', fields);
+    console.log('availableDevices (after filtering):', availableDevices);
+    console.log('--- End DeviceForm Debugging ---');
+  }, [allDevices, currentDeviceId, selectedMapId, fields, availableDevices]);
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -313,145 +326,145 @@ export const DeviceForm = ({
                         />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="critical_packetloss_threshold"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Critical Packet Loss (%)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g., 50"
-                          {...field}
-                          value={field.value ?? ''}
-                          onChange={(event) => field.onChange(event.target.value === '' ? null : +event.target.value)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-            <FormField
-              control={form.control}
-              name="show_live_ping"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      Show live ping status on map
-                    </FormLabel>
-                    <FormDescription>
-                      Display real-time ping latency and TTL directly on the device node.
-                    </FormDescription>
-                  </div>
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="critical_packetloss_threshold"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Critical Packet Loss (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 50"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(event.target.value === '' ? null : +event.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+        <FormField
+          control={form.control}
+          name="show_live_ping"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Show live ping status on map
+                </FormLabel>
+                <FormDescription>
+                  Display real-time ping latency and TTL directly on the device node.
+                </FormDescription>
+              </div>
+            </FormItem>
+          )}
+        />
 
-            <div className="space-y-4 border-t pt-4 mt-4">
-              <h3 className="text-lg font-medium">Connections</h3>
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex items-end gap-2 border p-3 rounded-md">
-                  <FormField
-                    control={form.control}
-                    name={`connections.${index}.target_device_id`}
-                    render={({ field: targetField }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Connected From</FormLabel>
-                        <Select
-                          onValueChange={targetField.onChange}
-                          defaultValue={targetField.value}
-                          disabled={!selectedMapId} // Disable if no map is selected
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a device" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {availableDevices.map((device) => (
-                              <SelectItem key={device.id} value={device.id!}>
-                                {device.name} ({device.ip_address || 'No IP'})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`connections.${index}.connection_type`}
-                    render={({ field: typeField }) => (
-                      <FormItem className="w-32">
-                        <FormLabel>Type</FormLabel>
-                        <Select onValueChange={typeField.onChange} defaultValue={typeField.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {connectionTypes.map((type) => (
-                              <SelectItem key={type} value={type} className="capitalize">
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(index)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <XCircle className="h-5 w-5" />
-                  </Button>
-                </div>
-              ))}
+        <div className="space-y-4 border-t pt-4 mt-4">
+          <h3 className="text-lg font-medium">Connections</h3>
+          {fields.map((field, index) => (
+            <div key={field.id} className="flex items-end gap-2 border p-3 rounded-md">
+              <FormField
+                control={form.control}
+                name={`connections.${index}.target_device_id`}
+                render={({ field: targetField }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel>Connected From</FormLabel>
+                    <Select
+                      onValueChange={targetField.onChange}
+                      defaultValue={targetField.value}
+                      disabled={!selectedMapId} // Disable if no map is selected
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a device" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableDevices.map((device) => (
+                          <SelectItem key={device.id} value={device.id!}>
+                            {device.name} ({device.ip_address || 'No IP'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`connections.${index}.connection_type`}
+                render={({ field: typeField }) => (
+                  <FormItem className="w-32">
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={typeField.onChange} defaultValue={typeField.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {connectionTypes.map((type) => (
+                          <SelectItem key={type} value={type} className="capitalize">
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button
                 type="button"
-                variant="outline"
-                onClick={() => append({ target_device_id: '', connection_type: 'cat5' })}
-                disabled={!selectedMapId || availableDevices.length === 0} // Disable if no map or no other devices
+                variant="ghost"
+                size="icon"
+                onClick={() => remove(index)}
+                className="text-red-500 hover:text-red-700"
               >
-                <Plus className="h-4 w-4 mr-2" />Add Connection
+                <XCircle className="h-5 w-5" />
               </Button>
-              {!selectedMapId && (
-                <p className="text-sm text-red-400">Please select a map to add connections.</p>
-              )}
-              {selectedMapId && availableDevices.length === 0 && (
-                <p className="text-sm text-muted-foreground">No other devices available to connect to on this map.</p>
-              )}
             </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => append({ target_device_id: '', connection_type: 'cat5' })}
+            disabled={!selectedMapId || availableDevices.length === 0} // Disable if no map or no other devices
+          >
+            <Plus className="h-4 w-4 mr-2" />Add Connection
+          </Button>
+          {!selectedMapId && (
+            <p className="text-sm text-red-400">Please select a map to add connections.</p>
+          )}
+          {selectedMapId && availableDevices.length === 0 && (
+            <p className="text-sm text-muted-foreground">No other devices available to connect to on this map.</p>
+          )}
+        </div>
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" asChild>
-                <Link to="/">Cancel</Link>
-              </Button>
-              <Button type="submit">{isEditing ? 'Save Changes' : 'Add Device'}</Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" asChild>
+            <Link to="/">Cancel</Link>
+          </Button>
+          <Button type="submit">{isEditing ? 'Save Changes' : 'Add Device'}</Button>
+        </div>
+      </form>
+    </Form>
+  </CardContent>
+</Card>
   );
 };
