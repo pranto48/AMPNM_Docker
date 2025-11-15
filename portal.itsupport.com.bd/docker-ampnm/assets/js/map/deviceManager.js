@@ -82,10 +82,8 @@ MapApp.deviceManager = {
                     } else if (device.status === 'online' && (device.old_status === 'critical' || device.old_status === 'offline')) {
                         window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
                     } else {
-                        // Only show info toast for status changes if not a viewer, or if it's a significant change
-                        if (window.userRole !== 'viewer' || (device.status !== 'online' && device.status !== 'offline')) {
-                             window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
-                        }
+                        // Show info toast for all status changes for all roles
+                        window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
                     }
                 }
 
@@ -127,13 +125,11 @@ MapApp.deviceManager = {
     setupAutoPing: (devices) => {
         Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
         MapApp.state.pingIntervals = {};
-        // Only admins can have auto-ping functionality
-        if (window.userRole === 'admin') {
-            devices.forEach(device => {
-                if (device.ping_interval > 0 && device.ip) {
-                    MapApp.state.pingIntervals[device.id] = setInterval(() => MapApp.deviceManager.pingSingleDevice(device.id), device.ping_interval * 1000);
-                }
-            });
-        }
+        // Enable auto-ping functionality for all roles
+        devices.forEach(device => {
+            if (device.ping_interval > 0 && device.ip) {
+                MapApp.state.pingIntervals[device.id] = setInterval(() => MapApp.deviceManager.pingSingleDevice(device.id), device.ping_interval * 1000);
+            }
+        });
     }
 };
