@@ -21,7 +21,7 @@ const EditDevicePage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDeviceData = async () => {
+    const fetchInitialData = async () => {
       if (!id) {
         showError('Device ID is missing.');
         navigate('/');
@@ -29,22 +29,26 @@ const EditDevicePage = () => {
       }
       setIsLoading(true);
       try {
-        const [fetchedDevices, fetchedMaps] = await Promise.all([
-          getDevices(), // Fetch all devices for connection dropdown
-          getMaps(), // Fetch all maps for selection
-        ]);
-        setAllDevices(fetchedDevices);
+        const fetchedMaps = await getMaps();
         setMaps(fetchedMaps);
 
-        const foundDevice = fetchedDevices.find((d: NetworkDevice) => d.id === id);
+        // Fetch all devices initially to find the current device and its map_id
+        const allFetchedDevices = await getDevices();
+        setAllDevices(allFetchedDevices); // Keep all devices for the dropdown
+
+        const foundDevice = allFetchedDevices.find((d: NetworkDevice) => d.id === id);
         if (foundDevice) {
           setDevice(foundDevice);
           setSelectedMapId(foundDevice.map_id); // Set selected map to device's map
-          const deviceEdges = await getEdges(foundDevice.map_id); // Fetch edges for the device's map
-          const connections = deviceEdges.filter(
-            (edge) => edge.source_id === id
-          );
-          setInitialConnections(connections);
+          
+          // Fetch edges for the device's map
+          if (foundDevice.map_id) {
+            const deviceEdges = await getEdges(foundDevice.map_id); 
+            const connections = deviceEdges.filter(
+              (edge) => edge.source_id === id
+            );
+            setInitialConnections(connections);
+          }
         } else {
           showError('Device not found.');
           navigate('/');
@@ -57,8 +61,26 @@ const EditDevicePage = () => {
         setIsLoading(false);
       }
     };
-    fetchDeviceData();
+    fetchInitialData();
   }, [id, navigate]);
+
+  useEffect(() => {
+    const fetchDevicesForMap = async () => {
+      if (selectedMapId) {
+        try {
+          const fetchedDevices = await getDevices(selectedMapId); // Fetch devices for the selected map
+          setAllDevices(fetchedDevices);
+        } catch (error) {
+          console.error('Failed to fetch devices for selected map:', error);
+          showError('Failed to load devices for the selected map.');
+        }
+      } else {
+        setAllDevices([]); // Clear devices if no map is selected
+      }
+    };
+    fetchDevicesForMap();
+  }, [selectedMapId]); // Re-fetch devices when selectedMapId changes
+
 
   const handleSubmit = async (
     deviceData: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>,
