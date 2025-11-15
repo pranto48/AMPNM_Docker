@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { NetworkDevice } from '@/services/networkDeviceService';
+import { NetworkDevice, NetworkEdge } from '@/services/networkDeviceService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
+import { Plus, XCircle } from 'lucide-react';
+
+const connectionTypes = ['cat5', 'fiber', 'wifi', 'radio'];
+
+const connectionSchema = z.object({
+  id: z.string().optional(), // For existing edges
+  target_device_id: z.string().min(1, 'Target device is required'),
+  connection_type: z.string().min(1, 'Connection type is required'),
+});
 
 const deviceSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -25,17 +34,33 @@ const deviceSchema = z.object({
   critical_latency_threshold: z.coerce.number().int().positive().optional().nullable(),
   critical_packetloss_threshold: z.coerce.number().int().positive().max(100).optional().nullable(),
   show_live_ping: z.boolean().default(false),
+  connections: z.array(connectionSchema).optional(),
 });
 
 interface DeviceFormProps {
   initialData?: Partial<NetworkDevice>;
-  onSubmit: (device: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>) => void;
+  initialConnections?: NetworkEdge[];
+  onSubmit: (
+    device: Omit<NetworkDevice, 'id' | 'position_x' | 'position_y' | 'user_id'>,
+    connections: (Omit<NetworkEdge, 'source_id' | 'map_id'> & { target_device_id: string })[]
+  ) => void;
   isEditing?: boolean;
+  allDevices: NetworkDevice[];
+  currentDeviceId?: string;
+  selectedMapId: string;
 }
 
 const icons = ['server', 'router', 'printer', 'laptop', 'wifi', 'database', 'box', 'camera', 'cloud', 'firewall', 'ipphone', 'mobile', 'nas', 'rack', 'punchdevice', 'radio-tower', 'switch', 'tablet', 'other'];
 
-export const DeviceForm = ({ initialData, onSubmit, isEditing = false }: DeviceFormProps) => {
+export const DeviceForm = ({
+  initialData,
+  initialConnections = [],
+  onSubmit,
+  isEditing = false,
+  allDevices,
+  currentDeviceId,
+  selectedMapId,
+}: DeviceFormProps) => {
   const form = useForm<z.infer<typeof deviceSchema>>({
     resolver: zodResolver(deviceSchema),
     defaultValues: {
@@ -52,12 +77,29 @@ export const DeviceForm = ({ initialData, onSubmit, isEditing = false }: DeviceF
       critical_latency_threshold: initialData?.critical_latency_threshold || undefined,
       critical_packetloss_threshold: initialData?.critical_packetloss_threshold || undefined,
       show_live_ping: initialData?.show_live_ping || false,
+      connections: initialConnections.map((edge) => ({
+        id: edge.id,
+        target_device_id: edge.target_id,
+        connection_type: edge.connection_type,
+      })),
     },
   });
 
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'connections',
+  });
+
   const handleSubmit = (values: z.infer<typeof deviceSchema>) => {
-    onSubmit(values);
+    const { connections, ...deviceValues } = values;
+    onSubmit(deviceValues, connections || []);
   };
+
+  const availableDevices = allDevices.filter(
+    (device) =>
+      device.id !== currentDeviceId &&
+      !fields.some((field) => field.target_device_id === device.id)
+  );
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -317,6 +359,90 @@ export const DeviceForm = ({ initialData, onSubmit, isEditing = false }: DeviceF
                 </FormItem>
               )}
             />
+
+            <div className="space-y-4 border-t pt-4 mt-4">
+              <h3 className="text-lg font-medium">Connections</h3>
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-end gap-2 border p-3 rounded-md">
+                  <FormField
+                    control={form.control}
+                    name={`connections.${index}.target_device_id`}
+                    render={({ field: targetField }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Connected From</FormLabel>
+                        <Select
+                          onValueChange={targetField.onChange}
+                          defaultValue={targetField.value}
+                          disabled={!selectedMapId} // Disable if no map is selected
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a device" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableDevices.map((device) => (
+                              <SelectItem key={device.id} value={device.id!}>
+                                {device.name} ({device.ip_address || 'No IP'})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`connections.${index}.connection_type`}
+                    render={({ field: typeField }) => (
+                      <FormItem className="w-32">
+                        <FormLabel>Type</FormLabel>
+                        <Select onValueChange={typeField.onChange} defaultValue={typeField.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {connectionTypes.map((type) => (
+                              <SelectItem key={type} value={type} className="capitalize">
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => remove(index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <XCircle className="h-5 w-5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => append({ target_device_id: '', connection_type: 'cat5' })}
+                disabled={!selectedMapId || availableDevices.length === 0} // Disable if no map or no other devices
+              >
+                <Plus className="h-4 w-4 mr-2" />Add Connection
+              </Button>
+              {!selectedMapId && (
+                <p className="text-sm text-red-400">Please select a map to add connections.</p>
+              )}
+              {selectedMapId && availableDevices.length === 0 && (
+                <p className="text-sm text-muted-foreground">No other devices available to connect to on this map.</p>
+              )}
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" asChild>
                 <Link to="/">Cancel</Link>

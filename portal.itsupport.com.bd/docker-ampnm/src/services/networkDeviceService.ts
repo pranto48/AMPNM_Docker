@@ -8,6 +8,7 @@ interface ApiResponse<T> {
   // For specific endpoints that return arrays directly
   devices?: T[];
   edges?: T[];
+  maps?: T[]; // Added for maps
 }
 
 export interface NetworkDevice {
@@ -42,12 +43,18 @@ export interface NetworkEdge {
   map_id?: string; // Added map_id
 }
 
-export interface MapData {
-  devices: Omit<NetworkDevice, 'user_id' | 'status'>[];
-  edges: Omit<NetworkEdge, 'id'>[];
+export interface Map {
+  id: string;
+  name: string;
+  type: string;
+  background_color?: string;
+  background_image_url?: string;
+  public_view_enabled: boolean;
+  lastModified: string;
+  deviceCount: number;
 }
 
-const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any): Promise<T> => {
+const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any, params?: Record<string, string>): Promise<T> => {
   const options: RequestInit = {
     method: method,
     headers: {
@@ -58,7 +65,10 @@ const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any): P
     options.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${LOCAL_API_URL}?action=${action}`, options);
+  const queryString = params ? new URLSearchParams(params).toString() : '';
+  const url = `${LOCAL_API_URL}?action=${action}${queryString ? `&${queryString}` : ''}`;
+
+  const response = await fetch(url, options);
   const result: ApiResponse<T> = await response.json();
 
   if (!response.ok || result.error) {
@@ -67,8 +77,17 @@ const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any): P
   return result as T; // Cast to T, assuming the data field or direct array is T
 };
 
-export const getDevices = async (): Promise<NetworkDevice[]> => {
-  const result = await callApi<{ devices: NetworkDevice[] }>('get_devices', 'GET');
+export const getMaps = async (): Promise<Map[]> => {
+  const result = await callApi<{ maps: Map[] }>('get_maps', 'GET');
+  return result.maps || [];
+};
+
+export const getDevices = async (mapId?: string): Promise<NetworkDevice[]> => {
+  const params: Record<string, string> = {};
+  if (mapId) {
+    params.map_id = mapId;
+  }
+  const result = await callApi<{ devices: NetworkDevice[] }>('get_devices', 'GET', undefined, params);
   return result.devices || [];
 };
 
@@ -132,13 +151,17 @@ export const deleteDevice = async (id: string): Promise<{ success: boolean }> =>
   return result;
 };
 
-export const getEdges = async (): Promise<NetworkEdge[]> => {
-  const result = await callApi<{ edges: NetworkEdge[] }>('get_edges', 'GET');
+export const getEdges = async (mapId?: string): Promise<NetworkEdge[]> => {
+  const params: Record<string, string> = {};
+  if (mapId) {
+    params.map_id = mapId;
+  }
+  const result = await callApi<{ edges: NetworkEdge[] }>('get_edges', 'GET', undefined, params);
   return result.edges || [];
 };
 
-export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string }): Promise<NetworkEdge> => {
-  const result = await callApi<NetworkEdge>('create_edge', 'POST', { source_id: edge.source, target_id: edge.target, map_id: edge.map_id, connection_type: 'cat5' });
+export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string; connection_type: string }): Promise<NetworkEdge> => {
+  const result = await callApi<NetworkEdge>('create_edge', 'POST', { source_id: edge.source, target_id: edge.target, map_id: edge.map_id, connection_type: edge.connection_type });
   return result;
 };
 
