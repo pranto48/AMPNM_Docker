@@ -67,7 +67,10 @@ MapApp.network = {
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';
-                document.addEventListener('click', closeContextMenu, { once: true });
+                // Add a small delay before attaching the click listener to prevent immediate closure
+                setTimeout(() => {
+                    document.addEventListener('click', closeContextMenu, { once: true });
+                }, 100); // 100ms delay
             } else if (edgeId) {
                 let menuItems = ``;
                 if (window.userRole === 'admin') {
@@ -82,7 +85,10 @@ MapApp.network = {
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';
-                document.addEventListener('click', closeContextMenu, { once: true });
+                // Add a small delay before attaching the click listener to prevent immediate closure
+                setTimeout(() => {
+                    document.addEventListener('click', closeContextMenu, { once: true });
+                }, 100); // 100ms delay
             } else { 
                 closeContextMenu(); 
             }
