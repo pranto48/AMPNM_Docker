@@ -179,6 +179,37 @@ $is_admin = ($user_role === 'admin');
             </form>
         </div>
     </div>
+
+    <!-- Custom Confirmation Modal -->
+    <div id="confirmModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 id="confirmModalTitle" class="text-xl font-semibold text-white">Confirm Action</h2>
+                <button onclick="closeModal('confirmModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <p id="confirmModalMessage" class="text-slate-300 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-4">
+                <button type="button" id="confirmModalCancelBtn" onclick="closeModal('confirmModal')" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                <button type="button" id="confirmModalConfirmBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Input Modal -->
+    <div id="inputModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 id="inputModalTitle" class="text-xl font-semibold text-white">Enter Value</h2>
+                <button onclick="closeModal('inputModal')" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <p id="inputModalMessage" class="text-slate-300 mb-4">Please enter the required information:</p>
+            <input type="text" id="inputModalField" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 text-white mb-6">
+            <div class="flex justify-end gap-4">
+                <button type="button" id="inputModalCancelBtn" onclick="closeModal('inputModal')" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                <button type="button" id="inputModalConfirmBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Submit</button>
+            </div>
+        </div>
+    </div>
 </main>
 
 <?php include 'footer.php'; ?>

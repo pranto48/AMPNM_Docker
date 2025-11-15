@@ -6,6 +6,14 @@ $pdo = getDbConnection();
 $current_user_id = $_SESSION['user_id'];
 $message = '';
 
+// Fetch all maps for the dropdown
+$stmt_maps = $pdo->prepare("SELECT id, name FROM maps WHERE user_id = ? ORDER BY name ASC");
+$stmt_maps->execute([$current_user_id]);
+$maps = $stmt_maps->fetchAll(PDO::FETCH_ASSOC);
+
+// Get map_id from URL if present, for pre-selection
+$preselected_map_id = $_GET['map_id'] ?? null;
+
 // Handle form submission BEFORE any HTML output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
@@ -109,7 +117,7 @@ include 'header.php';
                     <select id="map_id" name="map_id" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
                         <option value="">Unassigned</option>
                         <?php foreach ($maps as $map): ?>
-                            <option value="<?= htmlspecialchars($map['id']) ?>" <?= (($_POST['map_id'] ?? '') == $map['id']) ? 'selected' : '' ?>>
+                            <option value="<?= htmlspecialchars($map['id']) ?>" <?= ((($_POST['map_id'] ?? $preselected_map_id) == $map['id'])) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($map['name']) ?>
                             </option>
                         <?php endforeach; ?>

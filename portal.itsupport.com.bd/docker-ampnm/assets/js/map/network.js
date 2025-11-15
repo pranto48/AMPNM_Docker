@@ -37,8 +37,14 @@ MapApp.network = {
 
             let menuItems = ``;
             if (window.userRole === 'admin') {
-                menuItems += `<div class="context-menu-item text-yellow-400"><i class="fas fa-info-circle fa-fw mr-2"></i>Use Dashboard Map for Editing</div>`;
-                menuItems += `<div class="context-menu-item" data-action="go-to-dashboard-map"><i class="fas fa-arrow-right fa-fw mr-2"></i>Go to Dashboard Map</div>`;
+                if (nodeId) {
+                    menuItems += `<div class="context-menu-item" data-action="edit-device" data-id="${nodeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit Device</div>`;
+                    menuItems += `<div class="context-menu-item" data-action="copy-device" data-id="${nodeId}"><i class="fas fa-copy fa-fw mr-2"></i>Copy Device</div>`;
+                    menuItems += `<div class="context-menu-item text-red-400" data-action="delete-device" data-id="${nodeId}"><i class="fas fa-trash fa-fw mr-2"></i>Delete Device</div>`;
+                } else if (edgeId) {
+                    menuItems += `<div class="context-menu-item" data-action="edit-edge" data-id="${edgeId}"><i class="fas fa-edit fa-fw mr-2"></i>Edit Connection</div>`;
+                    menuItems += `<div class="context-menu-item text-red-400" data-action="delete-edge" data-id="${edgeId}"><i class="fas fa-trash fa-fw mr-2"></i>Delete Connection</div>`;
+                }
             } else {
                 menuItems += `<div class="context-menu-item text-slate-500">No actions available</div>`;
             }
@@ -52,11 +58,39 @@ MapApp.network = {
         contextMenu.addEventListener('click', async (e) => {
             const target = e.target.closest('.context-menu-item');
             if (target) {
-                const { action } = target.dataset;
+                const { action, id } = target.dataset;
                 closeContextMenu();
 
-                if (action === 'go-to-dashboard-map') {
-                    window.location.href = 'index.php#map'; // Redirect to the dashboard map tab
+                if (action === 'edit-device') {
+                    MapApp.ui.openDeviceModal(id);
+                } else if (action === 'copy-device') {
+                    MapApp.mapManager.copyDevice(id);
+                } else if (action === 'delete-device') {
+                    const confirmed = await MapApp.ui.showConfirm("Delete Device", "Are you sure you want to delete this device? This action cannot be undone.");
+                    if (confirmed) {
+                        try {
+                            await MapApp.api.post('delete_device', { id: id });
+                            MapApp.state.nodes.remove({ id: id });
+                            window.notyf.success('Device deleted successfully.');
+                        } catch (error) {
+                            console.error('Failed to delete device:', error);
+                            window.notyf.error(error.message || 'Failed to delete device.');
+                        }
+                    }
+                } else if (action === 'edit-edge') {
+                    MapApp.ui.openEdgeModal(id);
+                } else if (action === 'delete-edge') {
+                    const confirmed = await MapApp.ui.showConfirm("Delete Connection", "Are you sure you want to delete this connection? This action cannot be undone.");
+                    if (confirmed) {
+                        try {
+                            await MapApp.api.post('delete_edge', { id: id });
+                            MapApp.state.edges.remove({ id: id });
+                            window.notyf.success('Connection deleted successfully.');
+                        } catch (error) {
+                            console.error('Failed to delete connection:', error);
+                            window.notyf.error(error.message || 'Failed to delete connection.');
+                        }
+                    }
                 }
             }
         });

@@ -6,6 +6,7 @@ $pdo = getDbConnection();
 $current_user_id = $_SESSION['user_id'];
 $message = '';
 $device_id = $_GET['id'] ?? null;
+$return_map_id = $_GET['map_id'] ?? null; // Get map_id from URL for redirection
 
 if (!$device_id) {
     header('Location: devices.php');
@@ -61,10 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
                 $show_live_ping, $device_id, $current_user_id
             ]);
-            $message = '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">Device "' . htmlspecialchars($name) . '" updated successfully!</div>';
-            // Re-fetch device data to show updated values in the form
-            $stmt_device->execute([$device_id, $current_user_id]);
-            $device = $stmt_device->fetch(PDO::FETCH_ASSOC);
+            
+            // Redirect back to map.php with the map_id if available
+            if ($return_map_id) {
+                header('Location: map.php?map_id=' . urlencode($return_map_id));
+            } else {
+                header('Location: devices.php'); // Fallback to devices list
+            }
+            exit; // Important to exit after redirect
         } catch (PDOException $e) {
             $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Error updating device: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
@@ -79,7 +84,7 @@ $form_data = $device ?? [];
     <div class="container mx-auto px-4 py-8">
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-3xl font-bold text-white">Edit Device: <?= htmlspecialchars($form_data['name'] ?? 'N/A') ?></h1>
-            <a href="devices.php" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-arrow-left mr-2"></i>Back to Devices</a>
+            <a href="map.php<?= $return_map_id ? '?map_id=' . urlencode($return_map_id) : '' ?>" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-arrow-left mr-2"></i>Back to Map</a>
         </div>
 
         <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6 max-w-2xl mx-auto">
