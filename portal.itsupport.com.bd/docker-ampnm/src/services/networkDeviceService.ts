@@ -74,12 +74,21 @@ const callApi = async <T>(action: string, method: 'GET' | 'POST', body?: any, pa
   if (!response.ok || result.error) {
     throw new Error(result.error || `API call failed with status ${response.status}`);
   }
-  return result as T; // Cast to T, assuming the data field or direct array is T
+  // For actions that return a single object (like create_device, create_edge, update_edge),
+  // the PHP API directly returns the object, not wrapped in 'data'.
+  // For actions that return lists (like get_devices, get_edges, get_maps),
+  // they are wrapped in 'devices', 'edges', 'maps' respectively.
+  // We need to handle this dynamically or based on action.
+  // For simplicity, if it's not a list, assume it's the direct object.
+  if (action.startsWith('get_') && (result.devices || result.edges || result.maps)) {
+    return (result.devices || result.edges || result.maps) as T;
+  }
+  return result as T; // Assume direct object for single item returns
 };
 
 export const getMaps = async (): Promise<Map[]> => {
   const result = await callApi<{ maps: Map[] }>('get_maps', 'GET');
-  return result.maps || [];
+  return result as unknown as Map[]; // Cast to Map[]
 };
 
 export const getDevices = async (mapId?: string): Promise<NetworkDevice[]> => {
@@ -88,7 +97,7 @@ export const getDevices = async (mapId?: string): Promise<NetworkDevice[]> => {
     params.map_id = mapId;
   }
   const result = await callApi<{ devices: NetworkDevice[] }>('get_devices', 'GET', undefined, params);
-  return result.devices || [];
+  return result as unknown as NetworkDevice[]; // Cast to NetworkDevice[]
 };
 
 export const addDevice = async (device: Omit<NetworkDevice, 'user_id' | 'status' | 'last_ping' | 'last_ping_result'>): Promise<NetworkDevice> => {
@@ -157,7 +166,7 @@ export const getEdges = async (mapId?: string): Promise<NetworkEdge[]> => {
     params.map_id = mapId;
   }
   const result = await callApi<{ edges: NetworkEdge[] }>('get_edges', 'GET', undefined, params);
-  return result.edges || [];
+  return result as unknown as NetworkEdge[]; // Cast to NetworkEdge[]
 };
 
 export const addEdgeToDB = async (edge: { source: string; target: string; map_id: string; connection_type: string }): Promise<NetworkEdge> => {

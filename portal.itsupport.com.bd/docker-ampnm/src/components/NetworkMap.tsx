@@ -118,6 +118,9 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         critical_packetloss_threshold: device.critical_packetloss_threshold,
         show_live_ping: device.show_live_ping,
         map_id: device.map_id,
+        onEdit: (id: string) => navigate(`/edit-device/${id}`), // Pass navigate function
+        onDelete: handleDelete, // Pass delete handler
+        onStatusChange: handleStatusChange, // Pass status change handler
       },
     }),
     [handleStatusChange, navigate, isAdmin]
@@ -128,39 +131,42 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
     setNodes(devices.map(mapDeviceToNode));
   }, [devices, mapDeviceToNode, setNodes]);
 
-  // Load edges for the selected map
+  // Function to load edges from DB
+  const loadEdges = useCallback(async () => {
+    if (!selectedMapId) {
+      setEdges([]);
+      return;
+    }
+    try {
+      const edgesData = await getEdges(selectedMapId);
+      setEdges(
+        edgesData.map((edge: any) => ({
+          id: edge.id,
+          source: edge.source_id, // PHP uses source_id
+          target: edge.target_id, // PHP uses target_id
+          data: { connection_type: edge.connection_type || 'cat5' },
+        }))
+      );
+    } catch (error) {
+      console.error('Failed to load network edges:', error);
+      showError('Failed to load network connections.');
+    }
+  }, [setEdges, selectedMapId]);
+
+  // Load edges initially and when selectedMapId changes
   useEffect(() => {
-    const loadEdges = async () => {
-      if (!selectedMapId) {
-        setEdges([]);
-        return;
-      }
-      try {
-        const edgesData = await getEdges(selectedMapId);
-        setEdges(
-          edgesData.map((edge: any) => ({
-            id: edge.id,
-            source: edge.source_id, // PHP uses source_id
-            target: edge.target_id, // PHP uses target_id
-            data: { connection_type: edge.connection_type || 'cat5' },
-          }))
-        );
-      } catch (error) {
-        console.error('Failed to load network edges:', error);
-        showError('Failed to load network connections.');
-      }
-    };
     loadEdges();
-  }, [setEdges, selectedMapId]); // Depend on selectedMapId
+  }, [loadEdges]);
 
   // Implement polling for live status updates for all users
   useEffect(() => {
     const pollingInterval = setInterval(() => {
       onMapUpdate(); // This fetches updated device data
+      loadEdges(); // Also refresh edges
     }, 15000); // Poll every 15 seconds
 
     return () => clearInterval(pollingInterval);
-  }, [onMapUpdate]);
+  }, [onMapUpdate, loadEdges]);
 
   // Ref to store previous devices for status comparison
   const prevDevicesRef = useRef<NetworkDevice[]>([]);
@@ -249,27 +255,18 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         showError('No map selected. Cannot create connection.');
         return;
       }
-      // Optimistically add edge to UI
-      const newEdge = { 
-        id: `reactflow__edge-${params.source}${params.target}`, 
-        source: params.source!, 
-        target: params.target!, 
-        data: { connection_type: 'cat5' } 
-      };
-      setEdges((eds) => applyEdgeChanges([{ type: 'add', item: newEdge }], eds));
       
       try {
         // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: selectedMapId });
+        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: selectedMapId, connection_type: 'cat5' });
         showSuccess('Connection saved.');
+        loadEdges(); // Re-fetch all edges to ensure consistency
       } catch (error) {
         console.error('Failed to save connection:', error);
         showError('Failed to save connection.');
-        // Revert UI update on failure
-        setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges, isAdmin, selectedMapId]
+    [isAdmin, selectedMapId, loadEdges]
   );
 
   const handleDelete = async (deviceId: string) => {
@@ -278,20 +275,15 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       return;
     }
     if (window.confirm('Are you sure you want to delete this device?')) {
-      // Optimistically remove from UI
-      const originalNodes = nodes;
-      setNodes((nds) => nds.filter((node) => node.id !== deviceId));
-      
       try {
         // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
         onMapUpdate(); // Refresh parent component's device list
+        loadEdges(); // Also refresh edges as they might be affected
       } catch (error) {
         console.error('Failed to delete device:', error);
         showError('Failed to delete device.');
-        // Revert UI update on failure
-        setNodes(originalNodes);
       }
     }
   };
@@ -324,6 +316,7 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
           try {
             await deleteEdgeFromDB(change.id);
             showSuccess('Connection deleted.');
+            loadEdges(); // Re-fetch all edges to ensure consistency
           } catch (error) {
             console.error('Failed to delete connection:', error);
             showError('Failed to delete connection.');
@@ -331,7 +324,7 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         }
       });
     },
-    [onEdgesChange, isAdmin]
+    [onEdgesChange, isAdmin, loadEdges]
   );
 
   const onEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
@@ -349,19 +342,15 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
       showError('You do not have permission to save connection changes.');
       return;
     }
-    // Optimistically update UI
-    const originalEdges = edges;
-    setEdges((eds) => eds.map(e => e.id === edgeId ? { ...e, data: { connection_type } } : e));
     
     try {
       // Update in database
-      await updateEdgeInDB(edgeId, { connection_type });
+      await updateEdgeInDB(edgeId, { connection_type: connectionType });
       showSuccess('Connection updated.');
+      loadEdges(); // Re-fetch all edges to ensure consistency
     } catch (error) {
       console.error('Failed to update connection:', error);
       showError('Failed to update connection.');
-      // Revert UI update on failure
-      setEdges(originalEdges);
     }
   };
 
@@ -440,6 +429,7 @@ const NetworkMap = ({ devices, onMapUpdate, selectedMapId }: NetworkMapProps) =>
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data
+        loadEdges(); // Also refresh edges
       } catch (error: any) {
         dismissToast(toastId);
         console.error('Failed to import map:', error);
