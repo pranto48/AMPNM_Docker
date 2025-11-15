@@ -2,6 +2,7 @@ window.MapApp = window.MapApp || {};
 
 MapApp.network = {
     initializeMap: () => {
+        console.log('MapApp.network.initializeMap called. Current window.userRole:', window.userRole); // Debug log
         const container = document.getElementById('network-map');
         const contextMenu = document.getElementById('context-menu');
         MapApp.ui.populateLegend();
@@ -41,6 +42,7 @@ MapApp.network = {
 
         const closeContextMenu = () => { contextMenu.style.display = 'none'; };
         MapApp.state.network.on("oncontext", (params) => {
+            console.log('Context menu triggered. Node ID:', MapApp.state.network.getNodeAt(params.pointer.DOM), 'Edge ID:', MapApp.state.network.getEdgeAt(params.pointer.DOM), 'User Role:', window.userRole); // Debug log
             params.event.preventDefault();
             const nodeId = MapApp.state.network.getNodeAt(params.pointer.DOM);
             const edgeId = MapApp.state.network.getEdgeAt(params.pointer.DOM);
