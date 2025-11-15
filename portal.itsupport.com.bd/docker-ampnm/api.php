@@ -70,34 +70,40 @@ try {
     require_once 'includes/auth_check.php'; // This will now only run if the above public action didn't exit.
 
     // Define actions that 'viewer' role can perform (mostly GET requests for viewing)
-    $viewer_allowed_actions = [
+    $viewer_allowed_get_actions = [
         'get_maps', 'get_devices', 'get_edges', 'get_dashboard_data', 'get_ping_history',
         'get_status_logs', 'get_device_details', 'get_device_uptime', 'get_public_map_data',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
         'health',
-        // Removed 'ping_all_devices' from viewer_allowed_actions
-        // Removed 'check_device' from viewer_allowed_actions
-        // Removed 'update_device_status_by_ip' from viewer_allowed_actions
+    ];
+
+    // Define specific POST actions that 'viewer' role can perform
+    $viewer_allowed_post_actions = [
+        'ping_all_devices',
+        'check_device',
+        'update_device_status_by_ip',
     ];
 
     // If user is a 'viewer', restrict actions
     if ($_SESSION['user_role'] === 'viewer') {
-        if (!in_array($action, $viewer_allowed_actions)) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Forbidden: Your role does not permit this action.']);
-            exit;
-        }
-        // Further restrict 'get_devices' and 'get_edges' to only allow mapped devices/edges if map_id is provided
-        if (($action === 'get_devices' || $action === 'get_edges') && !isset($_GET['map_id'])) {
-             http_response_code(403);
-             echo json_encode(['error' => 'Forbidden: Viewers can only access devices/edges within a specific map.']);
-             exit;
-        }
-        // Viewers cannot perform POST requests
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            http_response_code(403);
-            echo json_encode(['error' => 'Forbidden: Viewers cannot perform write operations.']);
-            exit;
+            if (!in_array($action, $viewer_allowed_post_actions)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden: Your role does not permit this write action.']);
+                exit;
+            }
+        } else { // GET request
+            if (!in_array($action, $viewer_allowed_get_actions)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden: Your role does not permit this read action.']);
+                exit;
+            }
+            // Further restrict 'get_devices' and 'get_edges' to only allow mapped devices/edges if map_id is provided
+            if (($action === 'get_devices' || $action === 'get_edges') && !isset($_GET['map_id'])) {
+                 http_response_code(403);
+                 echo json_encode(['error' => 'Forbidden: Viewers can only access devices/edges within a specific map.']);
+                 exit;
+            }
         }
     }
 
