@@ -115,7 +115,9 @@ foreach ($edges as $e) {
         'cat5' => '#a78bfa',
         'fiber' => '#f97316',
         'wifi' => '#38bdf8',
-        'radio' => '#84cc16'
+        'radio' => '#84cc16',
+        'lan' => '#60a5fa', // New LAN color (blue)
+        'logical-tunneling' => '#c084fc' // New Logical Tunneling color (purple)
     ];
     $connection_type = $e['connection_type'] ?? 'cat5';
     $edge_color = $edge_color_map[$connection_type] ?? $edge_color_map['cat5'];
@@ -129,7 +131,7 @@ foreach ($edges as $e) {
         'font' => ['color' => '#ffffff', 'size' => 12, 'align' => 'top', 'strokeWidth' => 0],
         'smooth' => true,
         'width' => 2,
-        'dashes' => ($connection_type === 'wifi' || $connection_type === 'radio') ? [5, 5] : false,
+        'dashes' => ($connection_type === 'wifi' || $connection_type === 'radio' || $connection_type === 'logical-tunneling') ? [5, 5] : false,
     ];
 }
 
@@ -234,7 +236,9 @@ if ($map['background_image_url']) {
             'cloud': '\uf0c2', 'database': '\uf1c0', 'box': '\uf49e'
         };
         const edgeColorMap = {
-            cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16'
+            cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16',
+            lan: '#60a5fa', // New LAN color (blue)
+            'logical-tunneling': '#c084fc' // New Logical Tunneling color (purple)
         };
 
         // JavaScript equivalent of generateFaSvgDataUrl
@@ -287,7 +291,7 @@ if ($map['background_image_url']) {
                     
                     let dashes = false;
                     if (isActive) { dashes = animatedDashes; } 
-                    else if (edge.label === 'wifi' || edge.label === 'radio') { dashes = [5, 5]; }
+                    else if (edge.label === 'wifi' || edge.label === 'radio' || edge.label === 'logical-tunneling') { dashes = [5, 5]; }
                     
                     updates.push({ id: edge.id, color: { color: color }, dashes });
                 });

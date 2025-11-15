@@ -80,7 +80,12 @@ $is_admin = ($user_role === 'admin');
             <form id="edgeForm">
                 <input type="hidden" id="edgeId">
                 <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                    <option value="cat5">CAT5 Cable</option><option value="fiber">Fiber Optic</option><option value="wifi">WiFi</option><option value="radio">Radio</option>
+                    <option value="cat5">CAT5 Cable</option>
+                    <option value="fiber">Fiber Optic</option>
+                    <option value="wifi">WiFi</option>
+                    <option value="radio">Radio</option>
+                    <option value="lan">LAN</option>
+                    <option value="logical-tunneling">Logical Tunneling</option>
                 </select>
                 <div class="flex justify-end gap-4 mt-6">
                     <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>

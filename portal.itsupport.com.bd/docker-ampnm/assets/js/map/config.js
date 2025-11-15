@@ -15,6 +15,8 @@ MapApp.config = {
         offline: '#64748b', unknown: '#94a3b8'
     },
     edgeColorMap: {
-        cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16'
+        cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16',
+        lan: '#60a5fa', // New LAN color (blue)
+        'logical-tunneling': '#c084fc' // New Logical Tunneling color (purple)
     }
 };
