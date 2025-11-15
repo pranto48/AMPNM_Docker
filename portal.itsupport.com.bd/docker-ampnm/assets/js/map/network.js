@@ -63,10 +63,12 @@ MapApp.network = {
                         menuItems += `<div class="context-menu-item" data-action="ping" data-id="${nodeId}"><i class="fas fa-sync fa-fw mr-2"></i>Check Status</div>`;
                     }
                 }
+                console.log('Context menu HTML for node:', menuItems); // Debug log
                 contextMenu.innerHTML = menuItems;
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';
+                console.log('Context menu display style for node:', contextMenu.style.display); // Debug log
                 document.addEventListener('click', closeContextMenu, { once: true });
             } else if (edgeId) {
                 let menuItems = ``;
@@ -78,10 +80,12 @@ MapApp.network = {
                 } else {
                     menuItems += `<div class="context-menu-item text-slate-500">No actions available</div>`;
                 }
+                console.log('Context menu HTML for edge:', menuItems); // Debug log
                 contextMenu.innerHTML = menuItems;
                 contextMenu.style.left = `${params.pointer.DOM.x}px`;
                 contextMenu.style.top = `${params.pointer.DOM.y}px`;
                 contextMenu.style.display = 'block';
+                console.log('Context menu display style for edge:', contextMenu.style.display); // Debug log
                 document.addEventListener('click', closeContextMenu, { once: true });
             } else { 
                 closeContextMenu(); 
