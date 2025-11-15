@@ -38,7 +38,7 @@ $is_admin = ($user_role === 'admin');
                             <span class="ml-2 text-sm">Live Refresh</span>
                         </label>
                         <?php if ($is_admin): ?>
-                            <a href="create-device.php?map_id=<?= htmlspecialchars($map_id ?? '') ?>" id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</a>
+                            <a href="create-device.php" id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</a>
                             <button id="placeDeviceBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-map-pin mr-2"></i>Place Device</button>
                             <button id="addEdgeBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-link mr-2"></i>Add Connection</button>
                             <button id="scanNetworkBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-wifi mr-2"></i>Scan Network</button>
@@ -143,7 +143,10 @@ $is_admin = ($user_role === 'admin');
                 </div>
                 <div>
                     <label for="mapBgImageUrl" class="block text-sm font-medium text-slate-400 mb-1">Background Image URL</label>
-                    <input type="text" id="mapBgImageUrl" name="background_image_url" placeholder="Leave blank for no image" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="mapBgImageUrl" name="background_image_url" placeholder="Leave blank for no image" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                        <button type="button" id="clearMapBgImageUrlBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"><i class="fas fa-times"></i></button>
+                    </div>
                 </div>
                 <div class="text-center text-slate-500 text-sm">OR</div>
                 <div>
@@ -173,7 +176,7 @@ $is_admin = ($user_role === 'admin');
                     <button type="button" id="resetMapBgBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><i class="fas fa-undo mr-2"></i>Reset to Default</button>
                     <div class="flex gap-2">
                         <button type="button" id="cancelMapSettingsBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
+                        <button type="submit" id="saveMapSettingsBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
                     </div>
                 </div>
             </form>

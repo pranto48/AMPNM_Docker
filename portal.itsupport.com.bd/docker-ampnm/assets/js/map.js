@@ -62,6 +62,13 @@ MapApp.ui = {
             inputModalConfirmBtn: document.getElementById('inputModalConfirmBtn'),
             // Add Device button on map page
             addDeviceBtn: document.getElementById('addDeviceBtn'),
+            // Map Settings specific elements
+            mapBgColor: document.getElementById('mapBgColor'),
+            mapBgColorHex: document.getElementById('mapBgColorHex'),
+            mapBgImageUrl: document.getElementById('mapBgImageUrl'),
+            clearMapBgImageUrlBtn: document.getElementById('clearMapBgImageUrlBtn'),
+            mapBgUploadLoader: document.getElementById('mapBgUploadLoader'),
+            saveMapSettingsBtn: document.getElementById('saveMapSettingsBtn'),
         };
     },
 
@@ -355,8 +362,7 @@ function initMap() {
             downloadAnchorNode.setAttribute("download", `${mapName.replace(/\s+/g, '_')}_export.json`);
             document.body.appendChild(downloadAnchorNode);
             downloadAnchorNode.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadAnchorNode.remove();
             window.notyf.success('Map exported successfully.');
         });
 
@@ -589,11 +595,29 @@ function initMap() {
             }
         });
         els.cancelMapSettingsBtn.addEventListener('click', () => closeModal('mapSettingsModal'));
+        
+        // Sync color picker and hex input
         els.mapBgColor.addEventListener('input', (e) => {
             els.mapBgColorHex.value = e.target.value;
+            els.mapBgImageUrl.value = ''; // Clear image URL if color is set
         });
         els.mapBgColorHex.addEventListener('input', (e) => {
             els.mapBgColor.value = e.target.value;
+            els.mapBgImageUrl.value = ''; // Clear image URL if color is set
+        });
+
+        // Clear color inputs if image URL is entered
+        els.mapBgImageUrl.addEventListener('input', (e) => {
+            if (e.target.value !== '') {
+                els.mapBgColor.value = '#1e293b'; // Reset to default dark color
+                els.mapBgColorHex.value = '#1e293b';
+            }
+        });
+
+        // Clear image URL button
+        els.clearMapBgImageUrlBtn.addEventListener('click', () => {
+            els.mapBgImageUrl.value = '';
+            window.notyf.info('Background image URL cleared. Click Save to apply.');
         });
 
         els.publicViewToggle.addEventListener('change', () => {
@@ -615,9 +639,12 @@ function initMap() {
 
         els.mapSettingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            els.saveMapSettingsBtn.disabled = true;
+            els.saveMapSettingsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
             const updates = {
-                background_color: els.mapBgColorHex.value,
-                background_image_url: els.mapBgImageUrl.value,
+                background_color: els.mapBgColorHex.value === '#1e293b' && els.mapBgImageUrl.value === '' ? null : els.mapBgColorHex.value, // Only save color if no image and not default
+                background_image_url: els.mapBgImageUrl.value === '' ? null : els.mapBgImageUrl.value,
                 public_view_enabled: els.publicViewToggle.checked
             };
             try {
@@ -629,10 +656,13 @@ function initMap() {
             } catch (error) {
                 console.error("Failed to save map settings:", error);
                 window.notyf.error(error.message || "Could not save map settings.");
+            } finally {
+                els.saveMapSettingsBtn.disabled = false;
+                els.saveMapSettingsBtn.innerHTML = 'Save Changes';
             }
         });
         els.resetMapBgBtn.addEventListener('click', async () => {
-            const confirmed = await MapApp.ui.showConfirm("Reset Map Background", "Are you sure you want to reset the map background and disable public view? This action cannot be undone.", "Reset");
+            const confirmed = await MapApp.ui.showConfirm("Reset Map Background & Public View", "Are you sure you want to reset the map background to default (dark blue) and disable public view? This action cannot be undone.", "Reset");
             if (!confirmed) return;
 
             try {
@@ -660,6 +690,8 @@ function initMap() {
                 const result = await res.json();
                 if (result.success) {
                     els.mapBgImageUrl.value = result.url;
+                    els.mapBgColor.value = '#1e293b'; // Reset color if image is uploaded
+                    els.mapBgColorHex.value = '#1e293b';
                     window.notyf.success('Image uploaded. Click Save to apply.');
                 } else { throw new Error(result.error); }
             } catch (error) {
@@ -678,7 +710,7 @@ function initMap() {
             window.notyf.error('No map selected to share.');
             return;
         }
-        const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${state.currentMapId}`;
+        const shareUrl = `${window.location.origin}/public_map.php?map_id=${state.currentMapId}`;
         try {
             await navigator.clipboard.writeText(shareUrl);
             window.notyf.success('Share link copied to clipboard!');
