@@ -38,7 +38,7 @@ $is_admin = ($user_role === 'admin');
                             <span class="ml-2 text-sm">Live Refresh</span>
                         </label>
                         <?php if ($is_admin): ?>
-                            <a href="create-device.php" id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</a>
+                            <a href="create-device.php?map_id=<?= htmlspecialchars($map_id ?? '') ?>" id="addDeviceBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>Add Device</a>
                             <button id="placeDeviceBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-map-pin mr-2"></i>Place Device</button>
                             <button id="addEdgeBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-link mr-2"></i>Add Connection</button>
                             <button id="scanNetworkBtn" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500"><i class="fas fa-wifi mr-2"></i>Scan Network</button>
