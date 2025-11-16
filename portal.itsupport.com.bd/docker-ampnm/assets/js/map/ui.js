@@ -70,7 +70,13 @@ MapApp.ui = {
             return;
         }
         const edge = MapApp.state.edges.get(edgeId);
-        console.log('Opening Edge Editor for edge ID:', edgeId, 'with data:', edge); // Added console.log
+        console.log('openEdgeModal called with edge ID:', edgeId); // New log
+        console.log('Retrieved edge object:', edge); // New log
+        if (!edge) {
+            console.error('Error: Edge object not found for ID:', edgeId);
+            window.notyf.error('Error: Connection data not found.');
+            return;
+        }
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || ''; // Changed default to empty string
         MapApp.ui.els.edgeModal.classList.remove('hidden');

@@ -67,6 +67,7 @@ MapApp.network = {
                 contextMenu.style.display = 'block';
                 document.addEventListener('click', closeContextMenu, { once: true });
             } else if (edgeId) {
+                console.log("Context menu opened for edge. Edge ID:", edgeId); // Added console.log
                 let menuItems = ``;
                 if (window.userRole === 'admin') {
                     menuItems += `
