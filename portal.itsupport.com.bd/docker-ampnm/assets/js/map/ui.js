@@ -69,16 +69,17 @@ MapApp.ui = {
             window.notyf.error('You do not have permission to edit connections.');
             return;
         }
-        const edge = MapApp.state.edges.get(edgeId);
-        console.log('openEdgeModal called with edge ID:', edgeId); // New log
-        console.log('Retrieved edge object:', edge); // New log
+        // Explicitly cast edgeId to a Number to ensure type consistency
+        const edge = MapApp.state.edges.get(Number(edgeId));
+        console.log('openEdgeModal called with edge ID:', edgeId);
+        console.log('Retrieved edge object:', edge);
         if (!edge) {
             console.error('Error: Edge object not found for ID:', edgeId);
             window.notyf.error('Error: Connection data not found.');
             return;
         }
         document.getElementById('edgeId').value = edge.id;
-        document.getElementById('connectionType').value = edge.connection_type || ''; // Changed default to empty string
+        document.getElementById('connectionType').value = edge.connection_type || '';
         MapApp.ui.els.edgeModal.classList.remove('hidden');
     },
 

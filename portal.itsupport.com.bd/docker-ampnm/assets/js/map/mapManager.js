@@ -119,8 +119,10 @@ MapApp.mapManager = {
         MapApp.state.nodes.add(visNodes);
 
         const visEdges = edgeData.map(e => ({ id: e.id, from: e.source_id, to: e.target_id, connection_type: e.connection_type, label: e.connection_type }));
+        console.log('visEdges array before adding to dataset:', visEdges); // Added log
         MapApp.state.edges.clear(); 
         MapApp.state.edges.add(visEdges);
+        console.log('Edges in dataset after load:', MapApp.state.edges.get()); // Added log
         
         MapApp.deviceManager.setupAutoPing(deviceData);
         if (!MapApp.state.network) MapApp.network.initializeMap();
