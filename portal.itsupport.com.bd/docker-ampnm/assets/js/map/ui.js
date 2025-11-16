@@ -80,7 +80,7 @@ MapApp.ui = {
         }
         document.getElementById('edgeId').value = edge.id;
         document.getElementById('connectionType').value = edge.connection_type || '';
-        MapApp.ui.els.edgeModal.classList.remove('hidden');
+        openModal('edgeModal'); // Call the shared openModal function
     },
 
     updateAndAnimateEdges: () => {
