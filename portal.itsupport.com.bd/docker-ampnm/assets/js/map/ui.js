@@ -70,8 +70,9 @@ MapApp.ui = {
             return;
         }
         const edge = MapApp.state.edges.get(edgeId);
+        console.log('Opening Edge Editor for edge ID:', edgeId, 'with data:', edge); // Added console.log
         document.getElementById('edgeId').value = edge.id;
-        document.getElementById('connectionType').value = edge.connection_type || 'cat5';
+        document.getElementById('connectionType').value = edge.connection_type || ''; // Changed default to empty string
         MapApp.ui.els.edgeModal.classList.remove('hidden');
     },
 
@@ -90,7 +91,7 @@ MapApp.ui = {
                 const color = isOffline ? MapApp.config.statusColorMap.offline : (MapApp.config.edgeColorMap[edge.connection_type] || MapApp.config.edgeColorMap.cat5);
                 let dashes = false;
                 if (isActive) { dashes = animatedDashes; } 
-                else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio') { dashes = [5, 5]; }
+                else if (edge.connection_type === 'wifi' || edge.connection_type === 'radio' || edge.connection_type === 'logical-tunneling') { dashes = [5, 5]; }
                 updates.push({ id: edge.id, color, dashes });
             });
         }

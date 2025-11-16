@@ -80,6 +80,7 @@ $is_admin = ($user_role === 'admin');
             <form id="edgeForm">
                 <input type="hidden" id="edgeId">
                 <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                    <option value="" disabled selected>Select a connection type</option>
                     <option value="cat5">CAT5 Cable</option>
                     <option value="fiber">Fiber Optic</option>
                     <option value="wifi">WiFi</option>
