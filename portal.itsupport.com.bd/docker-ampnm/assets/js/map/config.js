@@ -2,7 +2,7 @@ window.MapApp = window.MapApp || {};
 
 MapApp.config = {
     API_URL: 'api.php',
-    REFRESH_INTERVAL_SECONDS: 1, // Set to 1 for live updates
+    REFRESH_INTERVAL_SECONDS: 10, // Changed from 1 to 10 seconds for less aggressive refreshing
     iconMap: {
         server: '\uf233', router: '\uf4d7', switch: '\uf796', printer: '\uf02f', nas: '\uf0a0',
         camera: '\uf030', other: '\uf108', firewall: '\uf3ed', ipphone: '\uf87d',

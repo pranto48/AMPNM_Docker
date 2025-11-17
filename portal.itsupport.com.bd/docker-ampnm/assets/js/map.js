@@ -108,20 +108,28 @@ function initMap() {
     els.refreshStatusBtn.addEventListener('click', async () => {
         els.refreshStatusBtn.disabled = true;
         await deviceManager.performBulkRefresh();
+        // Only re-enable if live refresh is NOT active
         if (!els.liveRefreshToggle.checked) els.refreshStatusBtn.disabled = false;
     });
 
     // Live Refresh toggle logic (now for all roles)
     els.liveRefreshToggle.addEventListener('change', (e) => {
+        if (window.userRole !== 'admin') {
+            // This should ideally be disabled in PHP, but as a fallback
+            e.target.checked = false;
+            window.notyf.error('You do not have permission to enable live status.');
+            return;
+        }
+
         if (e.target.checked) {
             window.notyf.info(`Live status enabled. Updating every ${MapApp.config.REFRESH_INTERVAL_SECONDS} seconds.`);
-            els.refreshStatusBtn.disabled = true;
-            deviceManager.performBulkRefresh();
+            els.refreshStatusBtn.disabled = true; // Disable manual refresh when live is on
+            deviceManager.performBulkRefresh(); // Initial refresh
             state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
         } else {
             if (state.globalRefreshIntervalId) clearInterval(state.globalRefreshIntervalId);
             state.globalRefreshIntervalId = null;
-            els.refreshStatusBtn.disabled = false;
+            els.refreshStatusBtn.disabled = false; // Re-enable manual refresh when live is off
             window.notyf.info('Live status disabled.');
         }
     });
@@ -307,7 +315,7 @@ function initMap() {
                     // Add the device to the map visually
                     const baseNode = {
                         id: updatedDevice.id, label: updatedDevice.name, title: MapApp.utils.buildNodeTitle(updatedDevice),
-                        x: updatedDevice.x, y: updatedUpdatedDevice.y, // Corrected variable name
+                        x: updatedDevice.x, y: updatedDevice.y, // Corrected variable name
                         font: { color: 'white', size: parseInt(updatedDevice.name_text_size) || 14, multi: true },
                         deviceData: updatedDevice
                     };
@@ -450,16 +458,17 @@ function initMap() {
 
     // Initial Load
     (async () => {
-        // Set live refresh to ON by default for viewers
+        // For viewers, disable live refresh and enable manual refresh
         if (window.userRole === 'viewer') {
-            els.liveRefreshToggle.checked = true;
-            els.liveRefreshToggle.disabled = true; // Disable toggle for viewers
-            els.refreshStatusBtn.disabled = true; // Disable manual refresh button for viewers when live is on
-            deviceManager.performBulkRefresh(); // Initial refresh
-            state.globalRefreshIntervalId = setInterval(deviceManager.performBulkRefresh, MapApp.config.REFRESH_INTERVAL_SECONDS * 1000);
-        } else {
+            els.liveRefreshToggle.checked = false; // Ensure it's off
+            els.liveRefreshToggle.disabled = true; // Keep it disabled
+            els.refreshStatusBtn.disabled = false; // Enable manual refresh
+            // Crucially, DO NOT start the global refresh interval for viewers
+            window.notyf.info('Live status is off by default for viewers. Use the refresh button to update.');
+        } else { // Admin role
             els.liveRefreshToggle.checked = false; // Default off for admin
             els.liveRefreshToggle.disabled = false; // Enable toggle for admin
+            els.refreshStatusBtn.disabled = false; // Enable manual refresh for admin
         }
 
         const urlParams = new URLSearchParams(window.location.search);

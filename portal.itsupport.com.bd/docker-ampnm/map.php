@@ -28,16 +28,16 @@ $is_admin = ($user_role === 'admin');
                     <h2 id="currentMapName" class="text-xl font-semibold text-white"></h2>
                     <div class="flex items-center gap-2">
                         <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-search"></i></button>
-                        <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
+                        <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses" <?= $is_admin ? '' : '' ?>><i class="fas fa-sync-alt"></i></button>
                         
                         <div class="flex items-center space-x-2 pl-2 ml-2 border-l border-slate-700">
                             <label for="liveRefreshToggle" class="text-sm text-slate-400 select-none cursor-pointer">Live Status</label>
                             <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="liveRefreshToggle" class="sr-only peer" <?= $is_admin ? '' : 'disabled checked' ?>>
+                                <input type="checkbox" id="liveRefreshToggle" class="sr-only peer" <?= $is_admin ? '' : 'disabled' ?>>
                                 <div class="w-11 h-6 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
                             </label>
                             <?php if (!$is_admin): ?>
-                                <span class="text-xs text-slate-500">(Always On)</span>
+                                <span class="text-xs text-slate-500">(Off by default)</span>
                             <?php endif; ?>
                         </div>
 

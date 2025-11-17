@@ -14,20 +14,22 @@ MapApp.deviceManager = {
             const newStatus = result.status;
 
             if (newStatus !== oldStatus) {
-                if (newStatus === 'warning') {
-                    SoundManager.play('warning');
-                } else if (newStatus === 'critical') {
-                    SoundManager.play('critical');
-                } else if (newStatus === 'offline') {
-                    SoundManager.play('offline');
-                } else if (newStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
-                    SoundManager.play('online');
-                }
+                if (window.userRole === 'admin') { // Only show notifications for admin
+                    if (newStatus === 'warning') {
+                        SoundManager.play('warning');
+                    } else if (newStatus === 'critical') {
+                        SoundManager.play('critical');
+                    } else if (newStatus === 'offline') {
+                        SoundManager.play('offline');
+                    } else if (newStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
+                        SoundManager.play('online');
+                    }
 
-                if (newStatus === 'critical' || newStatus === 'offline') {
-                    window.notyf.error({ message: `Device '${node.deviceData.name}' is now ${newStatus}.`, duration: 5000, dismissible: true });
-                } else if (newStatus === 'online' && (oldStatus === 'critical' || oldStatus === 'offline')) {
-                    window.notyf.success({ message: `Device '${node.deviceData.name}' is back online.`, duration: 5000 });
+                    if (newStatus === 'critical' || newStatus === 'offline') {
+                        window.notyf.error({ message: `Device '${node.deviceData.name}' is now ${newStatus}.`, duration: 5000, dismissible: true });
+                    } else if (newStatus === 'online' && (oldStatus === 'critical' || oldStatus === 'offline')) {
+                        window.notyf.success({ message: `Device '${node.deviceData.name}' is back online.`, duration: 5000 });
+                    }
                 }
             }
 
@@ -40,7 +42,9 @@ MapApp.deviceManager = {
             MapApp.state.nodes.update({ id: deviceId, deviceData: updatedDeviceData, icon: { ...node.icon, color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown }, title: MapApp.utils.buildNodeTitle(updatedDeviceData), label: label });
         } catch (error) {
             console.error("Failed to ping device:", error);
-            window.notyf.error(error.message || "Failed to ping device.");
+            if (window.userRole === 'admin') { // Only show error notifications for admin
+                window.notyf.error(error.message || "Failed to ping device.");
+            }
             // Revert to old status or mark as unknown if ping fails
             MapApp.state.nodes.update({ id: deviceId, icon: { ...node.icon, color: MapApp.config.statusColorMap[oldStatus] || MapApp.config.statusColorMap.unknown } });
         }
@@ -67,23 +71,25 @@ MapApp.deviceManager = {
 
                 if (device.old_status !== device.status) {
                     statusChanges++;
-                    if (device.status === 'warning') {
-                        SoundManager.play('warning');
-                    } else if (device.status === 'critical') {
-                        SoundManager.play('critical');
-                    } else if (device.status === 'offline') {
-                        SoundManager.play('offline');
-                    } else if (device.status === 'online' && (device.old_status === 'offline' || device.old_status === 'critical' || device.old_status === 'warning')) {
-                        SoundManager.play('online');
-                    }
-                    
-                    if (device.status === 'critical' || device.status === 'offline') {
-                        window.notyf.error({ message: `Device '${device.name}' is now ${device.status}.`, duration: 5000, dismissible: true });
-                    } else if (device.status === 'online' && (device.old_status === 'critical' || device.old_status === 'offline')) {
-                        window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
-                    } else {
-                        // Show info toast for all status changes for all roles
-                        window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
+                    if (window.userRole === 'admin') { // Only show notifications for admin
+                        if (device.status === 'warning') {
+                            SoundManager.play('warning');
+                        } else if (device.status === 'critical') {
+                            SoundManager.play('critical');
+                        } else if (device.status === 'offline') {
+                            SoundManager.play('offline');
+                        } else if (device.status === 'online' && (device.old_status === 'offline' || device.old_status === 'critical' || device.old_status === 'warning')) {
+                            SoundManager.play('online');
+                        }
+                        
+                        if (device.status === 'critical' || device.status === 'offline') {
+                            window.notyf.error({ message: `Device '${device.name}' is now ${device.status}.`, duration: 5000, dismissible: true });
+                        } else if (device.status === 'online' && (device.old_status === 'critical' || device.old_status === 'offline')) {
+                            window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
+                        } else {
+                            // Show info toast for all status changes for admin
+                            window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
+                        }
                     }
                 }
 
@@ -106,7 +112,7 @@ MapApp.deviceManager = {
                 MapApp.state.nodes.update(nodeUpdates);
             }
 
-            // Only show "All device statuses are stable" message for admin, not for viewers
+            // Only show "All device statuses are stable" message for admin
             if (statusChanges === 0 && result.updated_devices.length > 0 && window.userRole === 'admin') {
                 window.notyf.success({ message: 'All device statuses are stable.', duration: 2000 });
             }
@@ -115,7 +121,9 @@ MapApp.deviceManager = {
 
         } catch (error) {
             console.error("An error occurred during the bulk refresh process:", error);
-            window.notyf.error(error.message || "Failed to refresh device statuses.");
+            if (window.userRole === 'admin') { // Only show error notifications for admin
+                window.notyf.error(error.message || "Failed to refresh device statuses.");
+            }
             return 0;
         } finally {
             icon.classList.remove('fa-spin');
@@ -125,11 +133,13 @@ MapApp.deviceManager = {
     setupAutoPing: (devices) => {
         Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
         MapApp.state.pingIntervals = {};
-        // Enable auto-ping functionality for all roles
-        devices.forEach(device => {
-            if (device.ping_interval > 0 && device.ip) {
-                MapApp.state.pingIntervals[device.id] = setInterval(() => MapApp.deviceManager.pingSingleDevice(device.id), device.ping_interval * 1000);
-            }
-        });
+        // Only enable auto-ping functionality for admin role
+        if (window.userRole === 'admin') {
+            devices.forEach(device => {
+                if (device.ping_interval > 0 && device.ip) {
+                    MapApp.state.pingIntervals[device.id] = setInterval(() => MapApp.deviceManager.pingSingleDevice(device.id), device.ping_interval * 1000);
+                }
+            });
+        }
     }
 };
