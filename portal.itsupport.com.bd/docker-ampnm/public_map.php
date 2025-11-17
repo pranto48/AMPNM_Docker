@@ -8,15 +8,15 @@ if (!$map_id) {
 }
 
 // Construct the full HTTP URL for the API endpoint
-// Using localhost for internal server-side calls within the Docker container
-$api_url = "http://localhost:2266/api.php?action=get_public_map_data&map_id=" . urlencode($map_id);
+// Using 127.0.0.1 for internal server-side calls within the Docker container for reliability
+$api_url = "http://127.0.0.1:2266/api.php?action=get_public_map_data&map_id=" . urlencode($map_id);
 
 // Fetch map data using the public API endpoint
 $response = @file_get_contents($api_url); // Suppress warnings for file_get_contents
 
 if ($response === false) {
     $error = error_get_last();
-    die("Error loading map data from API: " . ($error['message'] ?? "Unknown error. Ensure the Docker app is running and accessible at http://localhost:2266 from within the container."));
+    die("Error loading map data from API: " . ($error['message'] ?? "Unknown error. Ensure the Docker app is running and accessible at http://127.0.0.1:2266 from within the container."));
 }
 
 $data = json_decode($response, true);
@@ -205,13 +205,6 @@ if ($map['background_image_url']) {
         </div>
     </header>
 
-    <!-- Temporary Font Awesome Test Element -->
-    <div style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: white; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-        <i class="fas fa-check-circle" style="font-size: 20px; color: green;"></i>
-        <span style="font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 20px; color: black;">&#xf233;</span>
-        <span style="margin-left: 5px; color: black; font-size: 12px;">FA Test</span>
-    </div>
-
     <div id="network-map-container"></div>
 
     <div id="status-legend">
@@ -232,26 +225,14 @@ if ($map['background_image_url']) {
             server: '\uf233', router: '\uf4d7', switch: '\uf796', printer: '\uf02f', nas: '\uf0a0',
             camera: '\uf030', other: '\uf108', firewall: '\uf3ed', ipphone: '\uf87d',
             punchdevice: '\uf2c2', 'wifi-router': '\uf1eb', 'radio-tower': '\uf519',
-            rack: '\uf1b3', 'laptop': '\uf109', 'tablet': '\uf3fa', 'mobile': '\uf3cd',
-            'cloud': '\uf0c2', 'database': '\uf1c0', 'box': '\uf49e'
+            rack: '\uf1b3', laptop: '\uf109', tablet: '\uf3fa', mobile: '\uf3cd',
+            cloud: '\uf0c2', database: '\uf1c0', box: '\uf49e'
         };
         const edgeColorMap = {
             cat5: '#a78bfa', fiber: '#f97316', wifi: '#38bdf8', radio: '#84cc16',
             lan: '#60a5fa', // New LAN color (blue)
             'logical-tunneling': '#c084fc' // New Logical Tunneling color (purple)
         };
-
-        // JavaScript equivalent of generateFaSvgDataUrl
-        function generateFaSvgDataUrlJs(iconCode, size, color) {
-            const fontFamily = 'Font Awesome 6 Free';
-            const fontWeight = '900'; // Solid icons
-            const svg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-                    <text x="50%" y="50%" style="font-family: '${fontFamily}'; font-weight: ${fontWeight}; font-size: ${size}px; fill: ${color}; text-anchor: middle; dominant-baseline: central;">${iconCode}</text>
-                </svg>
-            `;
-            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-        }
 
         // Utility to build node title (copy from MapApp.utils.buildNodeTitle)
         function buildNodeTitle(deviceData) {
@@ -303,7 +284,7 @@ if ($map['background_image_url']) {
         async function updateMapLive(nodesDataSet, edgesDataSet) {
             console.log("Fetching live map data...");
             const mapId = <?= json_encode($map_id) ?>;
-            const apiUrl = `http://localhost:2266/api.php?action=get_public_map_data&map_id=${mapId}`; // Changed to localhost
+            const apiUrl = `http://127.0.0.1:2266/api.php?action=get_public_map_data&map_id=${mapId}`; // Changed to 127.0.0.1
 
             try {
                 const response = await fetch(apiUrl);
@@ -350,7 +331,6 @@ if ($map['background_image_url']) {
                                 color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                             });
                         } else {
-                            // Use the new JavaScript function to generate SVG data URL
                             Object.assign(updatedNode, {
                                 shape: 'icon', // Changed to 'icon'
                                 icon: { // Added icon object
