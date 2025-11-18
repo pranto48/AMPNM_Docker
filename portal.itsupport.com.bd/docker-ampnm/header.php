@@ -57,6 +57,7 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
                             <a href="status_logs.php" class="nav-link"><i class="fas fa-clipboard-list fa-fw mr-2"></i>Status Logs</a>
                             <a href="email_notifications.php" class="nav-link"><i class="fas fa-envelope fa-fw mr-2"></i>Email Notifications</a>
                             <a href="users.php" class="nav-link"><i class="fas fa-users-cog fa-fw mr-2"></i>Users</a>
+                            <a href="license_management.php" class="nav-link"><i class="fas fa-id-card fa-fw mr-2"></i>License</a>
                         <?php endif; ?>
                         <a href="logout.php" class="nav-link"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Logout</a>
                     </div>
@@ -65,20 +66,23 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         </div>
     </nav>
     <div class="page-content">
-    <?php if (isset($_SESSION['license_status'])): ?>
+    <?php if (isset($_SESSION['license_status_code'])): ?>
         <?php
-            $license_status = $_SESSION['license_status'];
+            $license_status_code = $_SESSION['license_status_code'];
             $license_message = $_SESSION['license_message'];
             $max_devices = $_SESSION['license_max_devices'];
             $current_devices = $_SESSION['current_device_count'];
             $expires_at = $_SESSION['license_expires_at'];
+            $grace_period_end = $_SESSION['license_grace_period_end'];
 
             $status_class = '';
             $status_icon = '';
             $display_message = '';
+            $show_manage_link = true;
 
-            switch ($license_status) {
+            switch ($license_status_code) {
                 case 'active':
+                case 'free':
                     $status_class = 'bg-green-500/20 text-green-400 border-green-500/30';
                     $status_icon = '<i class="fas fa-check-circle mr-1"></i>';
                     $display_message = "License Active ({$current_devices}/{$max_devices} devices)";
@@ -86,33 +90,28 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
                         $display_message .= " - Expires: " . date('Y-m-d', strtotime($expires_at));
                     }
                     break;
-                case 'free': // Assuming 'free' is also a valid active status
-                    $status_class = 'bg-green-500/20 text-green-400 border-green-500/30';
-                    $status_icon = '<i class="fas fa-check-circle mr-1"></i>';
-                    $display_message = "Free License Active ({$current_devices}/{$max_devices} devices)";
-                    if ($expires_at) {
-                        $display_message .= " - Expires: " . date('Y-m-d', strtotime($expires_at));
-                    }
-                    break;
-                case 'expired':
-                    $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
+                case 'grace_period':
+                    $status_class = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
                     $status_icon = '<i class="fas fa-exclamation-triangle mr-1"></i>';
-                    $display_message = "License Expired! ({$license_message})";
+                    $display_message = "License Expired! Grace period until " . date('Y-m-d', $grace_period_end) . ".";
                     break;
+                case 'expired': // Should be caught by grace_period or disabled
                 case 'revoked':
+                case 'in_use':
+                case 'disabled':
                     $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
                     $status_icon = '<i class="fas fa-ban mr-1"></i>';
-                    $display_message = "License Revoked! ({$license_message})";
-                    break;
-                case 'in_use':
-                    $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
-                    $status_icon = '<i class="fas fa-server mr-1"></i>';
-                    $display_message = "License in use by another server! ({$license_message})";
+                    $display_message = "License Disabled! ({$license_message})";
                     break;
                 case 'unconfigured':
                     $status_class = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
                     $status_icon = '<i class="fas fa-exclamation-circle mr-1"></i>';
                     $display_message = "License Unconfigured! Please set up your license key.";
+                    break;
+                case 'portal_unreachable':
+                    $status_class = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+                    $status_icon = '<i class="fas fa-cloud-offline mr-1"></i>';
+                    $display_message = "License Portal Unreachable! ({$license_message})";
                     break;
                 case 'invalid':
                 case 'not_found':
@@ -127,8 +126,8 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         <div class="container mx-auto px-4 mt-4">
             <div class="p-3 rounded-lg text-sm flex items-center justify-between <?= $status_class ?>">
                 <div><?= $status_icon ?> <?= htmlspecialchars($display_message) ?></div>
-                <?php if ($license_status !== 'active' && $license_status !== 'free'): ?>
-                    <a href="license_setup_page.php" class="text-cyan-400 hover:underline ml-4">Manage License</a>
+                <?php if ($show_manage_link && $user_role === 'admin'): ?>
+                    <a href="license_management.php" class="text-cyan-400 hover:underline ml-4">Manage License</a>
                 <?php endif; ?>
             </div>
         </div>

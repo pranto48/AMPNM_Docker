@@ -4,8 +4,8 @@ require_once __DIR__ . '/includes/license_manager.php'; // Load license manager 
 
 $message = '';
 
-// If a license key is already set, redirect to index
-if (getAppLicenseKey()) {
+// If a license key is already set AND active/grace_period, redirect to index
+if (getAppSetting('app_license_key') && ($_SESSION['license_status_code'] === 'active' || $_SESSION['license_status_code'] === 'grace_period')) {
     header('Location: index.php');
     exit;
 }
@@ -62,6 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // License is valid, save it to app_settings
                     if (setAppLicenseKey($entered_license_key)) {
                         error_log("DEBUG: license_setup.php successfully saved license key: " . $entered_license_key);
+                        // Force re-verification to update session variables
+                        verifyLicenseWithPortal();
                         $message = '<div class="bg-green-500/20 border border-green-500/30 text-green-300 text-sm rounded-lg p-3 text-center">License key saved successfully! Redirecting...</div>';
                         header('Refresh: 3; url=index.php'); // Redirect to index after 3 seconds
                         exit;
@@ -101,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="license_key" class="block text-sm font-medium text-slate-300 mb-2">License Key</label>
                 <input type="text" name="license_key" id="license_key" required
                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
-                       placeholder="XXXX-XXXX-XXXX-XXXX">
+                       placeholder="XXXX-XXXX-XXXX-XXXX" value="<?= htmlspecialchars(getAppSetting('app_license_key') ?? '') ?>">
             </div>
             <button type="submit"
                     class="w-full px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none">

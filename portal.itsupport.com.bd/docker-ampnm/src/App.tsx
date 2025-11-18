@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AddDevicePage from "./pages/AddDevicePage";
 import EditDevicePage from "./pages/EditDevicePage";
+import LicenseManagementPage from "./pages/LicenseManagementPage"; // Import new page
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/add-device" element={<AddDevicePage />} />
           <Route path="/edit-device/:id" element={<EditDevicePage />} />
+          <Route path="/license-management" element={<LicenseManagementPage />} /> {/* New route */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

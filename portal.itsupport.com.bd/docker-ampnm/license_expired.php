@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/license_manager.php'; // Ensure license manager is loaded
 
-// If license is somehow active, redirect to index
-if (isset($_SESSION['license_status_code']) && $_SESSION['license_status_code'] === 'active') {
+// If license is somehow active or in grace period, redirect to index
+if (isset($_SESSION['license_status_code']) && ($_SESSION['license_status_code'] === 'active' || $_SESSION['license_status_code'] === 'grace_period')) {
     header('Location: index.php');
     exit;
 }
@@ -12,7 +13,7 @@ if (isset($_SESSION['license_status_code']) && $_SESSION['license_status_code'] 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>License Expired - AMPNM</title>
+    <title>License Disabled - AMPNM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
@@ -21,12 +22,12 @@ if (isset($_SESSION['license_status_code']) && $_SESSION['license_status_code'] 
     <div class="w-full max-w-md">
         <div class="text-center mb-8">
             <i class="fas fa-exclamation-triangle text-red-500 text-6xl"></i>
-            <h1 class="text-3xl font-bold text-white mt-4">License Expired</h1>
-            <p class="text-slate-400 mt-2">Your AMPNM application license has expired.</p>
+            <h1 class="text-3xl font-bold text-white mt-4">License Disabled</h1>
+            <p class="text-slate-400 mt-2">Your AMPNM application license is no longer active.</p>
         </div>
         <div class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-xl p-8 space-y-6 text-center">
             <p class="text-red-300 text-lg">
-                <?= htmlspecialchars($_SESSION['license_message'] ?? 'Your license has expired and the grace period has ended. The application is now disabled.') ?>
+                <?= htmlspecialchars($_SESSION['license_message'] ?? 'Your license has been disabled. The application is now non-functional.') ?>
             </p>
             <p class="text-slate-300">
                 Please contact IT Support BD to renew your license or purchase a new one.
