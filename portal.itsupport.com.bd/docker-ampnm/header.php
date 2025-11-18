@@ -69,7 +69,11 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
     <div class="page-content">
     <?php 
     // Only show license status if it's not 'unconfigured' OR if we are on the license_management.php page
-    if (isset($_SESSION['license_status_code']) && ($_SESSION['license_status_code'] !== 'unconfigured' || $current_page === 'license_management.php')): 
+    // Additionally, for 'active' and 'free' licenses, only show on license_management.php
+    if (isset($_SESSION['license_status_code']) && 
+        ($_SESSION['license_status_code'] !== 'unconfigured' || $current_page === 'license_management.php') &&
+        (($_SESSION['license_status_code'] !== 'active' && $_SESSION['license_status_code'] !== 'free') || $current_page === 'license_management.php')
+    ): 
         $license_status_code = $_SESSION['license_status_code'];
         $license_message = $_SESSION['license_message'];
         $max_devices = $_SESSION['license_max_devices'];
