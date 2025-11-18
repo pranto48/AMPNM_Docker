@@ -24,13 +24,29 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
-                    <a href="index.php" class="flex items-center gap-2 text-white font-bold">
+                    <!-- Mobile menu button -->
+                    <button id="mobile-menu-button" class="md:hidden p-2 text-slate-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                        <i class="fas fa-bars h-6 w-6"></i>
+                    </button>
+                    <a href="index.php" class="flex items-center gap-2 text-white font-bold ml-3 md:ml-0">
                         <i class="fas fa-shield-halved text-cyan-400 text-2xl"></i>
                         <span>AMPNM</span>
                     </a>
                 </div>
-                <div class="hidden md:block">
-                    <div id="main-nav" class="ml-10 flex items-baseline space-x-1">
+                
+                <!-- Mobile Sidebar / Desktop Navigation -->
+                <div id="main-nav-wrapper" class="fixed inset-y-0 left-0 w-64 bg-slate-800/95 backdrop-blur-lg z-50 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:w-auto md:bg-transparent md:backdrop-blur-none md:transform-none md:transition-none md:flex md:items-center">
+                    <!-- Close button for mobile sidebar -->
+                    <div class="flex items-center justify-between p-4 border-b border-slate-700 md:hidden">
+                        <a href="index.php" class="flex items-center gap-2 text-white font-bold">
+                            <i class="fas fa-shield-halved text-cyan-400 text-2xl"></i>
+                            <span>AMPNM</span>
+                        </a>
+                        <button id="close-mobile-menu-button" class="p-2 text-slate-300 hover:text-white focus:outline-none">
+                            <i class="fas fa-times h-6 w-6"></i>
+                        </button>
+                    </div>
+                    <div id="main-nav" class="flex flex-col p-4 space-y-1 md:flex-row md:p-0 md:space-y-0 md:space-x-1 md:ml-10">
                         <a href="index.php" class="nav-link"><i class="fas fa-tachometer-alt fa-fw mr-2"></i>Dashboard</a>
                         <?php if ($user_role === 'admin'): ?>
                             <a href="devices.php" class="nav-link"><i class="fas fa-server fa-fw mr-2"></i>Devices</a>
