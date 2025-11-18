@@ -1,5 +1,5 @@
 <?php
-require_once 'includes/functions.php'; // For getDbConnection
+require_once 'includes/functions.php'; // For getDbConnection and generateFaSvgDataUrl
 
 $map_id = $_GET['map_id'] ?? null;
 
@@ -94,17 +94,13 @@ foreach ($devices as $d) {
         $node['margin'] = 20;
         $node['level'] = -1;
     } else {
-        // Use vis.js native 'icon' shape for Font Awesome icons
-        $node['shape'] = 'icon';
-        $node['icon'] = [
-            'face' => 'Font Awesome 6 Free',
-            'weight' => '900', // Solid icons
-            'code' => $icon_code,
-            'size' => (int)$icon_size,
-            'color' => $node_color
-        ];
-        // vis.js handles size for 'icon' shape via icon.size, no need for top-level 'size'
-        unset($node['size']); 
+        // For Font Awesome icons, generate an SVG data URL and use shape 'image'
+        $svg_data_url = generateFaSvgDataUrl($icon_code, (int)$icon_size, $node_color);
+        $node['shape'] = 'image';
+        $node['image'] = $svg_data_url;
+        $node['size'] = (int)$icon_size; // Use the icon_size as the diameter for the image
+        $node['color'] = ['border' => $node_color, 'background' => 'transparent'];
+        $node['borderWidth'] = 3;
     }
     $vis_nodes[] = $node;
 }
@@ -284,7 +280,7 @@ if ($map['background_image_url']) {
         async function updateMapLive(nodesDataSet, edgesDataSet) {
             console.log("Fetching live map data...");
             const mapId = <?= json_encode($map_id) ?>;
-            const apiUrl = `http://127.0.0.1:2266/api.php?action=get_public_map_data&map_id=${mapId}`; // Changed to 127.0.0.1
+            const apiUrl = `http://localhost:2266/api.php?action=get_public_map_data&map_id=${mapId}`; // Changed to localhost
 
             try {
                 const response = await fetch(apiUrl);
@@ -331,19 +327,15 @@ if ($map['background_image_url']) {
                                 color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                             });
                         } else {
+                            // For Font Awesome icons, generate an SVG data URL and use shape 'image'
+                            const svg_data_url = generateFaSvgDataUrl(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color);
                             Object.assign(updatedNode, {
-                                shape: 'icon', // Changed to 'icon'
-                                icon: { // Added icon object
-                                    face: 'Font Awesome 6 Free',
-                                    weight: '900',
-                                    code: iconMap[d.type] || iconMap.other,
-                                    size: parseInt(icon_size),
-                                    color: node_color
-                                }
+                                shape: 'image',
+                                image: svg_data_url,
+                                size: parseInt(icon_size),
+                                color: { border: node_color, background: 'transparent' },
+                                borderWidth: 3
                             });
-                            // Remove image-specific properties if using shape: 'icon'
-                            delete updatedNode.image;
-                            delete updatedNode.size;
                         }
                         nodeUpdates.push(updatedNode);
                     });
@@ -353,6 +345,16 @@ if ($map['background_image_url']) {
                 console.error("Error updating map live:", error);
             }
         }
+
+        // PHP function to generate SVG data URL (copied from includes/functions.php)
+        function generateFaSvgDataUrl(iconCode, size, color) {
+            const escapedIconCode = iconCode; // Already escaped in PHP
+            const fontFamily = 'Font Awesome 6 Free';
+            const fontWeight = '900'; // Solid icons
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><text x="50%" y="50%" style="font-family: '${fontFamily}'; font-weight: ${fontWeight}; font-size: ${size}px; fill: ${color}; text-anchor: middle; dominant-baseline: central;">${escapedIconCode}</text></svg>`;
+            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        }
+
 
         document.addEventListener('DOMContentLoaded', function() {
             const nodes = new vis.DataSet(<?= json_encode($vis_nodes) ?>);
