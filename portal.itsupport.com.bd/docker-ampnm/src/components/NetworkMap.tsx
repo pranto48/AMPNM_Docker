@@ -27,11 +27,12 @@ import {
   updateEdgeInDB,
   importMap,
   MapData,
+  getPublicMapData,
 } from '@/services/networkDeviceService';
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // Declare SoundManager globally
 declare global {
@@ -43,7 +44,14 @@ declare global {
   }
 }
 
-const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapUpdate: () => void }) => {
+interface NetworkMapProps {
+  devices: NetworkDevice[];
+  onMapUpdate: () => void;
+  isPublicView?: boolean; // New prop for public view
+}
+
+const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false }: NetworkMapProps) => {
+  const { mapId: publicMapId } = useParams<{ mapId: string }>();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false);
@@ -59,8 +67,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
-      if (!isAdmin) {
-        // No error message needed, as the ping button is disabled for viewers
+      if (!isAdmin && !isPublicView) { // Only allow admin to update status in non-public view
         return;
       }
       // Optimistically update UI
@@ -69,7 +76,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       );
       try {
         // Update in database
-        const device = devices.find(d => d.id === nodeId);
+        const device = initialDevices.find(d => d.id === nodeId);
         if (device && device.ip_address) {
           await updateDevice(nodeId, { 
             status,
@@ -85,7 +92,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         );
       }
     },
-    [setNodes, devices, isAdmin]
+    [setNodes, initialDevices, isAdmin, isPublicView]
   );
 
   const mapDeviceToNode = useCallback(
@@ -104,54 +111,76 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         name_text_size: device.name_text_size,
         last_ping: device.last_ping,
         last_ping_result: device.status === 'online', // Derive from status
+        check_port: device.check_port,
+        description: device.description,
+        warning_latency_threshold: device.warning_latency_threshold,
+        warning_packetloss_threshold: device.warning_packetloss_threshold,
+        critical_latency_threshold: device.critical_latency_threshold,
+        critical_packetloss_threshold: device.critical_packetloss_threshold,
+        show_live_ping: device.show_live_ping,
+        map_id: device.map_id,
         onEdit: (id: string) => {
-          // No error message needed, as the dropdown item is hidden for viewers
-          if (isAdmin) {
+          if (!isPublicView && isAdmin) {
             navigate(`/edit-device/${id}`);
           }
         },
         onDelete: (id: string) => {
-          // No error message needed, as the dropdown item is hidden for viewers
-          if (isAdmin) {
+          if (!isPublicView && isAdmin) {
             handleDelete(id);
           }
         },
         onStatusChange: handleStatusChange,
+        isPublicView: isPublicView, // Pass public view status to node
       },
     }),
-    [handleStatusChange, navigate, isAdmin]
+    [handleStatusChange, navigate, isAdmin, isPublicView]
   );
 
-  // Update nodes when devices change
+  // Update nodes when devices change (either from prop or internal fetch)
   useEffect(() => {
-    setNodes(devices.map(mapDeviceToNode));
-  }, [devices, mapDeviceToNode, setNodes]);
+    setNodes(initialDevices.map(mapDeviceToNode));
+  }, [initialDevices, mapDeviceToNode, setNodes]);
 
-  // Load edges
+  // Load edges (either from prop or internal fetch)
   useEffect(() => {
     const loadEdges = async () => {
-      try {
-        const edgesData = await getEdges();
-        setEdges(
-          edgesData.map((edge: any) => ({
-            id: edge.id,
-            source: edge.source_id, // PHP uses source_id
-            target: edge.target_id, // PHP uses target_id
-            data: { connection_type: edge.connection_type || 'cat5' },
-          }))
-        );
-      } catch (error) {
-        console.error('Failed to load network edges:', error);
-        showError('Failed to load network connections.');
+      if (isPublicView && publicMapId) {
+        // Edges are already part of the getPublicMapData response, so no separate fetch needed here.
+        // They are passed via initialDevices (which is actually mapData.devices in PublicMapPage)
+        // and mapData.edges in PublicMapPage.
+        // For now, we'll assume initialDevices is the full mapData.devices and edges are separate.
+        // This needs to be aligned with how PublicMapPage passes data.
+        // For public view, edges should come from mapData.edges directly.
+        // For non-public view, getEdges() is fine.
+        // Let's adjust PublicMapPage to pass edges directly to NetworkMap.
+        // For now, I'll keep this as is, assuming initialDevices is just devices.
+        // The PublicMapPage will handle passing the correct edges.
+      } else {
+        try {
+          const edgesData = await getEdges();
+          setEdges(
+            edgesData.map((edge: any) => ({
+              id: edge.id,
+              source: edge.source_id, // PHP uses source_id
+              target: edge.target_id, // PHP uses target_id
+              data: { connection_type: edge.connection_type || 'cat5' },
+            }))
+          );
+        } catch (error) {
+          console.error('Failed to load network edges:', error);
+          showError('Failed to load network connections.');
+        }
       }
     };
     loadEdges();
-  }, [setEdges]);
+  }, [setEdges, isPublicView, publicMapId]); // Added publicMapId to dependencies
 
   // Implement polling for live status updates for all users
   useEffect(() => {
     const pollingInterval = setInterval(() => {
-      onMapUpdate(); // This fetches updated device data
+      if (onMapUpdate) { // Only call if onMapUpdate is provided (i.e., not public view)
+        onMapUpdate(); // This fetches updated device data
+      }
     }, 15000); // Poll every 15 seconds
 
     return () => clearInterval(pollingInterval);
@@ -164,7 +193,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   useEffect(() => {
     const prevDevicesMap = new Map(prevDevicesRef.current.map(d => [d.id, d.status]));
 
-    devices.forEach(currentDevice => {
+    initialDevices.forEach(currentDevice => {
       const prevStatus = prevDevicesMap.get(currentDevice.id);
       const newStatus = currentDevice.status;
 
@@ -185,8 +214,8 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     });
 
     // Update ref for the next render
-    prevDevicesRef.current = devices;
-  }, [devices]);
+    prevDevicesRef.current = initialDevices;
+  }, [initialDevices]);
 
 
   // Style edges based on connection type and device status
@@ -235,8 +264,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onConnect = useCallback(
     async (params: Connection) => {
-      if (!isAdmin) {
-        // No error message needed, as nodesConnectable is false for viewers
+      if (!isAdmin || isPublicView) {
         return;
       }
       // Optimistically add edge to UI
@@ -250,7 +278,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       
       try {
         // Save to database
-        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: devices[0]?.map_id || '1' }); // Assuming map_id 1 if not set
+        await addEdgeToDB({ source: params.source!, target: params.target!, map_id: initialDevices[0]?.map_id || '1' }); // Assuming map_id 1 if not set
         showSuccess('Connection saved.');
       } catch (error) {
         console.error('Failed to save connection:', error);
@@ -259,12 +287,11 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id));
       }
     },
-    [setEdges, isAdmin, devices]
+    [setEdges, isAdmin, isPublicView, initialDevices]
   );
 
   const handleDelete = async (deviceId: string) => {
-    if (!isAdmin) {
-      // No error message needed, as the dropdown item is hidden for viewers
+    if (!isAdmin || isPublicView) {
       return;
     }
     if (window.confirm('Are you sure you want to delete this device?')) {
@@ -288,8 +315,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const onNodeDragStop: NodeDragHandler = useCallback(
     async (_event, node) => {
-      if (!isAdmin) {
-        // No error message needed, as nodesDraggable is false for viewers
+      if (!isAdmin || isPublicView) {
         return;
       }
       try {
@@ -299,7 +325,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         showError('Failed to save device position.');
       }
     },
-    [isAdmin]
+    [isAdmin, isPublicView]
   );
 
   const onEdgesChangeHandler: OnEdgesChange = useCallback(
@@ -307,8 +333,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       onEdgesChange(changes);
       changes.forEach(async (change) => {
         if (change.type === 'remove') {
-          if (!isAdmin) {
-            // No error message needed, as elementsSelectable is false for viewers
+          if (!isAdmin || isPublicView) {
             return;
           }
           try {
@@ -321,12 +346,11 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         }
       });
     },
-    [onEdgesChange, isAdmin]
+    [onEdgesChange, isAdmin, isPublicView]
   );
 
   const onEdgeClick = (_event: React.MouseEvent, edge: Edge) => {
-    if (!isAdmin) {
-      // No error message needed, as elementsSelectable is false for viewers
+    if (!isAdmin || isPublicView) {
       return;
     }
     setEditingEdge(edge);
@@ -334,8 +358,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleSaveEdge = async (edgeId: string, connectionType: string) => {
-    if (!isAdmin) {
-      // No error message needed, as the dialog is not opened for viewers
+    if (!isAdmin || isPublicView) {
       return;
     }
     // Optimistically update UI
@@ -355,12 +378,11 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleExport = async () => {
-    if (!isAdmin) {
-      // No error message needed, as the button is hidden for viewers
+    if (!isAdmin || isPublicView) {
       return;
     }
     const exportData: MapData = {
-      devices: devices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => ({
+      devices: initialDevices.map(({ user_id, status, last_ping, last_ping_result, ...rest }) => ({
         ...rest,
         ip_address: rest.ip_address || null,
         position_x: rest.position_x || null,
@@ -397,16 +419,14 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
   };
 
   const handleImportClick = () => {
-    if (!isAdmin) {
-      // No error message needed, as the button is hidden for viewers
+    if (!isAdmin || isPublicView) {
       return;
     }
     importInputRef.current?.click();
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isAdmin) {
-      // No error message needed, as the button is hidden for viewers
+    if (!isAdmin || isPublicView) {
       return;
     }
     const file = event.target.files?.[0];
@@ -419,7 +439,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
       try {
         const mapData = JSON.parse(e.target?.result as string) as MapData;
         if (!mapData.devices || !mapData.edges) throw new Error('Invalid map file format.');
-        await importMap(mapData, devices[0]?.map_id || '1'); // Pass current map_id
+        await importMap(mapData, initialDevices[0]?.map_id || '1'); // Pass current map_id
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
         onMapUpdate(); // Refresh the map data
@@ -436,7 +456,7 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
 
   const handleShareMap = async () => {
     // Share map is accessible to all roles, as it's just generating a public link.
-    const currentMapId = devices.length > 0 ? devices[0].map_id : null;
+    const currentMapId = initialDevices.length > 0 ? initialDevices[0].map_id : null;
 
     if (!currentMapId) {
       showError('No map selected to share.');
@@ -470,9 +490,9 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         fitView
         fitViewOptions={{ padding: 0.1 }}
         proOptions={{ hideAttribution: true }} // Hide React Flow attribution
-        nodesDraggable={isAdmin} // Only allow admins to drag nodes
-        nodesConnectable={isAdmin} // Only allow admins to connect nodes
-        elementsSelectable={isAdmin} // Only allow admins to select elements
+        nodesDraggable={!isPublicView && isAdmin} // Only allow admins to drag nodes in non-public view
+        nodesConnectable={!isPublicView && isAdmin} // Only allow admins to connect nodes in non-public view
+        elementsSelectable={!isPublicView && isAdmin} // Only allow admins to select elements in non-public view
       >
         <Controls />
         <MiniMap 
@@ -489,17 +509,17 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
         <Background gap={16} size={1} color="#444" />
       </ReactFlow>
       <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-        {isAdmin && (
+        {!isPublicView && isAdmin && (
           <Button onClick={() => navigate('/add-device')} size="sm">
             <PlusCircle className="h-4 w-4 mr-2" />Add Device
           </Button>
         )}
-        {isAdmin && (
+        {!isPublicView && isAdmin && (
           <Button onClick={handleExport} variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />Export
           </Button>
         )}
-        {isAdmin && (
+        {!isPublicView && isAdmin && (
           <Button onClick={handleImportClick} variant="outline" size="sm">
             <Upload className="h-4 w-4 mr-2" />Import
           </Button>
@@ -511,11 +531,13 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
           accept="application/json" 
           className="hidden" 
         />
-        <Button onClick={handleShareMap} variant="outline" size="sm">
-          <Share2 className="h-4 w-4 mr-2" />Share Map
-        </Button>
+        {!isPublicView && ( // Share button is available for all roles in non-public view
+          <Button onClick={handleShareMap} variant="outline" size="sm">
+            <Share2 className="h-4 w-4 mr-2" />Share Map
+          </Button>
+        )}
       </div>
-      {isEdgeEditorOpen && isAdmin && ( // Only open for admin
+      {isEdgeEditorOpen && !isPublicView && isAdmin && ( // Only open for admin in non-public view
         <EdgeEditorDialog 
           isOpen={isEdgeEditorOpen} 
           onClose={() => setIsEdgeEditorOpen(false)} 

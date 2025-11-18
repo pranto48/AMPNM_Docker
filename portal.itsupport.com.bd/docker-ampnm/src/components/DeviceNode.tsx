@@ -68,10 +68,10 @@ const DeviceNode = ({ data }: { data: any }) => {
 
   const userRole = window.userRole || 'viewer';
   const isAdmin = userRole === 'admin';
+  const canModify = !data.isPublicView && isAdmin; // Can modify if not public view and is admin
 
   const handlePing = async () => {
-    if (!isAdmin) {
-      // No error message needed, as the button is disabled for viewers
+    if (!canModify) {
       return;
     }
     if (!data.ip_address) return;
@@ -147,7 +147,7 @@ const DeviceNode = ({ data }: { data: any }) => {
             <Button 
               size="sm" 
               onClick={handlePing} 
-              disabled={isPinging || !data.ip_address || !isAdmin}
+              disabled={isPinging || !data.ip_address || !canModify}
               className="h-7 text-xs"
             >
               <Activity className={`mr-1 h-3 w-3 ${isPinging ? 'animate-spin' : ''}`} />
@@ -163,7 +163,7 @@ const DeviceNode = ({ data }: { data: any }) => {
             )}
           </div>
         </CardContent>
-        {isAdmin && (
+        {canModify && (
           <div className="absolute top-1 right-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

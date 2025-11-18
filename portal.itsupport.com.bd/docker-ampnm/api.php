@@ -72,7 +72,7 @@ try {
     // Define actions that 'viewer' role can perform (mostly GET requests for viewing)
     $viewer_allowed_get_actions = [
         'get_maps', 'get_devices', 'get_edges', 'get_dashboard_data', 'get_ping_history',
-        'get_status_logs', 'get_device_details', 'get_device_uptime', 'get_public_map_data',
+        'get_status_logs', 'get_device_details', 'get_device_uptime',
         'get_smtp_settings', 'get_all_devices_for_subscriptions', 'get_device_subscriptions',
         'health', 'get_current_license_info', // Added for license management
     ];

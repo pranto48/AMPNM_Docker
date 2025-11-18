@@ -8,6 +8,7 @@ interface ApiResponse<T> {
   // For specific endpoints that return arrays directly
   devices?: T[];
   edges?: T[];
+  map?: any; // For public map data
 }
 
 export interface NetworkDevice {
@@ -169,6 +170,26 @@ export const importMap = async (mapData: MapData, map_id: string): Promise<{ suc
   };
   const result = await callApi<{ success: boolean }>('import_map', 'POST', payload);
   return result;
+};
+
+export const getPublicMapData = async (mapId: string): Promise<{ map: any; devices: NetworkDevice[]; edges: NetworkEdge[] }> => {
+  const result = await callApi<{ map: any; devices: NetworkDevice[]; edges: NetworkEdge[] }>('get_public_map_data', 'GET', undefined, { map_id: mapId });
+  return {
+    map: result.map,
+    devices: result.devices.map(d => ({
+      ...d,
+      ip_address: d.ip, // Map ip to ip_address for React component
+      icon: d.type, // Map type to icon for React component
+      position_x: d.x,
+      position_y: d.y,
+      last_ping: d.last_seen,
+    })),
+    edges: result.edges.map(e => ({
+      ...e,
+      source: e.source_id, // Map source_id to source for React component
+      target: e.target_id, // Map target_id to target for React component
+    })),
+  };
 };
 
 // Real-time subscription is removed as it's Supabase-specific.
