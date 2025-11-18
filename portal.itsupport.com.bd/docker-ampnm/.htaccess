@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # If the request is for a file or directory, serve it directly
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # If the request is for /public-map/anything, serve public_map.php
+  RewriteRule ^public-map/.*$ public_map.php [L]
+
+  # For all other requests (main app routes), serve index.php
+  RewriteRule . index.php [L]
+</IfModule>

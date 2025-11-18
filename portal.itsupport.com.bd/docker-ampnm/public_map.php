@@ -31,14 +31,8 @@
 <body>
     <div id="root"></div>
     <script>
-        // This script will redirect to the React Router path for the public map
-        // It ensures the React app handles the routing correctly.
-        const mapId = new URLSearchParams(window.location.search).get('map_id');
-        if (mapId) {
-            window.history.replaceState(null, '', `/public-map/${mapId}`);
-        } else {
-            window.history.replaceState(null, '', '/'); // Redirect to home if no mapId
-        }
+        // No window.history.replaceState needed here.
+        // React Router in App.tsx will handle the /public-map/:mapId route.
     </script>
 </body>
 </html>

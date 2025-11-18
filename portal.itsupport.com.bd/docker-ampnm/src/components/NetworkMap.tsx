@@ -39,7 +39,7 @@ declare global {
   interface Window {
     SoundManager: {
       play: (soundName: string) => void;
-    };
+    >;
     userRole: string; // Declare userRole
   }
 }
@@ -465,7 +465,7 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
 
     // Construct the shareable URL
     // Using localhost for the public URL
-    const shareUrl = `http://localhost:2266/public_map.php?map_id=${currentMapId}`;
+    const shareUrl = `http://localhost:2266/public-map/${currentMapId}`; // CHANGED: Clean URL
 
     try {
       await navigator.clipboard.writeText(shareUrl);
