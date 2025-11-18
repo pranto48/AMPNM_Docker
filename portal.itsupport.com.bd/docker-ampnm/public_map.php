@@ -94,13 +94,15 @@ foreach ($devices as $d) {
         $node['margin'] = 20;
         $node['level'] = -1;
     } else {
-        // For Font Awesome icons, generate an SVG data URL and use shape 'image'
-        $svg_data_url = generateFaSvgDataUrl($icon_code, (int)$icon_size, $node_color);
-        $node['shape'] = 'image';
-        $node['image'] = $svg_data_url;
-        $node['size'] = (int)$icon_size; // Use the icon_size as the diameter for the image
-        $node['color'] = ['border' => $node_color, 'background' => 'transparent'];
-        $node['borderWidth'] = 3;
+        // Revert to using vis.js native icon shape
+        $node['shape'] = 'icon';
+        $node['icon'] = [
+            'face' => 'Font Awesome 6 Free',
+            'weight' => '900', // Solid icons
+            'code' => $icon_code,
+            'size' => (int)$icon_size,
+            'color' => $node_color
+        ];
     }
     $vis_nodes[] = $node;
 }
@@ -327,14 +329,16 @@ if ($map['background_image_url']) {
                                 color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
                             });
                         } else {
-                            // For Font Awesome icons, generate an SVG data URL and use shape 'image'
-                            const svg_data_url = generateFaSvgDataUrl(iconMap[d.type] || iconMap.other, parseInt(icon_size), node_color);
+                            // For Font Awesome icons, use vis.js native icon shape
                             Object.assign(updatedNode, {
-                                shape: 'image',
-                                image: svg_data_url,
-                                size: parseInt(icon_size),
-                                color: { border: node_color, background: 'transparent' },
-                                borderWidth: 3
+                                shape: 'icon',
+                                icon: {
+                                    face: 'Font Awesome 6 Free',
+                                    weight: '900', // Solid icons
+                                    code: iconMap[d.type] || iconMap.other,
+                                    size: parseInt(icon_size),
+                                    color: node_color
+                                }
                             });
                         }
                         nodeUpdates.push(updatedNode);
