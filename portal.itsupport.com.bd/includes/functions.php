@@ -241,12 +241,12 @@ function getDockerfileContent() {
         "# Enable Apache modules",
         "RUN a2enmod rewrite",
         "",
-        "# Copy application files from the ampnm-app-source directory",
-        "COPY ampnm-app-source/ /var/www/html/",
+        "# Copy application files from the build context root",
+        "COPY . /var/www/html/", // CHANGED: Copy entire build context
         "",
-        "# Copy the entrypoint script from the build context root",
-        "COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh",
-        "RUN chmod +x /usr/local/bin/docker-entrypoint.sh",
+        "# Copy the entrypoint script to the web root",
+        "COPY docker-entrypoint.sh /var/www/html/docker-entrypoint.sh", // CHANGED: Copy to web root
+        "RUN chmod +x /var/www/html/docker-entrypoint.sh",
         "",
         "# Set permissions",
         "RUN chown -R www-data:www-data /var/www/html \\",
@@ -268,7 +268,7 @@ function getDockerfileContent() {
         "    && chmod -R 775 /var/www/html/uploads",
         "",
         "# Use the copied entrypoint script",
-        "ENTRYPOINT [\"/usr/local/bin/docker-entrypoint.sh\"]"
+        "ENTRYPOINT [\"/var/www/html/docker-entrypoint.sh\"]" // CHANGED: Use entrypoint from web root
     ];
     return implode("\n", $dockerfile_lines);
 }
@@ -285,7 +285,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./ampnm-app-source/:/var/www/html/
+      - ./:/var/www/html/ // CHANGED: Mount entire project root
     depends_on:
       db:
         condition: service_healthy

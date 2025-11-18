@@ -188,7 +188,7 @@ MapApp.mapManager = {
 
     updatePublicViewLink: (mapId, isEnabled) => {
         if (isEnabled) {
-            const publicLink = `http://192.168.20.5:2266/public_map.php?map_id=${mapId}`;
+            const publicLink = `http://localhost:2266/public_map.php?map_id=${mapId}`; // CHANGED: Use localhost
             MapApp.ui.els.publicViewLink.value = publicLink;
             MapApp.ui.els.publicViewLinkContainer.classList.remove('hidden');
         } else {

@@ -444,8 +444,8 @@ const NetworkMap = ({ devices, onMapUpdate }: { devices: NetworkDevice[]; onMapU
     }
 
     // Construct the shareable URL
-    // Using hardcoded IP and port as requested by the user
-    const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${currentMapId}`;
+    // Using localhost for the public URL
+    const shareUrl = `http://localhost:2266/public_map.php?map_id=${currentMapId}`;
 
     try {
       await navigator.clipboard.writeText(shareUrl);

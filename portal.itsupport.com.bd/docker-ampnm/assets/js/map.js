@@ -307,7 +307,7 @@ function initMap() {
                     // Add the device to the map visually
                     const baseNode = {
                         id: updatedDevice.id, label: updatedDevice.name, title: MapApp.utils.buildNodeTitle(updatedDevice),
-                        x: updatedDevice.x, y: updatedUpdatedDevice.y, // Corrected variable name
+                        x: updatedDevice.x, y: updatedDevice.y, // Corrected variable name
                         font: { color: 'white', size: parseInt(updatedDevice.name_text_size) || 14, multi: true },
                         deviceData: updatedDevice
                     };
@@ -437,8 +437,8 @@ function initMap() {
             window.notyf.error('No map selected to share.');
             return;
         }
-        // Construct the shareable URL using the hardcoded IP and port
-        const shareUrl = `http://192.168.20.5:2266/public_map.php?map_id=${state.currentMapId}`;
+        // Construct the shareable URL using localhost
+        const shareUrl = `http://localhost:2266/public_map.php?map_id=${state.currentMapId}`;
         try {
             await navigator.clipboard.writeText(shareUrl);
             window.notyf.success('Share link copied to clipboard!');
