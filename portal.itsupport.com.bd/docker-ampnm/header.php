@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 // Ensure user_role is set, default to 'viewer' if not (e.g., for new sessions after upgrade)
 $user_role = $_SESSION['user_role'] ?? 'viewer';
+$current_page = basename($_SERVER['PHP_SELF']); // Get current page filename
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -66,63 +67,64 @@ $user_role = $_SESSION['user_role'] ?? 'viewer';
         </div>
     </nav>
     <div class="page-content">
-    <?php if (isset($_SESSION['license_status_code'])): ?>
-        <?php
-            $license_status_code = $_SESSION['license_status_code'];
-            $license_message = $_SESSION['license_message'];
-            $max_devices = $_SESSION['license_max_devices'];
-            $current_devices = $_SESSION['current_device_count'];
-            $expires_at = $_SESSION['license_expires_at'];
-            $grace_period_end = $_SESSION['license_grace_period_end'];
+    <?php 
+    // Only show license status if it's not 'unconfigured' OR if we are on the license_management.php page
+    if (isset($_SESSION['license_status_code']) && ($_SESSION['license_status_code'] !== 'unconfigured' || $current_page === 'license_management.php')): 
+        $license_status_code = $_SESSION['license_status_code'];
+        $license_message = $_SESSION['license_message'];
+        $max_devices = $_SESSION['license_max_devices'];
+        $current_devices = $_SESSION['current_device_count'];
+        $expires_at = $_SESSION['license_expires_at'];
+        $grace_period_end = $_SESSION['license_grace_period_end'];
 
-            $status_class = '';
-            $status_icon = '';
-            $display_message = '';
-            $show_manage_link = true;
+        $status_class = '';
+        $status_icon = '';
+        $display_message = '';
+        $show_manage_link = true;
 
-            switch ($license_status_code) {
-                case 'active':
-                case 'free':
-                    $status_class = 'bg-green-500/20 text-green-400 border-green-500/30';
-                    $status_icon = '<i class="fas fa-check-circle mr-1"></i>';
-                    $display_message = "License Active ({$current_devices}/{$max_devices} devices)";
-                    if ($expires_at) {
-                        $display_message .= " - Expires: " . date('Y-m-d', strtotime($expires_at));
-                    }
-                    break;
-                case 'grace_period':
-                    $status_class = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-                    $status_icon = '<i class="fas fa-exclamation-triangle mr-1"></i>';
-                    $display_message = "License Expired! Grace period until " . date('Y-m-d', $grace_period_end) . ".";
-                    break;
-                case 'expired': // Should be caught by grace_period or disabled
-                case 'revoked':
-                case 'in_use':
-                case 'disabled':
-                    $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
-                    $status_icon = '<i class="fas fa-ban mr-1"></i>';
-                    $display_message = "License Disabled! ({$license_message})";
-                    break;
-                case 'unconfigured':
-                    $status_class = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-                    $status_icon = '<i class="fas fa-exclamation-circle mr-1"></i>';
-                    $display_message = "License Unconfigured! Please set up your license key.";
-                    break;
-                case 'portal_unreachable':
-                    $status_class = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-                    $status_icon = '<i class="fas fa-cloud-offline mr-1"></i>';
-                    $display_message = "License Portal Unreachable! ({$license_message})";
-                    break;
-                case 'invalid':
-                case 'not_found':
-                case 'error':
-                default:
-                    $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
-                    $status_icon = '<i class="fas fa-times-circle mr-1"></i>';
-                    $display_message = "License Invalid! ({$license_message})";
-                    break;
-            }
-        ?>
+        switch ($license_status_code) {
+            case 'active':
+            case 'free':
+                $status_class = 'bg-green-500/20 text-green-400 border-green-500/30';
+                $status_icon = '<i class="fas fa-check-circle mr-1"></i>';
+                $display_message = "License Active ({$current_devices}/{$max_devices} devices)";
+                if ($expires_at) {
+                    $display_message .= " - Expires: " . date('Y-m-d', strtotime($expires_at));
+                }
+                break;
+            case 'grace_period':
+                $status_class = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+                $status_icon = '<i class="fas fa-exclamation-triangle mr-1"></i>';
+                $display_message = "License Expired! Grace period until " . date('Y-m-d', $grace_period_end) . ".";
+                break;
+            case 'expired': // Should be caught by grace_period or disabled
+            case 'revoked':
+            case 'in_use':
+            case 'disabled':
+                $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
+                $status_icon = '<i class="fas fa-ban mr-1"></i>';
+                $display_message = "License Disabled! ({$license_message})";
+                break;
+            case 'unconfigured':
+                $status_class = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+                $status_icon = '<i class="fas fa-exclamation-circle mr-1"></i>';
+                $display_message = "License Unconfigured! Please set up your license key.";
+                break;
+            case 'portal_unreachable':
+                $status_class = 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+                $status_icon = '<i class="fas fa-cloud-offline mr-1"></i>';
+                $display_message = "License Portal Unreachable! ({$license_message})";
+                break;
+            case 'invalid':
+            case 'not_found':
+            case 'error':
+            default:
+                $status_class = 'bg-red-500/20 text-red-400 border-red-500/30';
+                $status_icon = '<i class="fas fa-times-circle mr-1"></i>';
+                $display_message = "License Invalid! ({$license_message})";
+                break;
+        }
+    ?>
         <div class="container mx-auto px-4 mt-4">
             <div class="p-3 rounded-lg text-sm flex items-center justify-between <?= $status_class ?>">
                 <div><?= $status_icon ?> <?= htmlspecialchars($display_message) ?></div>
