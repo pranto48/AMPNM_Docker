@@ -37,20 +37,27 @@ function initUsers() {
         usersTableBody.innerHTML = '';
         try {
             const users = await api.get('get_users');
-            usersTableBody.innerHTML = users.map(user => `
-                <tr class="border-b border-slate-700">
-                    <td class="px-6 py-4 whitespace-nowrap text-white">${user.username}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-slate-400 capitalize">${user.role}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-slate-400">${new Date(user.created_at).toLocaleString()}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        ${user.username !== 'admin' ? `
+            usersTableBody.innerHTML = users.map(user => {
+                const isDefaultAdmin = user.username === 'admin';
+                const isCurrentUser = user.id == window.currentLoggedInUserId; // Compare with exposed ID
+
+                // Delete button should be disabled for default admin and the current logged-in user
+                const deleteDisabled = isDefaultAdmin || isCurrentUser ? 'disabled' : '';
+                const deleteClass = deleteDisabled ? 'opacity-50 cursor-not-allowed' : '';
+
+                return `
+                    <tr class="border-b border-slate-700">
+                        <td class="px-6 py-4 whitespace-nowrap text-white">${user.username}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-slate-400 capitalize">${user.role}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-slate-400">${new Date(user.created_at).toLocaleString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
                             <button class="edit-role-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${user.id}" data-username="${user.username}" data-role="${user.role}"><i class="fas fa-user-tag mr-2"></i>Edit Role</button>
                             <button class="change-password-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-key mr-2"></i>Change Password</button>
-                            <button class="delete-user-btn text-red-500 hover:text-red-400" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-trash mr-2"></i>Delete</button>
-                        ` : '<span class="text-slate-500">Admin User</span>'}
-                    </td>
-                </tr>
-            `).join('');
+                            <button class="delete-user-btn text-red-500 hover:text-red-400 ${deleteClass}" data-id="${user.id}" data-username="${user.username}" ${deleteDisabled}><i class="fas fa-trash mr-2"></i>Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         } catch (error) {
             console.error('Failed to load users:', error);
             window.notyf.error('Failed to load users.');
@@ -93,9 +100,9 @@ function initUsers() {
         const editRoleButton = e.target.closest('.edit-role-btn');
         const changePasswordButton = e.target.closest('.change-password-btn');
 
-        if (deleteButton) {
+        if (deleteButton && !deleteButton.disabled) { // Check if button is not disabled
             const { id, username } = deleteButton.dataset;
-            if (confirm(`Are you sure you want to delete user "${username}"?`)) {
+            if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
                 try {
                     const result = await api.post('delete_user', { id });
                     if (result.success) {

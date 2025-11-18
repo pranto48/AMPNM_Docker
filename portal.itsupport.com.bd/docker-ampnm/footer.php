@@ -40,6 +40,8 @@
 
         // Expose user role globally for client-side checks
         window.userRole = '<?php echo $_SESSION['user_role'] ?? 'viewer'; ?>';
+        window.currentLoggedInUserId = '<?php echo $_SESSION['user_id'] ?? ''; ?>';
+        window.currentLoggedInUsername = '<?php echo $_SESSION['username'] ?? ''; ?>';
 
         const page = '<?php echo basename($_SERVER['PHP_SELF']); ?>';
         
