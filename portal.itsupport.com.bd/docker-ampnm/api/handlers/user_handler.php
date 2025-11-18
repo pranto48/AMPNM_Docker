@@ -59,7 +59,7 @@ switch ($action) {
             $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($user && $user['username'] === 'admin' && $id == $_SESSION['user_id']) {
+            if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id']) { // Check against session username
                 http_response_code(403);
                 echo json_encode(['error' => 'Cannot change your own role.']);
                 exit;
@@ -68,6 +68,40 @@ switch ($action) {
             $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
             $stmt->execute([$new_role, $id]);
             echo json_encode(['success' => true, 'message' => 'User role updated successfully.']);
+        }
+        break;
+
+    case 'update_user_password': // NEW ACTION
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $id = $input['id'] ?? null;
+            $new_password = $input['new_password'] ?? null;
+
+            if (!$id || empty($new_password)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'User ID and new password are required.']);
+                exit;
+            }
+            if (strlen($new_password) < 6) {
+                http_response_code(400);
+                echo json_encode(['error' => 'New password must be at least 6 characters long.']);
+                exit;
+            }
+
+            // Prevent admin from changing their own password through this API if they are the target user
+            // This is a safety measure, though the frontend prevents it for 'admin' user.
+            $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id']) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Cannot change your own password through this interface. Please use the dedicated admin password change page if available.']);
+                exit;
+            }
+
+            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $stmt->execute([$hashed_password, $id]);
+            echo json_encode(['success' => true, 'message' => 'User password updated successfully.']);
         }
         break;
 
@@ -84,9 +118,14 @@ switch ($action) {
             $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
             $stmt->execute([$id]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($user && $user['username'] === 'admin') {
+            if ($user && $user['username'] === $_SESSION['username'] && $id == $_SESSION['user_id']) { // Check against session username
                 http_response_code(403);
-                echo json_encode(['error' => 'Cannot delete the admin user.']);
+                echo json_encode(['error' => 'Cannot delete your own user account.']);
+                exit;
+            }
+            if ($user && $user['username'] === 'admin') { // Also prevent deleting the default 'admin' user
+                http_response_code(403);
+                echo json_encode(['error' => 'Cannot delete the default admin user.']);
                 exit;
             }
 

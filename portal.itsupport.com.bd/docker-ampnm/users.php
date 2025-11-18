@@ -87,6 +87,31 @@ include 'header.php';
             </form>
         </div>
     </div>
+
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="modal-backdrop hidden">
+        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-white">Change Password for <span id="change_password_username_display" class="text-cyan-400"></span></h2>
+                <button id="closeChangePasswordModal" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <form id="changePasswordForm" class="space-y-4">
+                <input type="hidden" id="change_password_user_id">
+                <div>
+                    <label for="new_password_input" class="block text-sm font-medium text-slate-400 mb-1">New Password</label>
+                    <input type="password" id="new_password_input" name="new_password" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                </div>
+                <div>
+                    <label for="confirm_new_password_input" class="block text-sm font-medium text-slate-400 mb-1">Confirm New Password</label>
+                    <input type="password" id="confirm_new_password_input" name="confirm_new_password" required class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                </div>
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" id="cancelChangePasswordBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </main>
 
 <?php include 'footer.php'; ?>

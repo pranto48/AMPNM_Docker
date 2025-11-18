@@ -13,6 +13,16 @@ function initUsers() {
     const editUsernameDisplay = document.getElementById('edit_username_display');
     const editRoleSelect = document.getElementById('edit_role');
 
+    // Change Password Modal elements
+    const changePasswordModal = document.getElementById('changePasswordModal');
+    const closeChangePasswordModal = document.getElementById('closeChangePasswordModal');
+    const cancelChangePasswordBtn = document.getElementById('cancelChangePasswordBtn');
+    const changePasswordForm = document.getElementById('changePasswordForm');
+    const changePasswordUserId = document.getElementById('change_password_user_id');
+    const changePasswordUsernameDisplay = document.getElementById('change_password_username_display');
+    const newPasswordInput = document.getElementById('new_password_input');
+    const confirmNewPasswordInput = document.getElementById('confirm_new_password_input');
+
     const api = {
         get: (action) => fetch(`${API_URL}?action=${action}`).then(res => res.json()),
         post: (action, body) => fetch(`${API_URL}?action=${action}`, {
@@ -35,6 +45,7 @@ function initUsers() {
                     <td class="px-6 py-4 whitespace-nowrap">
                         ${user.username !== 'admin' ? `
                             <button class="edit-role-btn text-yellow-400 hover:text-yellow-300 mr-3" data-id="${user.id}" data-username="${user.username}" data-role="${user.role}"><i class="fas fa-user-tag mr-2"></i>Edit Role</button>
+                            <button class="change-password-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-key mr-2"></i>Change Password</button>
                             <button class="delete-user-btn text-red-500 hover:text-red-400" data-id="${user.id}" data-username="${user.username}"><i class="fas fa-trash mr-2"></i>Delete</button>
                         ` : '<span class="text-slate-500">Admin User</span>'}
                     </td>
@@ -80,6 +91,7 @@ function initUsers() {
     usersTableBody.addEventListener('click', async (e) => {
         const deleteButton = e.target.closest('.delete-user-btn');
         const editRoleButton = e.target.closest('.edit-role-btn');
+        const changePasswordButton = e.target.closest('.change-password-btn');
 
         if (deleteButton) {
             const { id, username } = deleteButton.dataset;
@@ -103,6 +115,13 @@ function initUsers() {
             editUsernameDisplay.value = username;
             editRoleSelect.value = role;
             openModal('editRoleModal');
+        } else if (changePasswordButton) {
+            const { id, username } = changePasswordButton.dataset;
+            changePasswordUserId.value = id;
+            changePasswordUsernameDisplay.textContent = username;
+            newPasswordInput.value = '';
+            confirmNewPasswordInput.value = '';
+            openModal('changePasswordModal');
         }
     });
 
@@ -123,6 +142,46 @@ function initUsers() {
             if (result.success) {
                 window.notyf.success('User role updated successfully.');
                 closeModal('editRoleModal');
+                await loadUsers();
+            } else {
+                window.notyf.error(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            window.notyf.error('An unexpected error occurred.');
+            console.error(error);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = 'Save Changes';
+        }
+    });
+
+    closeChangePasswordModal.addEventListener('click', () => closeModal('changePasswordModal'));
+    cancelChangePasswordBtn.addEventListener('click', () => closeModal('changePasswordModal'));
+
+    changePasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = changePasswordUserId.value;
+        const newPassword = newPasswordInput.value;
+        const confirmNewPassword = confirmNewPasswordInput.value;
+
+        if (newPassword !== confirmNewPassword) {
+            window.notyf.error('New passwords do not match.');
+            return;
+        }
+        if (newPassword.length < 6) {
+            window.notyf.error('Password must be at least 6 characters long.');
+            return;
+        }
+
+        const button = changePasswordForm.querySelector('button[type="submit"]');
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+        try {
+            const result = await api.post('update_user_password', { id, new_password: newPassword });
+            if (result.success) {
+                window.notyf.success('User password updated successfully.');
+                closeModal('changePasswordModal');
                 await loadUsers();
             } else {
                 window.notyf.error(`Error: ${result.error}`);
