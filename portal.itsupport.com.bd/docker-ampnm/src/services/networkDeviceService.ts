@@ -1,4 +1,4 @@
-const LOCAL_API_URL = 'http://192.168.20.5:2266/api.php'; // Use the hardcoded IP for the API
+const LOCAL_API_URL = 'http://localhost:2266/api.php'; // Use localhost for better compatibility
 
 interface ApiResponse<T> {
   success?: boolean;
