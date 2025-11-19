@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentMapId, setCurrentMapId] = useState<string | null>(null); // State to hold current map ID
 
   const userRole = window.userRole || 'viewer';
   const isAdmin = userRole === 'admin';
@@ -64,6 +65,8 @@ const Index = () => {
         map_id: d.map_id,
       }));
       setDevices(mappedDevices);
+      // Set the current map ID from the first device, or null if no devices
+      setCurrentMapId(mappedDevices.length > 0 ? mappedDevices[0].map_id || null : null);
     } catch (error) {
       showError("Failed to load devices from database.");
     } finally {

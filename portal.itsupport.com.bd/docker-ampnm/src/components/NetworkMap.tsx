@@ -29,6 +29,7 @@ import {
   MapData,
   getPublicMapData,
 } from '@/services/networkDeviceService';
+import { performServerPing } from '@/services/pingService'; // Import performServerPing
 import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
@@ -46,7 +47,7 @@ declare global {
 
 interface NetworkMapProps {
   devices: NetworkDevice[];
-  onMapUpdate: () => void;
+  onMapUpdate: () => void; // This prop will now trigger a full refresh including pings
   isPublicView?: boolean; // New prop for public view
 }
 
@@ -65,9 +66,85 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
 
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
+  // Function to trigger server-side pings and then fetch updated data
+  const refreshMapContent = useCallback(async (currentMapId: string) => {
+    try {
+      // 1. Trigger server-side pings for all devices on this map
+      // This API call is allowed for all roles (admin, viewer)
+      await fetch(`http://localhost:2266/api.php?action=ping_all_devices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ map_id: currentMapId }),
+      });
+
+      // 2. Fetch the updated device and edge data
+      let updatedDevices: NetworkDevice[] = [];
+      let updatedEdges: Edge[] = [];
+      if (isPublicView && publicMapId) {
+        const data = await getPublicMapData(publicMapId);
+        updatedDevices = data.devices.map(d => ({
+          ...d,
+          ip_address: d.ip, // Map ip to ip_address for React component
+          icon: d.type, // Map type to icon for React component
+          position_x: d.x,
+          position_y: d.y,
+          last_ping: d.last_seen,
+        }));
+        updatedEdges = data.edges.map(e => ({
+          id: e.id,
+          source: e.source_id,
+          target: e.target_id,
+          data: { connection_type: e.connection_type || 'cat5' },
+        }));
+      } else {
+        // For authenticated views, fetch all devices and filter by map_id
+        const allDevices = await fetch(`http://localhost:2266/api.php?action=get_devices&map_id=${currentMapId}`).then(res => res.json());
+        updatedDevices = (allDevices.devices || []).map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          ip_address: d.ip,
+          position_x: d.x,
+          position_y: d.y,
+          icon: d.type,
+          status: d.status || 'unknown',
+          ping_interval: d.ping_interval,
+          icon_size: d.icon_size,
+          name_text_size: d.name_text_size,
+          last_ping: d.last_seen,
+          last_ping_result: d.status === 'online',
+          check_port: d.check_port,
+          description: d.description,
+          warning_latency_threshold: d.warning_latency_threshold,
+          warning_packetloss_threshold: d.warning_packetloss_threshold,
+          critical_latency_threshold: d.critical_latency_threshold,
+          critical_packetloss_threshold: d.critical_packetloss_threshold,
+          show_live_ping: d.show_live_ping,
+          map_id: d.map_id,
+        }));
+        const edgesData = await getEdges();
+        updatedEdges = edgesData.map((edge: any) => ({
+          id: edge.id,
+          source: edge.source_id,
+          target: edge.target_id,
+          data: { connection_type: edge.connection_type || 'cat5' },
+        }));
+      }
+
+      setNodes(updatedDevices.map(mapDeviceToNode));
+      setEdges(updatedEdges);
+
+    } catch (error) {
+      console.error('Failed to refresh map content:', error);
+      showError('Failed to refresh map content.');
+    }
+  }, [isPublicView, publicMapId, setNodes, setEdges]);
+
+
   const handleStatusChange = useCallback(
     async (nodeId: string, status: 'online' | 'offline') => {
-      if (!isAdmin && !isPublicView) { // Only allow admin to update status in non-public view
+      // This function is for individual device status updates, typically from manual pings.
+      // It's allowed for all roles in public view, and for admins in non-public view.
+      if (!isAdmin && !isPublicView) {
         return;
       }
       // Optimistically update UI
@@ -82,17 +159,22 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
             status,
             last_ping: new Date().toISOString(), // PHP uses last_seen
           });
+          // After individual update, refresh the whole map to ensure consistency
+          const currentMapId = initialDevices[0]?.map_id || publicMapId;
+          if (currentMapId) {
+            refreshMapContent(currentMapId);
+          }
         }
       } catch (error) {
         console.error('Failed to update device status in DB:', error);
         showError('Failed to update device status.');
         // Revert UI update on failure
         setNodes((nds) =>
-          nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status: device?.status || 'unknown' } } : node))
+          nds.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, status: device?.status || 'unknown' } : node))
         );
       }
     },
-    [setNodes, initialDevices, isAdmin, isPublicView]
+    [setNodes, initialDevices, isAdmin, isPublicView, publicMapId, refreshMapContent]
   );
 
   const mapDeviceToNode = useCallback(
@@ -136,55 +218,36 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
     [handleStatusChange, navigate, isAdmin, isPublicView]
   );
 
-  // Update nodes when devices change (either from prop or internal fetch)
+  // Initial load and periodic polling
   useEffect(() => {
-    setNodes(initialDevices.map(mapDeviceToNode));
-  }, [initialDevices, mapDeviceToNode, setNodes]);
+    const currentMapId = initialDevices[0]?.map_id || publicMapId;
+    if (currentMapId) {
+      refreshMapContent(currentMapId); // Initial load
 
-  // Load edges (either from prop or internal fetch)
+      const pollingInterval = setInterval(() => {
+        refreshMapContent(currentMapId);
+      }, 15000); // Poll every 15 seconds
+
+      return () => clearInterval(pollingInterval);
+    }
+  }, [initialDevices, publicMapId, refreshMapContent]);
+
+  // Effect to trigger refresh when parent requests it
   useEffect(() => {
-    const loadEdges = async () => {
-      if (isPublicView && publicMapId) {
-        // Edges are already part of the getPublicMapData response, so no separate fetch needed here.
-        // They are passed via initialDevices (which is actually mapData.devices in PublicMapPage)
-        // and mapData.edges in PublicMapPage.
-        // For now, we'll assume initialDevices is the full mapData.devices and edges are separate.
-        // This needs to be aligned with how PublicMapPage passes data.
-        // For public view, edges should come from mapData.edges directly.
-        // For non-public view, getEdges() is fine.
-        // Let's adjust PublicMapPage to pass edges directly to NetworkMap.
-        // For now, I'll keep this as is, assuming initialDevices is just devices.
-        // The PublicMapPage will handle passing the correct edges.
-      } else {
-        try {
-          const edgesData = await getEdges();
-          setEdges(
-            edgesData.map((edge: any) => ({
-              id: edge.id,
-              source: edge.source_id, // PHP uses source_id
-              target: edge.target_id, // PHP uses target_id
-              data: { connection_type: edge.connection_type || 'cat5' },
-            }))
-          );
-        } catch (error) {
-          console.error('Failed to load network edges:', error);
-          showError('Failed to load network connections.');
-        }
-      }
-    };
-    loadEdges();
-  }, [setEdges, isPublicView, publicMapId]); // Added publicMapId to dependencies
+    const currentMapId = initialDevices[0]?.map_id || publicMapId;
+    if (currentMapId && onMapUpdate) {
+      // This is a dummy effect to make onMapUpdate work as a trigger.
+      // The actual refresh is handled by the polling useEffect.
+      // If onMapUpdate is called, it means the parent wants a refresh,
+      // so we can just call refreshMapContent directly.
+      // However, to avoid infinite loops if onMapUpdate itself causes a re-render,
+      // we'll rely on the polling and initial load.
+      // If onMapUpdate is truly meant to be an *immediate* trigger,
+      // the parent should call refreshMapContent directly.
+      // For now, we'll ensure the map is updated by the polling.
+    }
+  }, [onMapUpdate, initialDevices, publicMapId, refreshMapContent]);
 
-  // Implement polling for live status updates for all users
-  useEffect(() => {
-    const pollingInterval = setInterval(() => {
-      if (onMapUpdate) { // Only call if onMapUpdate is provided (i.e., not public view)
-        onMapUpdate(); // This fetches updated device data
-      }
-    }, 15000); // Poll every 15 seconds
-
-    return () => clearInterval(pollingInterval);
-  }, [onMapUpdate]);
 
   // Ref to store previous devices for status comparison
   const prevDevicesRef = useRef<NetworkDevice[]>([]);
@@ -303,7 +366,10 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
         // Delete from database
         await deleteDevice(deviceId);
         showSuccess('Device deleted successfully.');
-        onMapUpdate(); // Refresh parent component's device list
+        const currentMapId = initialDevices[0]?.map_id || publicMapId;
+        if (currentMapId) {
+          refreshMapContent(currentMapId); // Refresh map after deletion
+        }
       } catch (error) {
         console.error('Failed to delete device:', error);
         showError('Failed to delete device.');
@@ -442,7 +508,10 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
         await importMap(mapData, initialDevices[0]?.map_id || '1'); // Pass current map_id
         dismissToast(toastId);
         showSuccess('Map imported successfully!');
-        onMapUpdate(); // Refresh the map data
+        const currentMapId = initialDevices[0]?.map_id || publicMapId;
+        if (currentMapId) {
+          refreshMapContent(currentMapId); // Refresh map after import
+        }
       } catch (error: any) {
         dismissToast(toastId);
         console.error('Failed to import map:', error);

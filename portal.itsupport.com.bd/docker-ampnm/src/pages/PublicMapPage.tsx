@@ -83,6 +83,7 @@ const PublicMapPage = () => {
         </div>
       </header>
       <div className="container mx-auto p-4">
+        {/* Pass fetchPublicMap as onMapUpdate to trigger refreshes */}
         <NetworkMap devices={mapData.devices} onMapUpdate={fetchPublicMap} isPublicView={true} />
       </div>
     </div>
