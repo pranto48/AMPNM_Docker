@@ -32,6 +32,8 @@ try {
             FROM 
                 devices d
             LEFT JOIN 
+                maps m ON d.map_id = m.id
+            LEFT JOIN 
                 ping_results p ON p.id = (
                     SELECT id 
                     FROM ping_results 
@@ -111,7 +113,7 @@ try {
 
     // Define specific POST actions that 'viewer' role can perform
     $viewer_allowed_post_actions = [
-        // 'ping_all_devices', // Removed from here, handled above as public with map check
+        'ping_all_devices', // ADDED: Allow viewers to trigger bulk pings
         'check_device',
         'update_device_status_by_ip',
     ];
