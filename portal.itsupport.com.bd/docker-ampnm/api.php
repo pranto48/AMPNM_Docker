@@ -8,6 +8,7 @@ $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 try {
     // --- Public Actions (NO AUTH REQUIRED) ---
+    // These actions must be handled and exit BEFORE any authentication checks.
     if ($action === 'get_public_map_data') {
         $pdo = getDbConnection();
         $map_id = $_GET['map_id'] ?? null;
@@ -67,6 +68,7 @@ try {
     }
 
     // --- Authenticated Actions (AUTH REQUIRED) ---
+    // All code below this line requires authentication.
     require_once 'includes/auth_check.php'; // This will now only run if the above public action didn't exit.
 
     // Define actions that 'viewer' role can perform (mostly GET requests for viewing)
