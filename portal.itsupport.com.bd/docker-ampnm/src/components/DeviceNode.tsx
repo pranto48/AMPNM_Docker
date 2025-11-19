@@ -129,7 +129,16 @@ const DeviceNode = ({ data }: { data: any }) => {
           <CardTitle style={{ fontSize: `${nameTextSize}px` }} className="font-medium text-white truncate">
             {data.name}
           </CardTitle>
-          <IconComponent style={{ height: `${iconSize}px`, width: `${iconSize}px` }} />
+          {data.icon_url ? (
+            <img 
+              src={data.icon_url} 
+              alt={data.name} 
+              style={{ height: `${iconSize}px`, width: `${iconSize}px`, objectFit: 'contain' }} 
+              className="flex-shrink-0"
+            />
+          ) : (
+            <IconComponent style={{ height: `${iconSize}px`, width: `${iconSize}px` }} />
+          )}
         </CardHeader>
         <CardContent className="p-3">
           <div className="font-mono text-xs text-gray-400 mb-2">{data.ip_address || 'No IP'}</div>
