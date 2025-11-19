@@ -17,16 +17,19 @@ import {
   WifiOff,
   Clock,
   Cloud,
-  HardDrive,
+  HardDrive, // For NAS
   Camera,
-  Shield,
-  Phone,
+  Shield, // For Firewall
+  Phone, // For IP Phone
   Tablet,
-  Smartphone,
-  Radio,
-  Cable,
-  Box,
-  Gauge
+  Smartphone, // For Mobile Phone
+  Radio, // For Radio Tower
+  Cable, // For Punch Device
+  Box, // For Box (Group)
+  ServerRack, // For Rack
+  Network, // For Switch or generic network device
+  Plug, // Alternative for Punch Device
+  Switch // For Switch
 } from 'lucide-react';
 import { performServerPing, parsePingOutput } from '@/services/pingService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -44,7 +47,7 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   router: Router,
   printer: Printer,
   laptop: Laptop,
-  wifi: Wifi,
+  wifi: Wifi, // Keep for 'wifi' type if it exists, otherwise remove
   database: Database,
   box: Box,
   camera: Camera,
@@ -53,12 +56,12 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   ipphone: Phone,
   mobile: Smartphone,
   nas: HardDrive,
-  rack: Gauge, // Using Gauge as a placeholder for rack
-  punchdevice: Cable, // Using Cable as a placeholder for punchdevice
+  rack: ServerRack, // More specific icon for rack
+  punchdevice: Plug, // Using Plug for punch device
   'radio-tower': Radio,
-  switch: Cable, // Using Cable as a placeholder for switch
+  switch: Switch, // More specific icon for switch
   tablet: Tablet,
-  'wifi-router': Wifi,
+  'wifi-router': Wifi, // Explicitly for wifi-router
   other: Server, // Default to server if not found
 };
 
