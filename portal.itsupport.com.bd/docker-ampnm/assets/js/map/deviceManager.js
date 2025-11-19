@@ -54,9 +54,11 @@ MapApp.deviceManager = {
             const result = await MapApp.api.post('ping_all_devices', { map_id: MapApp.state.currentMapId });
             
             if (!result.success) { // Check result.success explicitly
+                console.error("Bulk refresh API returned failure:", result); // Added detailed log
                 throw new Error(result.message || 'Failed to refresh device statuses due to an unknown server issue.');
             }
             if (!result.updated_devices) { // Still check for updated_devices array
+                console.error("Bulk refresh API returned no updated_devices:", result); // Added detailed log
                 throw new Error('Invalid response from server during bulk refresh: missing device data.');
             }
 

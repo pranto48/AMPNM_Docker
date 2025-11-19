@@ -40,7 +40,7 @@ declare global {
   interface Window {
     SoundManager: {
       play: (soundName: string) => void;
-    >;
+    };
     userRole: string; // Declare userRole
   }
 }
@@ -71,11 +71,16 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
     try {
       // 1. Trigger server-side pings for all devices on this map
       // This API call is allowed for all roles (admin, viewer)
-      await fetch(`http://localhost:2266/api.php?action=ping_all_devices`, {
+      const pingResponse = await fetch(`http://localhost:2266/api.php?action=ping_all_devices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ map_id: currentMapId }),
       });
+      const pingResult = await pingResponse.json();
+      if (!pingResponse.ok || pingResult.error || !pingResult.success) {
+        console.error('API ping_all_devices failed:', pingResult); // Added detailed log
+        throw new Error(pingResult.error || pingResult.message || 'Failed to trigger device pings.');
+      }
 
       // 2. Fetch the updated device and edge data
       let updatedDevices: NetworkDevice[] = [];
