@@ -437,8 +437,7 @@ function initMap() {
             window.notyf.error('No map selected to share.');
             return;
         }
-        // Construct the shareable URL using localhost
-        const shareUrl = `http://localhost:2266/public_map.php?map_id=${state.currentMapId}`;
+        const shareUrl = MapApp.utils.buildPublicMapUrl(state.currentMapId);
         try {
             await navigator.clipboard.writeText(shareUrl);
             window.notyf.success('Share link copied to clipboard!');

@@ -16,5 +16,11 @@ MapApp.utils = {
             title += `<br><small style="color: #fca5a5; font-family: monospace;">${sanitizedReason}</small>`;
         }
         return title;
+    },
+
+    buildPublicMapUrl: (mapId) => {
+        const { protocol, hostname } = window.location;
+        const port = '2266';
+        return `${protocol}//${hostname}:${port}/public_map.php?map_id=${mapId}`;
     }
 };
