@@ -19,8 +19,9 @@ MapApp.utils = {
     },
 
     buildPublicMapUrl: (mapId) => {
-        const { protocol, hostname } = window.location;
-        const port = '2266';
-        return `${protocol}//${hostname}:${port}/public_map.php?map_id=${mapId}`;
+        const { protocol, hostname, port } = window.location;
+        const effectivePort = port || '2266';
+        const portSegment = effectivePort ? `:${effectivePort}` : '';
+        return `${protocol}//${hostname}${portSegment}/public_map.php?map_id=${mapId}`;
     }
 };

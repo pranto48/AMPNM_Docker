@@ -1,4 +1,6 @@
-const LOCAL_API_URL = 'http://localhost:2266/api.php'; // Use localhost for better compatibility
+import { getDockerBaseUrl } from '../utils/url';
+
+const LOCAL_API_URL = `${getDockerBaseUrl()}/api.php`;
 
 interface ApiResponse<T> {
   success?: boolean;

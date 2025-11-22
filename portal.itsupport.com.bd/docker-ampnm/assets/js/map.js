@@ -374,6 +374,15 @@ function initMap() {
             }
         });
 
+        els.openPublicLinkBtn.addEventListener('click', () => {
+            const publicLink = els.publicViewLink.value;
+            if (publicLink) {
+                window.open(publicLink, '_blank', 'noopener');
+            } else {
+                window.notyf.error('Enable public view to generate a link first.');
+            }
+        });
+
         els.mapSettingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const updates = {

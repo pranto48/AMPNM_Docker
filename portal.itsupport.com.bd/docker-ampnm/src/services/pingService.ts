@@ -7,7 +7,9 @@ export interface PingResult {
   statusCode: number;
 }
 
-const LOCAL_API_URL = 'http://localhost:2266/api.php';
+import { getDockerBaseUrl } from '../utils/url';
+
+const LOCAL_API_URL = `${getDockerBaseUrl()}/api.php`;
 
 export const performServerPing = async (host: string, count: number = 4): Promise<PingResult> => {
   try {
