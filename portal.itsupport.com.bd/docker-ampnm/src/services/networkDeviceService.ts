@@ -1,4 +1,6 @@
-const LOCAL_API_URL = 'http://localhost:2266/api.php'; // Use localhost for better compatibility
+import { getDockerBaseUrl } from '../utils/url';
+
+const LOCAL_API_URL = `${getDockerBaseUrl()}/api.php`;
 
 interface ApiResponse<T> {
   success?: boolean;
@@ -23,6 +25,7 @@ export interface NetworkDevice {
   ping_interval?: number;
   icon_size?: number;
   name_text_size?: number;
+  monitor_method?: 'ping' | 'port';
   last_ping?: string | null; // Corresponds to last_seen
   last_ping_result?: boolean | null; // Not directly stored, derived from status
   check_port?: number;
@@ -79,6 +82,7 @@ export const addDevice = async (device: Omit<NetworkDevice, 'user_id' | 'status'
     name: device.name,
     ip: device.ip_address,
     check_port: device.check_port,
+    monitor_method: device.monitor_method,
     type: device.icon, // PHP uses 'type' for icon
     description: device.description,
     map_id: device.map_id,
@@ -103,6 +107,7 @@ export const updateDevice = async (id: string, updates: Partial<NetworkDevice>):
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.ip_address !== undefined) payload.ip = updates.ip_address;
   if (updates.check_port !== undefined) payload.check_port = updates.check_port;
+  if (updates.monitor_method !== undefined) payload.monitor_method = updates.monitor_method;
   if (updates.icon !== undefined) payload.type = updates.icon; // PHP uses 'type' for icon
   if (updates.description !== undefined) payload.description = updates.description;
   if (updates.map_id !== undefined) payload.map_id = updates.map_id;

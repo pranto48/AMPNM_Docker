@@ -106,19 +106,25 @@ function parsePingOutput($output) {
 
 // Function to save a ping result to the database
 function savePingResult($pdo, $host, $pingResult) {
-    $parsed = parsePingOutput($pingResult['output']);
-    $success = $pingResult['success'];
+    $parsed = parsePingOutput($pingResult['output'] ?? '');
+
+    // Normalize values to satisfy NOT NULL schema constraints and avoid type warnings
+    $packetLoss = isset($parsed['packet_loss']) ? (int)$parsed['packet_loss'] : 100;
+    $avgTime = isset($parsed['avg_time']) ? (float)$parsed['avg_time'] : 0;
+    $minTime = isset($parsed['min_time']) ? (float)$parsed['min_time'] : 0;
+    $maxTime = isset($parsed['max_time']) ? (float)$parsed['max_time'] : 0;
+    $successFlag = !empty($pingResult['success']) ? 1 : 0;
 
     $sql = "INSERT INTO ping_results (host, packet_loss, avg_time, min_time, max_time, success, output) VALUES (?, ?, ?, ?, ?, ?, ?)";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         $host,
-        $parsed['packet_loss'],
-        $parsed['avg_time'],
-        $parsed['min_time'],
-        $parsed['max_time'],
-        $success,
-        $pingResult['output']
+        $packetLoss,
+        $avgTime,
+        $minTime,
+        $maxTime,
+        $successFlag,
+        $pingResult['output'] ?? ''
     ]);
 }
 

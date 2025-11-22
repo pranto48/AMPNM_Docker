@@ -158,8 +158,11 @@ $is_admin = ($user_role === 'admin');
                         <label class="block text-sm font-medium text-slate-400">Public Link:</label>
                         <div class="flex items-center gap-2">
                             <input type="text" id="publicViewLink" class="flex-grow bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm cursor-text" readonly>
-                            <button type="button" id="copyPublicLinkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm">
+                            <button type="button" id="copyPublicLinkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm flex items-center">
                                 <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                            <button type="button" id="openPublicLinkBtn" class="px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-600 text-sm flex items-center">
+                                <i class="fas fa-external-link-alt mr-1"></i>Open
                             </button>
                         </div>
                     </div>

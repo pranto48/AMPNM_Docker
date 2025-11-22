@@ -90,6 +90,41 @@ function logStatusChange($pdo, $deviceId, $oldStatus, $newStatus, $details) {
     }
 }
 
+function evaluateDeviceCheck($pdo, $device, &$details, &$last_avg_time, &$last_ttl, &$check_output = '') {
+    $monitorMethod = $device['monitor_method'] ?? 'ping';
+    $hasPort = !empty($device['check_port']) && is_numeric($device['check_port']);
+    $last_seen = $device['last_seen'];
+
+    if (empty($device['ip'])) {
+        $details = 'Device has no IP configured for monitoring.';
+        return ['status' => 'unknown', 'last_seen' => $last_seen];
+    }
+
+    if ($monitorMethod === 'port' && $hasPort) {
+        $portCheckResult = checkPortStatus($device['ip'], $device['check_port']);
+        $details = $portCheckResult['success'] ? "Port {$device['check_port']} is open." : "Port {$device['check_port']} is closed.";
+        $last_avg_time = $portCheckResult['time'];
+        $check_output = $portCheckResult['output'] ?? '';
+        $last_seen = $portCheckResult['success'] ? date('Y-m-d H:i:s') : $last_seen;
+        return ['status' => $portCheckResult['success'] ? 'online' : 'offline', 'last_seen' => $last_seen];
+    }
+
+    if ($monitorMethod === 'port' && !$hasPort) {
+        $details = 'Port monitoring selected but no port is configured; falling back to ping.';
+    }
+
+    $pingResult = executePing($device['ip'], 1);
+    savePingResult($pdo, $device['ip'], $pingResult);
+    $parsedResult = parsePingOutput($pingResult['output']);
+    $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details);
+    $last_avg_time = $parsedResult['avg_time'] ?? null;
+    $last_ttl = $parsedResult['ttl'] ?? null;
+    $check_output = $pingResult['output'];
+    $last_seen = $status !== 'offline' ? date('Y-m-d H:i:s') : $last_seen;
+
+    return ['status' => $status, 'last_seen' => $last_seen];
+}
+
 switch ($action) {
     case 'import_devices':
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can import devices.']); exit; }
@@ -115,7 +150,7 @@ switch ($action) {
             $pdo->beginTransaction();
             try {
                 $sql = "INSERT INTO devices (
-                    user_id, name, ip, check_port, type, description,
+                    user_id, name, ip, check_port, monitor_method, type, description,
                     ping_interval, icon_size, name_text_size, icon_url, 
                     warning_latency_threshold, warning_packetloss_threshold, 
                     critical_latency_threshold, critical_packetloss_threshold, 
@@ -131,6 +166,7 @@ switch ($action) {
                         ($device['name'] ?? 'Imported Device'),
                         $device['ip'] ?? null,
                         $device['check_port'] ?? null,
+                        $device['monitor_method'] ?? 'ping',
                         $device['type'] ?? 'other',
                         $device['description'] ?? null,
                         $device['ping_interval'] ?? null,
@@ -175,21 +211,10 @@ switch ($action) {
                 $last_seen = $device['last_seen'];
                 $details = '';
 
-                if (!empty($device['check_port']) && is_numeric($device['check_port'])) {
-                    $portCheckResult = checkPortStatus($device['ip'], $device['check_port']);
-                    $new_status = $portCheckResult['success'] ? 'online' : 'offline';
-                    $last_avg_time = $portCheckResult['time'];
-                    $details = $portCheckResult['success'] ? "Port {$device['check_port']} is open." : "Port {$device['check_port']} is closed.";
-                } else {
-                    $pingResult = executePing($device['ip'], 1);
-                    savePingResult($pdo, $device['ip'], $pingResult);
-                    $parsedResult = parsePingOutput($pingResult['output']);
-                    $new_status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details);
-                    $last_avg_time = $parsedResult['avg_time'] ?? null;
-                    $last_ttl = $parsedResult['ttl'] ?? null;
-                }
-                
-                if ($new_status !== 'offline') { $last_seen = date('Y-m-d H:i:s'); }
+                $check_output = '';
+                $evaluation = evaluateDeviceCheck($pdo, $device, $details, $last_avg_time, $last_ttl, $check_output);
+                $new_status = $evaluation['status'];
+                $last_seen = $evaluation['last_seen'];
                 
                 if ($old_status !== $new_status) {
                     logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
@@ -243,24 +268,10 @@ switch ($action) {
                 $details = '';
 
                 if (!empty($device['ip'])) {
-                    if (!empty($device['check_port']) && is_numeric($device['check_port'])) {
-                        $portCheckResult = checkPortStatus($device['ip'], $device['check_port']);
-                        $new_status = $portCheckResult['success'] ? 'online' : 'offline';
-                        $last_avg_time = $portCheckResult['time'];
-                        $check_output = $portCheckResult['output'];
-                        $details = $portCheckResult['success'] ? "Port {$device['check_port']} is open." : "Port {$device['check_port']} is closed.";
-                    } else {
-                        $pingResult = executePing($device['ip'], 1);
-                        savePingResult($pdo, $device['ip'], $pingResult);
-                        $parsedResult = parsePingOutput($pingResult['output']);
-                        $new_status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details);
-                        $last_avg_time = $parsedResult['avg_time'] ?? null;
-                        $last_ttl = $parsedResult['ttl'] ?? null;
-                        $check_output = $pingResult['output'];
-                    }
+                    $evaluation = evaluateDeviceCheck($pdo, $device, $details, $last_avg_time, $last_ttl, $check_output);
+                    $new_status = $evaluation['status'];
+                    $last_seen = $evaluation['last_seen'];
                 }
-                
-                if ($new_status !== 'offline') { $last_seen = date('Y-m-d H:i:s'); }
                 
                 logStatusChange($pdo, $device['id'], $old_status, $new_status, $details);
                 sendEmailNotification($pdo, $device, $old_status, $new_status, $details); // Trigger email notification
@@ -328,24 +339,10 @@ switch ($action) {
             $details = '';
 
             if (!empty($device['ip'])) {
-                if (!empty($device['check_port']) && is_numeric($device['check_port'])) {
-                    $portCheckResult = checkPortStatus($device['ip'], $device['check_port']);
-                    $status = $portCheckResult['success'] ? 'online' : 'offline';
-                    $last_avg_time = $portCheckResult['time'];
-                    $check_output = $portCheckResult['output'];
-                    $details = $portCheckResult['success'] ? "Port {$device['check_port']} is open." : "Port {$device['check_port']} is closed.";
-                } else {
-                    $pingResult = executePing($device['ip'], 1);
-                    savePingResult($pdo, $device['ip'], $pingResult);
-                    $parsedResult = parsePingOutput($pingResult['output']);
-                    $status = getStatusFromPingResult($device, $pingResult, $parsedResult, $details);
-                    $last_avg_time = $parsedResult['avg_time'] ?? null;
-                    $last_ttl = $parsedResult['ttl'] ?? null;
-                    $check_output = $pingResult['output'];
-                }
+                $evaluation = evaluateDeviceCheck($pdo, $device, $details, $last_avg_time, $last_ttl, $check_output);
+                $status = $evaluation['status'];
+                $last_seen = $evaluation['last_seen'];
             }
-            
-            if ($status !== 'offline') { $last_seen = date('Y-m-d H:i:s'); }
             
             logStatusChange($pdo, $deviceId, $old_status, $status, $details);
             sendEmailNotification($pdo, $device, $old_status, $status, $details); // Trigger email notification
@@ -424,7 +421,7 @@ switch ($action) {
 
         $sql = "
             SELECT 
-                d.id, d.name, d.ip, d.check_port, d.type, d.description, d.enabled, d.x, d.y, d.map_id, 
+                d.id, d.name, d.ip, d.check_port, d.monitor_method, d.type, d.description, d.enabled, d.x, d.y, d.map_id,
                 d.ping_interval, d.icon_size, d.name_text_size, d.icon_url, 
                 d.warning_latency_threshold, d.warning_packetloss_threshold, 
                 d.critical_latency_threshold, d.critical_packetloss_threshold, 
@@ -485,10 +482,10 @@ switch ($action) {
                 exit;
             }
 
-            $sql = "INSERT INTO devices (user_id, name, ip, check_port, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
-                $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['type'], $input['description'] ?? null, $input['map_id'] ?? null,
+                $current_user_id, $input['name'], $input['ip'] ?? null, $input['check_port'] ?? null, $input['monitor_method'] ?? 'ping', $input['type'], $input['description'] ?? null, $input['map_id'] ?? null,
                 $input['x'] ?? null, $input['y'] ?? null,
                 $input['ping_interval'] ?? null, $input['icon_size'] ?? 50, $input['name_text_size'] ?? 14, $input['icon_url'] ?? null,
                 $input['warning_latency_threshold'] ?? null, $input['warning_packetloss_threshold'] ?? null,
@@ -509,7 +506,7 @@ switch ($action) {
             $id = $input['id'] ?? null;
             $updates = $input['updates'] ?? [];
             if (!$id || empty($updates)) { http_response_code(400); echo json_encode(['error' => 'Device ID and updates are required']); exit; }
-            $allowed_fields = ['name', 'ip', 'check_port', 'type', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'icon_url', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl']; // Added status and last_seen
+            $allowed_fields = ['name', 'ip', 'check_port', 'monitor_method', 'type', 'description', 'x', 'y', 'map_id', 'ping_interval', 'icon_size', 'name_text_size', 'icon_url', 'warning_latency_threshold', 'warning_packetloss_threshold', 'critical_latency_threshold', 'critical_packetloss_threshold', 'show_live_ping', 'status', 'last_seen', 'last_avg_time', 'last_ttl']; // Added status and last_seen
             $fields = []; $params = [];
             foreach ($updates as $key => $value) {
                 if (in_array($key, $allowed_fields)) {
@@ -620,6 +617,72 @@ switch ($action) {
             if (!$id) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
             $stmt = $pdo->prepare("DELETE FROM devices WHERE id = ? AND user_id = ?"); $stmt->execute([$id, $current_user_id]);
             echo json_encode(['success' => true, 'message' => 'Device deleted successfully']);
+        }
+        break;
+
+    case 'copy_device':
+        if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can copy devices.']); exit; }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $sourceId = $input['id'] ?? null;
+            if (!$sourceId) { http_response_code(400); echo json_encode(['error' => 'Device ID is required']); exit; }
+
+            // License guard
+            $max_devices = $_SESSION['license_max_devices'] ?? 0;
+            $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE user_id = ?");
+            $stmtCount->execute([$current_user_id]);
+            $current_devices = (int) $stmtCount->fetchColumn();
+            if ($max_devices > 0 && $current_devices >= $max_devices) {
+                http_response_code(403);
+                echo json_encode(['error' => "License limit reached. Cannot copy more than {$max_devices} devices."]); exit;
+            }
+
+            $stmt = $pdo->prepare("SELECT * FROM devices WHERE id = ? AND user_id = ?");
+            $stmt->execute([$sourceId, $current_user_id]);
+            $device = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$device) { http_response_code(404); echo json_encode(['error' => 'Device not found']); exit; }
+
+            $baseName = $device['name'] . '_copy';
+            $newName = $baseName;
+            $suffix = 2;
+            $nameCheckStmt = $pdo->prepare("SELECT COUNT(*) FROM devices WHERE user_id = ? AND name = ?");
+            while (true) {
+                $nameCheckStmt->execute([$current_user_id, $newName]);
+                if ((int) $nameCheckStmt->fetchColumn() === 0) { break; }
+                $newName = $baseName . "{$suffix}";
+                $suffix++;
+            }
+
+            $insertSql = "INSERT INTO devices (user_id, name, ip, check_port, monitor_method, type, description, map_id, x, y, ping_interval, icon_size, name_text_size, icon_url, warning_latency_threshold, warning_packetloss_threshold, critical_latency_threshold, critical_packetloss_threshold, show_live_ping) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $insertStmt = $pdo->prepare($insertSql);
+            $insertStmt->execute([
+                $current_user_id,
+                $newName,
+                $device['ip'],
+                $device['check_port'],
+                $device['monitor_method'] ?? 'ping',
+                $device['type'],
+                $device['description'],
+                $device['map_id'],
+                $device['x'],
+                $device['y'],
+                $device['ping_interval'],
+                $device['icon_size'],
+                $device['name_text_size'],
+                $device['icon_url'],
+                $device['warning_latency_threshold'],
+                $device['warning_packetloss_threshold'],
+                $device['critical_latency_threshold'],
+                $device['critical_packetloss_threshold'],
+                ($device['show_live_ping'] ?? false) ? 1 : 0
+            ]);
+
+            $newId = $pdo->lastInsertId();
+            $fetchSql = "SELECT d.*, m.name as map_name FROM devices d LEFT JOIN maps m ON d.map_id = m.id WHERE d.id = ? AND d.user_id = ?";
+            $fetchStmt = $pdo->prepare($fetchSql);
+            $fetchStmt->execute([$newId, $current_user_id]);
+            $newDevice = $fetchStmt->fetch(PDO::FETCH_ASSOC);
+
+            echo json_encode(['success' => true, 'device' => $newDevice]);
         }
         break;
 

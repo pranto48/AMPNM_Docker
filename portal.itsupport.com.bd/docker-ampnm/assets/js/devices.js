@@ -38,12 +38,18 @@ function initDevices() {
         const lastSeen = device.last_seen ? new Date(device.last_seen).toLocaleString() : 'Never';
         const mapLink = device.map_id ? `<a href="map.php?map_id=${device.map_id}" class="text-cyan-400 hover:underline">${device.map_name}</a>` : '<span class="text-slate-500">Unassigned</span>';
         const viewOnMapLink = device.map_id ? `<a href="map.php?map_id=${device.map_id}&edit_device_id=${device.id}" class="text-cyan-400 hover:text-cyan-300 mr-3" title="View on Map"><i class="fas fa-map-marked-alt"></i></a>` : `<span class="text-slate-600 mr-3" title="Not on a map"><i class="fas fa-map-marked-alt"></i></span>`;
+        const monitorMethod = device.monitor_method === 'port' ? 'Port check' : 'IP ping';
+        const monitorDetail = device.monitor_method === 'port'
+            ? (device.check_port ? `Port ${device.check_port}` : 'Port not set')
+            : 'ICMP';
+        const monitorBadge = `<span class="text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-200 inline-flex items-center gap-1"><i class="fas ${device.monitor_method === 'port' ? 'fa-plug' : 'fa-wave-square'}"></i>${monitorMethod}</span>`;
 
         // Conditional rendering of action buttons based on user role
         const actionsHtml = window.userRole === 'admin' ? `
             <button class="details-device-btn text-blue-400 hover:text-blue-300 mr-3" data-id="${device.id}" title="View Details"><i class="fas fa-chart-line"></i></button>
             ${viewOnMapLink}
             <a href="edit-device.php?id=${device.id}" class="edit-device-btn text-yellow-400 hover:text-yellow-300 mr-3" title="Edit Device"><i class="fas fa-edit"></i></a>
+            <button class="copy-device-btn text-indigo-300 hover:text-indigo-200 mr-3" data-id="${device.id}" title="Copy Device"><i class="fas fa-clone"></i></button>
             <button class="check-device-btn text-green-400 hover:text-green-300 mr-3" data-id="${device.id}" title="Check Status"><i class="fas fa-sync"></i></button>
             <button class="delete-device-btn text-red-500 hover:text-red-400" data-id="${device.id}" title="Delete Device"><i class="fas fa-trash"></i></button>
         ` : `
@@ -55,7 +61,7 @@ function initDevices() {
         return `
             <tr data-id="${device.id}" class="border-b border-slate-700 hover:bg-slate-800/50">
                 <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-white">${device.name}</div><div class="text-sm text-slate-400 capitalize">${device.type}</div></td>
-                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-slate-400 font-mono">${device.ip || 'N/A'}</div></td>
+                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-slate-400 font-mono">${device.ip || 'N/A'}</div><div class="text-xs text-slate-500 mt-1 flex items-center gap-2">${monitorBadge}<span>${monitorDetail}</span></div></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">${mapLink}</td>
                 <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex items-center gap-2 text-xs leading-5 font-semibold rounded-full ${statusClass}"><div class="${statusIndicatorClass}"></div>${device.status}</span></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-400">${lastSeen}</td>
@@ -116,6 +122,7 @@ function initDevices() {
                         <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                             <strong class="text-slate-400">Type:</strong> <span class="text-white capitalize">${device.type}</span>
                             <strong class="text-slate-400">Map:</strong> <span class="text-white">${device.map_name || 'Unassigned'}</span>
+                            <strong class="text-slate-400">Monitor:</strong> <span class="text-white">${device.monitor_method === 'port' ? `Port check${device.check_port ? ` (port ${device.check_port})` : ''}` : 'IP ping'}</span>
                             <strong class="text-slate-400">Ping Interval:</strong> <span class="text-white">${device.ping_interval ? `${device.ping_interval}s` : 'Disabled'}</span>
                             <strong class="text-slate-400">Live Ping:</strong> <span class="text-white">${device.show_live_ping ? 'Enabled' : 'Disabled'}</span>
                         </div>
@@ -194,11 +201,32 @@ function initDevices() {
             try {
                 await api.post('check_device', { id: deviceId });
                 await loadDevices();
-            } catch (error) { 
-                console.error('Failed to check device:', error); 
+            } catch (error) {
+                console.error('Failed to check device:', error);
                 window.notyf.error('Failed to check device.');
             }
             finally { button.disabled = false; icon.classList.remove('fa-spin'); }
+        }
+
+        if (button.classList.contains('copy-device-btn')) {
+            const icon = button.querySelector('i');
+            icon.classList.add('fa-spin');
+            button.disabled = true;
+            try {
+                const result = await api.post('copy_device', { id: deviceId });
+                if (result && result.success) {
+                    window.notyf.success('Device copied');
+                    await loadDevices();
+                } else {
+                    throw new Error(result.error || 'Copy failed');
+                }
+            } catch (error) {
+                console.error('Failed to copy device:', error);
+                window.notyf.error('Failed to copy device.');
+            } finally {
+                icon.classList.remove('fa-spin');
+                button.disabled = false;
+            }
         }
 
         if (button.classList.contains('delete-device-btn')) {

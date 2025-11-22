@@ -374,6 +374,15 @@ function initMap() {
             }
         });
 
+        els.openPublicLinkBtn.addEventListener('click', () => {
+            const publicLink = els.publicViewLink.value;
+            if (publicLink) {
+                window.open(publicLink, '_blank', 'noopener');
+            } else {
+                window.notyf.error('Enable public view to generate a link first.');
+            }
+        });
+
         els.mapSettingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const updates = {
@@ -437,8 +446,7 @@ function initMap() {
             window.notyf.error('No map selected to share.');
             return;
         }
-        // Construct the shareable URL using localhost
-        const shareUrl = `http://localhost:2266/public_map.php?map_id=${state.currentMapId}`;
+        const shareUrl = MapApp.utils.buildPublicMapUrl(state.currentMapId);
         try {
             await navigator.clipboard.writeText(shareUrl);
             window.notyf.success('Share link copied to clipboard!');
