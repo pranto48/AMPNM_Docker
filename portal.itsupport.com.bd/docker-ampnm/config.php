@@ -8,8 +8,9 @@ define('DB_NAME', getenv('DB_NAME') ?: 'network_monitor');
 
 // License System Configuration
 // IMPORTANT: Changed fallback to the correct public HTTPS URL.
-define('LICENSE_API_URL', getenv('LICENSE_API_URL') ?: 'https://portal.itsupport.com.bd/verify_license.php'); 
+define('LICENSE_API_URL', getenv('LICENSE_API_URL') ?: 'https://portal.itsupport.com.bd/verify_license.php');
 define('APP_LICENSE_KEY_ENV', getenv('APP_LICENSE_KEY') ?: ''); // This is the key from docker-compose.yml, might be empty
+define('LICENSE_DATA_KEY', getenv('LICENSE_DATA_KEY') ?: ''); // Optional stronger key for encrypting license data at rest
 
 // Create database connection
 function getDbConnection() {
@@ -70,6 +71,81 @@ function getAppSetting($key) {
 }
 
 /**
+ * Builds a 32-byte encryption key for at-rest secrets. Uses LICENSE_DATA_KEY when provided
+ * and falls back to a hashed combination of the transport encryption key and host identity.
+ */
+function getLicenseDataSecretKey() {
+    // Prefer an explicitly-provided strong key from the environment
+    $raw_key = LICENSE_DATA_KEY;
+
+    if (empty($raw_key)) {
+        // Derive a host-specific key to avoid a single static secret living in source code
+        $pepper = getenv('LICENSE_DATA_PEPPER') ?: 'ampnm-license-data-pepper';
+        $raw_key = hash('sha256', $pepper . '|' . php_uname('n'), true);
+    } elseif (strlen($raw_key) < 32) {
+        // Normalize shorter secrets to 32 bytes
+        $raw_key = hash('sha256', $raw_key, true);
+    }
+
+    return substr($raw_key, 0, 32);
+}
+
+/**
+ * Encrypts sensitive values for storage using AES-256-GCM with a random IV.
+ */
+function encryptSensitiveValue($plain_text) {
+    if ($plain_text === null || $plain_text === '') {
+        return $plain_text;
+    }
+
+    $key = getLicenseDataSecretKey();
+    $iv_length = openssl_cipher_iv_length('aes-256-gcm');
+    $iv = random_bytes($iv_length);
+    $tag = '';
+    $ciphertext = openssl_encrypt($plain_text, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+    return base64_encode(json_encode([
+        'iv' => base64_encode($iv),
+        'tag' => base64_encode($tag),
+        'ciphertext' => base64_encode($ciphertext),
+        'v' => 1,
+    ]));
+}
+
+/**
+ * Decrypts values produced by encryptSensitiveValue. Falls back to returning the raw value
+ * when it is not an encrypted payload so existing installs keep working.
+ */
+function decryptSensitiveValue($stored_value) {
+    if ($stored_value === null || $stored_value === '') {
+        return $stored_value;
+    }
+
+    $decoded = base64_decode($stored_value, true);
+    if ($decoded === false) {
+        return $stored_value; // Not encoded via encryptSensitiveValue
+    }
+
+    $payload = json_decode($decoded, true);
+    if (!is_array($payload) || ($payload['v'] ?? null) !== 1) {
+        return $stored_value; // Unknown format; treat as legacy plaintext
+    }
+
+    $key = getLicenseDataSecretKey();
+    $iv = base64_decode($payload['iv'] ?? '', true);
+    $tag = base64_decode($payload['tag'] ?? '', true);
+    $cipher = base64_decode($payload['ciphertext'] ?? '', true);
+
+    if ($iv === false || $tag === false || $cipher === false) {
+        return $stored_value; // Malformed payload
+    }
+
+    $plain = openssl_decrypt($cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+
+    return $plain === false ? $stored_value : $plain;
+}
+
+/**
  * Updates or inserts a setting into the app_settings table.
  * @param string $key The key of the setting.
  * @param string $value The new value for the setting.
@@ -92,7 +168,8 @@ function updateAppSetting($key, $value) {
  * @return string|null The license key, or null if not set.
  */
 function getAppLicenseKey() {
-    return getAppSetting('app_license_key');
+    $value = getAppSetting('app_license_key');
+    return decryptSensitiveValue($value);
 }
 
 /**
@@ -101,7 +178,8 @@ function getAppLicenseKey() {
  * @return bool True on success, false on failure.
  */
 function setAppLicenseKey($key) {
-    return updateAppSetting('app_license_key', $key);
+    $encrypted = encryptSensitiveValue($key);
+    return updateAppSetting('app_license_key', $encrypted);
 }
 
 /**
