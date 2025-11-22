@@ -1,15 +1,11 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-# This script is executed when the Docker container starts.
+APACHE_PORT="${APACHE_PORT:-2266}"
 
-# 1. Modify Apache's configuration to listen on port 2266 instead of the default 80.
-echo "Configuring Apache to listen on port 2266..."
-sed -i 's/Listen 80/Listen 2266/g' /etc/apache2/ports.conf
-sed -i 's/<VirtualHost \*:80>/<VirtualHost \*:2266>/g' /etc/apache2/sites-available/000-default.conf
+echo "Configuring Apache to listen on port ${APACHE_PORT}..."
+sed -ri "s/Listen 80/Listen ${APACHE_PORT}/" /etc/apache2/ports.conf || true
+sed -ri "s/<VirtualHost \*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sites-available/000-default.conf || true
 
-# 2. Start the Apache web server.
-# 'exec' is used to replace the script process with the Apache process,
-# which is standard practice for container entrypoints.
-echo "Starting Apache web server..."
+echo "Starting Apache web server on port ${APACHE_PORT}..."
 exec apache2-foreground
