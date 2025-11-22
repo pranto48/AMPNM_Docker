@@ -33,6 +33,7 @@ $maps = $stmt_maps->fetchAll(PDO::FETCH_ASSOC);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $ip = trim($_POST['ip'] ?? '');
+    $monitor_method = $_POST['monitor_method'] ?? ($device['monitor_method'] ?? 'ping');
     $check_port = $_POST['check_port'] ?? null;
     $type = $_POST['type'] ?? 'server';
     $description = trim($_POST['description'] ?? '');
@@ -52,10 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = '<div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">Device name is required.</div>';
     } else {
         try {
-            $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
+            $sql = "UPDATE devices SET name = ?, ip = ?, check_port = ?, monitor_method = ?, type = ?, description = ?, map_id = ?, ping_interval = ?, icon_size = ?, name_text_size = ?, icon_url = ?, warning_latency_threshold = ?, warning_packetloss_threshold = ?, critical_latency_threshold = ?, critical_packetloss_threshold = ?, show_live_ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
-                $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port, $type, empty($description) ? null : $description, empty($map_id) ? null : $map_id,
+                $name, empty($ip) ? null : $ip, empty($check_port) ? null : $check_port, $monitor_method, $type, empty($description) ? null : $description, empty($map_id) ? null : $map_id,
                 empty($ping_interval) ? null : $ping_interval, $icon_size, $name_text_size, empty($icon_url) ? null : $icon_url,
                 empty($warning_latency_threshold) ? null : $warning_latency_threshold, empty($warning_packetloss_threshold) ? null : $warning_packetloss_threshold,
                 empty($critical_latency_threshold) ? null : $critical_latency_threshold, empty($critical_packetloss_threshold) ? null : $critical_packetloss_threshold,
@@ -127,10 +128,20 @@ $form_data = $device ?? [];
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div>
-                    <label for="check_port" class="block text-sm font-medium text-slate-400 mb-1">Service Port (Optional)</label>
-                    <input type="number" id="check_port" name="check_port" placeholder="e.g., 80 for HTTP" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" value="<?= htmlspecialchars($form_data['check_port'] ?? '') ?>">
-                    <p class="text-xs text-slate-500 mt-1">If set, status is based on this port. If empty, it will use ICMP (ping).</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="monitor_method" class="block text-sm font-medium text-slate-400 mb-1">Monitoring Method</label>
+                        <select id="monitor_method" name="monitor_method" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
+                            <option value="ping" <?= (($form_data['monitor_method'] ?? 'ping') === 'ping') ? 'selected' : '' ?>>IP Ping (ICMP)</option>
+                            <option value="port" <?= (($form_data['monitor_method'] ?? 'ping') === 'port') ? 'selected' : '' ?>>Service Port Check</option>
+                        </select>
+                        <p class="text-xs text-slate-500 mt-1">Choose how availability is checked for this device.</p>
+                    </div>
+                    <div>
+                        <label for="check_port" class="block text-sm font-medium text-slate-400 mb-1">Service Port (Optional)</label>
+                        <input type="number" id="check_port" name="check_port" placeholder="e.g., 80 for HTTP" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" value="<?= htmlspecialchars($form_data['check_port'] ?? '') ?>">
+                        <p class="text-xs text-slate-500 mt-1">For port checks, provide the port to probe; leave blank for pure ping.</p>
+                    </div>
                 </div>
                 <div>
                     <label for="ping_interval" class="block text-sm font-medium text-slate-400 mb-1">Ping Interval (seconds)</label>

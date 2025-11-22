@@ -16,7 +16,7 @@ switch ($action) {
             'success' => true,
             'license_status_code' => $_SESSION['license_status_code'] ?? 'unknown',
             'license_message' => $_SESSION['license_message'] ?? 'License status unknown.',
-            'app_license_key' => getAppSetting('app_license_key') ?? '',
+            'app_license_key' => getAppLicenseKey() ?? '',
             'installation_id' => getAppSetting('installation_id') ?? '',
             'max_devices' => $_SESSION['license_max_devices'] ?? 0,
             'current_devices' => $_SESSION['current_device_count'] ?? 0,

@@ -36,7 +36,7 @@ if ($_SESSION['user_role'] !== 'admin' && in_array($current_page, $admin_only_pa
 
 // Check license status and redirect if necessary
 $license_status_code = $_SESSION['license_status_code'] ?? 'unknown';
-$app_license_key = getAppSetting('app_license_key');
+$app_license_key = getAppLicenseKey();
 
 // If license key is not configured, redirect to setup page
 if (empty($app_license_key) && $current_page !== 'license_setup.php') {

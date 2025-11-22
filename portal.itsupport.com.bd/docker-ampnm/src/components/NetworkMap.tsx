@@ -34,6 +34,7 @@ import { EdgeEditorDialog } from './EdgeEditorDialog';
 import DeviceNode from './DeviceNode';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildPublicMapUrl, getDockerBaseUrl } from '@/utils/url';
 
 // Declare SoundManager globally
 declare global {
@@ -67,15 +68,16 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
   const nodeTypes = useMemo(() => ({ device: DeviceNode }), []);
 
   // Function to trigger server-side pings and then fetch updated data
-  const refreshMapContent = useCallback(async (currentMapId: string) => {
-    try {
-      // 1. Trigger server-side pings for all devices on this map
-      // This API call is allowed for all roles (admin, viewer)
-      const pingResponse = await fetch(`http://localhost:2266/api.php?action=ping_all_devices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ map_id: currentMapId }),
-      });
+    const refreshMapContent = useCallback(async (currentMapId: string) => {
+      const apiBase = `${getDockerBaseUrl()}/api.php`;
+      try {
+        // 1. Trigger server-side pings for all devices on this map
+        // This API call is allowed for all roles (admin, viewer)
+        const pingResponse = await fetch(`${apiBase}?action=ping_all_devices`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ map_id: currentMapId }),
+        });
       const pingResult = await pingResponse.json();
       if (!pingResponse.ok || pingResult.error || !pingResult.success) {
         console.error('API ping_all_devices failed:', pingResult); // Added detailed log
@@ -103,7 +105,7 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
         }));
       } else {
         // For authenticated views, fetch all devices and filter by map_id
-        const allDevices = await fetch(`http://localhost:2266/api.php?action=get_devices&map_id=${currentMapId}`).then(res => res.json());
+        const allDevices = await fetch(`${apiBase}?action=get_devices&map_id=${currentMapId}`).then(res => res.json());
         updatedDevices = (allDevices.devices || []).map((d: any) => ({
           id: d.id,
           name: d.name,
@@ -537,9 +539,8 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
       return;
     }
 
-    // Construct the shareable URL
-    // Using localhost for the public URL
-    const shareUrl = `http://localhost:2266/public-map/${currentMapId}`; // CHANGED: Clean URL
+    // Construct the shareable URL based on the active host/port
+    const shareUrl = buildPublicMapUrl(currentMapId);
 
     try {
       await navigator.clipboard.writeText(shareUrl);

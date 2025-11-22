@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/license_manager.php'; // Load license manager 
 $message = '';
 
 // If a license key is already set AND active/grace_period, redirect to index
-if (getAppSetting('app_license_key') && ($_SESSION['license_status_code'] === 'active' || $_SESSION['license_status_code'] === 'grace_period')) {
+if (getAppLicenseKey() && ($_SESSION['license_status_code'] === 'active' || $_SESSION['license_status_code'] === 'grace_period')) {
     header('Location: index.php');
     exit;
 }
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="license_key" class="block text-sm font-medium text-slate-300 mb-2">License Key</label>
                 <input type="text" name="license_key" id="license_key" required
                        class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
-                       placeholder="XXXX-XXXX-XXXX-XXXX" value="<?= htmlspecialchars(getAppSetting('app_license_key') ?? '') ?>">
+                       placeholder="XXXX-XXXX-XXXX-XXXX" value="<?= htmlspecialchars(getAppLicenseKey() ?? '') ?>">
             </div>
             <button type="submit"
                     class="w-full px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none">

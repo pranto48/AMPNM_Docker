@@ -10,6 +10,10 @@ define('LICENSE_GRACE_PERIOD_DAYS', 7); // 7 days grace period after expiry
 define('ENCRYPTION_KEY', 'ITSupportBD_SecureKey_2024');
 define('CIPHER_METHOD', 'aes-256-cbc');
 
+// --- Integrity and anti-tamper configuration ---
+define('LICENSE_FINGERPRINT_MODE', getenv('LICENSE_FINGERPRINT_MODE') ?: 'enforce'); // enforce | allow-rebaseline
+define('LICENSE_FINGERPRINT_KEY', getenv('LICENSE_FINGERPRINT_KEY') ?: 'ampnm-license-fingerprint');
+
 function decryptLicenseData(string $encrypted_data) {
     $data = base64_decode($encrypted_data);
     $iv_length = openssl_cipher_iv_length(CIPHER_METHOD);
@@ -35,7 +39,78 @@ function decryptLicenseData(string $encrypted_data) {
     }
     return $result;
 }
+
+function computeFileFingerprint(string $path): ?string {
+    if (!is_readable($path)) {
+        return null;
+    }
+
+    $contents = file_get_contents($path);
+    if ($contents === false) {
+        return null;
+    }
+
+    return hash_hmac('sha256', $contents, getLicenseDataSecretKey() . '|' . LICENSE_FINGERPRINT_KEY);
+}
+
+function ensureLicenseIntegrity(): bool {
+    $critical_files = [
+        __DIR__ . '/license_manager.php',
+        __DIR__ . '/auth_check.php',
+        __DIR__ . '/../api/handlers/license_handler.php',
+        __DIR__ . '/../config.php',
+    ];
+
+    foreach ($critical_files as $file) {
+        $fingerprint = computeFileFingerprint($file);
+        if ($fingerprint === null) {
+            error_log("LICENSE_INTEGRITY: Unable to fingerprint {$file}");
+            continue;
+        }
+
+        $key = 'integrity_' . basename($file);
+        $stored = getAppSetting($key);
+
+        // First run or after explicit reset: capture baseline silently
+        if (empty($stored)) {
+            updateAppSetting($key, $fingerprint);
+            continue;
+        }
+
+        if (!hash_equals($stored, $fingerprint)) {
+            error_log("LICENSE_INTEGRITY: Fingerprint mismatch for {$file}. Stored baseline differs from current file.");
+
+            if (LICENSE_FINGERPRINT_MODE === 'allow-rebaseline') {
+                updateAppSetting($key, $fingerprint);
+                continue;
+            }
+
+            $_SESSION['license_status_code'] = 'disabled';
+            $_SESSION['license_message'] = 'License system integrity check failed. Core files were modified.';
+            $_SESSION['license_max_devices'] = 0;
+            $_SESSION['license_expires_at'] = null;
+            $_SESSION['license_grace_period_end'] = null;
+            $_SESSION['license_last_verified'] = time();
+            return false;
+        }
+    }
+
+    return true;
+}
 // --- End Encryption/Decryption Configuration ---
+
+// Initialize session defaults early so integrity failures set meaningful messages
+if (!isset($_SESSION['license_status_code'])) $_SESSION['license_status_code'] = 'unknown';
+if (!isset($_SESSION['license_message'])) $_SESSION['license_message'] = 'License status unknown.';
+if (!isset($_SESSION['license_max_devices'])) $_SESSION['license_max_devices'] = 0;
+if (!isset($_SESSION['license_expires_at'])) $_SESSION['license_expires_at'] = null;
+if (!isset($_SESSION['current_device_count'])) $_SESSION['current_device_count'] = 0;
+if (!isset($_SESSION['license_grace_period_end'])) $_SESSION['license_grace_period_end'] = null;
+
+// Block execution if core files were tampered with and re-baselining is not allowed
+if (!ensureLicenseIntegrity()) {
+    return;
+}
 
 // Function to generate a UUID (Universally Unique Identifier)
 function generateUuid() {
@@ -63,7 +138,7 @@ function verifyLicenseWithPortal() {
         return; // Use cached data
     }
 
-    $app_license_key = getAppSetting('app_license_key');
+    $app_license_key = getAppLicenseKey();
     $installation_id = getAppSetting('installation_id');
     $user_id = $_SESSION['user_id'] ?? 'anonymous'; // Use 'anonymous' if not logged in for initial checks
 
@@ -186,8 +261,12 @@ if (empty($installation_id)) {
     $installation_id = $new_uuid;
 }
 
-// 2. Check if license key is configured
-$app_license_key = getAppSetting('app_license_key');
+// 2. Check if license key is configured (prioritize environment-provided key for anti-tamper)
+$app_license_key = getAppLicenseKey();
+if (!empty(APP_LICENSE_KEY_ENV) && APP_LICENSE_KEY_ENV !== $app_license_key) {
+    setAppLicenseKey(APP_LICENSE_KEY_ENV);
+    $app_license_key = APP_LICENSE_KEY_ENV;
+}
 
 // If license key is not set, verifyLicenseWithPortal will set status to 'unconfigured'
 // If license key is set, verify it
