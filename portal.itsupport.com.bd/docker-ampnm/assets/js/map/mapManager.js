@@ -188,9 +188,7 @@ MapApp.mapManager = {
 
     updatePublicViewLink: (mapId, isEnabled) => {
         if (isEnabled) {
-            // CHANGED: Point to the new React-based public map URL
-            const publicLink = `http://localhost:2266/public_map.php?map_id=${mapId}`;
-            MapApp.ui.els.publicViewLink.value = publicLink;
+            MapApp.ui.els.publicViewLink.value = MapApp.utils.buildPublicMapUrl(mapId);
             MapApp.ui.els.publicViewLinkContainer.classList.remove('hidden');
         } else {
             MapApp.ui.els.publicViewLink.value = '';

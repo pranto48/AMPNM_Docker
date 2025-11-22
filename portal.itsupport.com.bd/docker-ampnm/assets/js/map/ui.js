@@ -50,6 +50,7 @@ MapApp.ui = {
             publicViewLinkContainer: document.getElementById('publicViewLinkContainer'),
             publicViewLink: document.getElementById('publicViewLink'),
             copyPublicLinkBtn: document.getElementById('copyPublicLinkBtn'),
+            openPublicLinkBtn: document.getElementById('openPublicLinkBtn'),
         };
     },
 

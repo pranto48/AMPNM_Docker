@@ -382,3 +382,176 @@ body {
 .alert-admin-error {
     @apply bg-red-700/30 text-red-200 px-4 py-3 rounded relative border border-red-600/50;
 }
+/* Utility pills and badges */
+.meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.45rem 0.75rem;
+    border-radius: 9999px;
+    background: rgba(148, 163, 184, 0.16);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.glass-chip {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: #34d399;
+    box-shadow: 0 0 16px rgba(52, 211, 153, 0.8);
+    display: inline-block;
+}
+
+/* User login adjustments */
+.user-login-card {
+    background: linear-gradient(145deg, rgba(37, 99, 235, 0.25), rgba(16, 185, 129, 0.2)), rgba(24, 30, 42, 0.7);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.user-login-aside {
+    background: linear-gradient(145deg, rgba(8, 47, 73, 0.45), rgba(30, 64, 175, 0.3));
+    border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+/* Admin login differentiators */
+.admin-circuit {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(80, 227, 194, 0.08), transparent 24%),
+                radial-gradient(circle at 80% 80%, rgba(74, 144, 226, 0.1), transparent 30%),
+                repeating-linear-gradient(90deg, rgba(80, 227, 194, 0.08) 0, rgba(80, 227, 194, 0.08) 1px, transparent 1px, transparent 12px),
+                repeating-linear-gradient(0deg, rgba(74, 144, 226, 0.08) 0, rgba(74, 144, 226, 0.08) 1px, transparent 1px, transparent 12px);
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.admin-login-card {
+    border: 1px solid rgba(80, 227, 194, 0.35);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+}
+
+.admin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.35rem 0.8rem;
+    border-radius: 9999px;
+    background: rgba(80, 227, 194, 0.12);
+    border: 1px solid rgba(80, 227, 194, 0.35);
+    color: #e2f5ff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.intel-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.admin-ribbon {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.65rem 1rem;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px dashed rgba(80, 227, 194, 0.35);
+    color: #cbd5e1;
+    font-weight: 600;
+}
+
+/* Hero orbs + product styling */
+.hero-orb {
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.35;
+    z-index: 0;
+}
+
+.hero-orb.orb-left { background: #4a90e2; top: -40px; left: -60px; }
+.hero-orb.orb-right { background: #50e3c2; bottom: -60px; right: -80px; }
+
+.products-hero {
+    overflow: hidden;
+}
+
+.products-spotlight {
+    border: 1px solid rgba(80, 227, 194, 0.25);
+}
+
+.glow-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.5rem 0.9rem;
+    border-radius: 9999px;
+    background: linear-gradient(120deg, rgba(80, 227, 194, 0.18), rgba(74, 144, 226, 0.2));
+    border: 1px solid rgba(80, 227, 194, 0.4);
+    color: #e0f2fe;
+    font-weight: 700;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.glow-pill.subtle {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #cbd5e1;
+    box-shadow: none;
+}
+
+.category-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: #e2f5ff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ampnm-selector {
+    position: relative;
+}
+
+.ampnm-selector::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    border: 1px dashed rgba(80, 227, 194, 0.35);
+    pointer-events: none;
+}
+
+.product-card {
+    position: relative;
+}
+
+.product-card:hover {
+    transform: translateY(-10px);
+}
+
+/* Not found page */
+.not-found-card {
+    overflow: hidden;
+}
