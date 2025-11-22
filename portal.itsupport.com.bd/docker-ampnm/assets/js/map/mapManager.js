@@ -2,13 +2,30 @@ window.MapApp = window.MapApp || {};
 
 MapApp.mapManager = {
     createMap: async () => {
+        if (window.userRole !== 'admin') {
+            // No error message needed, as the button is disabled for viewers
+            return;
+        }
         const name = prompt("Enter a name for the new map:");
-        if (name) { 
-            const newMap = await MapApp.api.post('create_map', { name }); 
+        if (name === null) { // User clicked cancel
+            window.notyf.info("Map creation cancelled.");
+            return; // Stop execution if prompt is cancelled
+        }
+        const trimmedName = name.trim();
+        if (trimmedName === '') {
+            window.notyf.error("Map name cannot be empty.");
+            return; // Stop execution if name is empty
+        }
+        
+        try {
+            const newMap = await MapApp.api.post('create_map', { name: trimmedName }); 
             await MapApp.mapManager.loadMaps(); 
             MapApp.ui.els.mapSelector.value = newMap.id; 
             await MapApp.mapManager.switchMap(newMap.id); 
-            window.notyf.success(`Map "${name}" created.`);
+            window.notyf.success(`Map "${trimmedName}" created.`);
+        } catch (error) {
+            console.error("Failed to create map:", error);
+            window.notyf.error(error.message || "Failed to create map.");
         }
     },
 
@@ -57,12 +74,16 @@ MapApp.mapManager = {
             mapEl.style.backgroundImage = currentMap.background_image_url ? `url(${currentMap.background_image_url})` : '';
             mapEl.style.backgroundSize = 'cover';
             mapEl.style.backgroundPosition = 'center';
+            // Update public view link display
+            MapApp.mapManager.updatePublicViewLink(currentMap.id, currentMap.public_view_enabled);
         }
         
-        const [deviceData, edgeData] = await Promise.all([
+        // Correctly extract the 'devices' array from the API response
+        const [deviceResponse, edgeData] = await Promise.all([
             MapApp.api.get('get_devices', { map_id: mapId }), 
             MapApp.api.get('get_edges', { map_id: mapId })
         ]);
+        const deviceData = deviceResponse.devices || []; // Extract the array here
         
         const visNodes = deviceData.map(d => {
             let label = d.name;
@@ -98,8 +119,10 @@ MapApp.mapManager = {
         MapApp.state.nodes.add(visNodes);
 
         const visEdges = edgeData.map(e => ({ id: e.id, from: e.source_id, to: e.target_id, connection_type: e.connection_type, label: e.connection_type }));
+        console.log('visEdges array before adding to dataset:', visEdges); // Added log
         MapApp.state.edges.clear(); 
         MapApp.state.edges.add(visEdges);
+        console.log('Edges in dataset after load:', MapApp.state.edges.get()); // Added log
         
         MapApp.deviceManager.setupAutoPing(deviceData);
         if (!MapApp.state.network) MapApp.network.initializeMap();
@@ -107,6 +130,10 @@ MapApp.mapManager = {
     },
 
     copyDevice: async (deviceId) => {
+        if (window.userRole !== 'admin') {
+            // No error message needed, as the context menu item is hidden for viewers
+            return;
+        }
         const nodeToCopy = MapApp.state.nodes.get(deviceId);
         if (!nodeToCopy) return;
 
@@ -134,29 +161,38 @@ MapApp.mapManager = {
             const createdDevice = await MapApp.api.post('create_device', newDeviceData);
             window.notyf.success(`Device "${originalDevice.name}" copied.`);
             
-            const visNode = {
+            const baseNode = {
                 id: createdDevice.id,
                 label: createdDevice.name,
                 title: MapApp.utils.buildNodeTitle(createdDevice),
                 x: createdDevice.x,
-                y: createdDevice.y,
-                shape: 'icon',
-                icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown },
+                y: createdDevice.y, // Corrected variable name
                 font: { color: 'white', size: parseInt(createdDevice.name_text_size) || 14, multi: true },
                 deviceData: createdDevice
             };
-            if (createdDevice.type === 'box') {
-                Object.assign(visNode, {
-                    shape: 'box',
-                    color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' },
-                    margin: 20,
-                    level: -1
-                });
+
+            let visNode;
+            if (createdDevice.icon_url) {
+                visNode = { ...baseNode, shape: 'image', image: createdDevice.icon_url, size: (parseInt(createdDevice.icon_size) || 50) / 2, color: { border: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown, background: 'transparent' }, borderWidth: 3 };
+            } else if (createdDevice.type === 'box') {
+                visNode = { ...baseNode, shape: 'box', color: { background: 'rgba(49, 65, 85, 0.5)', border: '#475569' }, margin: 20, level: -1 };
+            } else {
+                visNode = { ...baseNode, shape: 'icon', icon: { face: "'Font Awesome 6 Free'", weight: "900", code: MapApp.config.iconMap[createdDevice.type] || MapApp.config.iconMap.other, size: parseInt(createdDevice.icon_size) || 50, color: MapApp.config.statusColorMap[createdDevice.status] || MapApp.config.statusColorMap.unknown } };
             }
             MapApp.state.nodes.add(visNode);
         } catch (error) {
             console.error("Failed to copy device:", error);
             window.notyf.error("Could not copy the device.");
+        }
+    },
+
+    updatePublicViewLink: (mapId, isEnabled) => {
+        if (isEnabled) {
+            MapApp.ui.els.publicViewLink.value = MapApp.utils.buildPublicMapUrl(mapId);
+            MapApp.ui.els.publicViewLinkContainer.classList.remove('hidden');
+        } else {
+            MapApp.ui.els.publicViewLink.value = '';
+            MapApp.ui.els.publicViewLinkContainer.classList.add('hidden');
         }
     }
 };

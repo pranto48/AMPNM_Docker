@@ -1,6 +1,10 @@
 <?php
 require_once 'includes/auth_check.php';
 include 'header.php';
+
+// Get user role from session
+$user_role = $_SESSION['user_role'] ?? 'viewer';
+$is_admin = ($user_role === 'admin');
 ?>
 
 <main id="app">
@@ -10,11 +14,10 @@ include 'header.php';
                 <h1 class="text-3xl font-bold text-white">Network Map</h1>
                 <div class="flex gap-4">
                     <select id="mapSelector" class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500"></select>
-                    <?php if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'viewer'): ?>
-                        <button id="newMapBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><i class="fas fa-plus mr-2"></i>New Map</button>
-                        <button id="renameMapBtn" class="px-4 py-2 bg-yellow-600/80 text-white rounded-lg hover:bg-yellow-700"><i class="fas fa-edit mr-2"></i>Rename Map</button>
-                        <button id="deleteMapBtn" class="px-4 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-700"><i class="fas fa-trash mr-2"></i>Delete Map</button>
-                    <?php endif; ?>
+                    <button id="newMapBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-plus mr-2"></i>New Map</button>
+                    <button id="renameMapBtn" class="px-4 py-2 bg-yellow-600/80 text-white rounded-lg hover:bg-yellow-700" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-edit mr-2"></i>Rename Map</button>
+                    <button id="deleteMapBtn" class="px-4 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-700" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-trash mr-2"></i>Delete Map</button>
+                    <button id="shareMapBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i class="fas fa-share-alt mr-2"></i>Share Map</button>
                 </div>
             </div>
         </div>
@@ -24,29 +27,28 @@ include 'header.php';
                 <div class="flex items-center justify-between">
                     <h2 id="currentMapName" class="text-xl font-semibold text-white"></h2>
                     <div class="flex items-center gap-2">
-                        <?php if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'viewer'): ?>
-                            <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network"><i class="fas fa-search"></i></button>
-                            <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
-                        <?php endif; ?>
+                        <button id="scanNetworkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Scan Network" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-search"></i></button>
+                        <button id="refreshStatusBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Refresh Device Statuses"><i class="fas fa-sync-alt"></i></button>
                         
                         <div class="flex items-center space-x-2 pl-2 ml-2 border-l border-slate-700">
                             <label for="liveRefreshToggle" class="text-sm text-slate-400 select-none cursor-pointer">Live Status</label>
                             <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="liveRefreshToggle" class="sr-only peer" <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'viewer') ? 'disabled' : ''; ?>>
+                                <input type="checkbox" id="liveRefreshToggle" class="sr-only peer" <?= $is_admin ? '' : 'disabled checked' ?>>
                                 <div class="w-11 h-6 bg-slate-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
                             </label>
+                            <?php if (!$is_admin): ?>
+                                <span class="text-xs text-slate-500">(Always On)</span>
+                            <?php endif; ?>
                         </div>
 
                         <div class="pl-2 ml-2 border-l border-slate-700 flex items-center gap-2">
-                            <?php if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'viewer'): ?>
-                                <button id="placeDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Place Existing Device"><i class="fas fa-download"></i></button>
-                                <button id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device"><i class="fas fa-plus"></i></button>
-                                <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection"><i class="fas fa-project-diagram"></i></button>
-                                <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map"><i class="fas fa-file-export"></i></button>
-                                <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map"><i class="fas fa-file-import"></i></button>
-                                <input type="file" id="importFile" class="hidden" accept=".json">
-                                <button id="mapSettingsBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Map Settings"><i class="fas fa-cog"></i></button>
-                            <?php endif; ?>
+                            <button id="placeDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Place Existing Device" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-download"></i></button>
+                            <a href="create-device.php" id="addDeviceBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add New Device" <?= $is_admin ? '' : 'style="display:none;"' ?>><i class="fas fa-plus"></i></a>
+                            <button id="addEdgeBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Add Connection" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-project-diagram"></i></button>
+                            <button id="exportBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Export Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-export"></i></button>
+                            <button id="importBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Import Map" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-file-import"></i></button>
+                            <input type="file" id="importFile" class="hidden" accept=".json">
+                            <button id="mapSettingsBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Map Settings" <?= $is_admin ? '' : 'disabled' ?>><i class="fas fa-cog"></i></button>
                             <button id="fullscreenBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600" title="Toggle Fullscreen"><i class="fas fa-expand"></i></button>
                         </div>
                     </div>
@@ -65,126 +67,12 @@ include 'header.php';
             <i class="fas fa-map-signs text-slate-600 text-5xl mb-4"></i>
             <h2 class="text-2xl font-bold text-white mb-2">No Network Maps Found</h2>
             <p class="text-slate-400 mb-6">Create a map to start visualizing your network.</p>
-            <?php if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'viewer'): ?>
-                <button id="createFirstMapBtn" class="px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-lg">Create Your First Map</button>
-            <?php endif; ?>
+            <button id="createFirstMapBtn" class="px-6 py-3 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-lg" <?= $is_admin ? '' : 'disabled' ?>>Create Your First Map</button>
         </div>
     </div>
 
     <!-- Modals -->
-    <div id="deviceModal" class="modal-backdrop hidden">
-        <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] flex flex-col">
-            <h2 id="modalTitle" class="text-xl font-semibold text-white mb-4">Add Device</h2>
-            <form id="deviceForm" class="flex flex-col flex-grow">
-                <input type="hidden" id="deviceId" name="id">
-                <div class="flex-grow overflow-y-auto pr-2 -mr-2 space-y-4">
-                    <div>
-                        <label for="deviceName" class="block text-sm font-medium text-slate-400 mb-1">Name</label>
-                        <input type="text" id="deviceName" name="name" placeholder="Device Name" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" required>
-                    </div>
-                    <div id="deviceIpWrapper">
-                        <label for="deviceIp" class="block text-sm font-medium text-slate-400 mb-1">IP Address</label>
-                        <input type="text" id="deviceIp" name="ip" placeholder="IP Address" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500" required>
-                    </div>
-                    <div>
-                        <label for="deviceDescription" class="block text-sm font-medium text-slate-400 mb-1">Description</label>
-                        <textarea id="deviceDescription" name="description" rows="2" placeholder="Optional notes about the device" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500"></textarea>
-                    </div>
-                    <div id="devicePortWrapper">
-                        <label for="checkPort" class="block text-sm font-medium text-slate-400 mb-1">Service Port (Optional)</label>
-                        <input type="number" id="checkPort" name="check_port" placeholder="e.g., 80 for HTTP" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                        <p class="text-xs text-slate-500 mt-1">If set, status is based on this port. If empty, it will use ICMP (ping).</p>
-                    </div>
-                    <div>
-                        <label for="deviceType" class="block text-sm font-medium text-slate-400 mb-1">Type (Default Icon)</label>
-                        <select id="deviceType" name="type" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                            <option value="box">Box (Group)</option>
-                            <option value="camera">CC Camera</option>
-                            <option value="cloud">Cloud</option>
-                            <option value="database">Database</option>
-                            <option value="firewall">Firewall</option>
-                            <option value="ipphone">IP Phone</option>
-                            <option value="laptop">Laptop/PC</option>
-                            <option value="mobile">Mobile Phone</option>
-                            <option value="nas">NAS</option>
-                            <option value="rack">Networking Rack</option>
-                            <option value="printer">Printer</option>
-                            <option value="punchdevice">Punch Device</option>
-                            <option value="radio-tower">Radio Tower</option>
-                            <option value="router">Router</option>
-                            <option value="server">Server</option>
-                            <option value="switch">Switch</option>
-                            <option value="tablet">Tablet</option>
-                            <option value="wifi-router">WiFi Router</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <fieldset class="border border-slate-600 rounded-lg p-4">
-                        <legend class="text-sm font-medium text-slate-400 px-2">Custom Icon</legend>
-                        <div class="space-y-3">
-                            <div>
-                                <label for="icon_url" class="block text-sm font-medium text-slate-400 mb-1">Icon URL</label>
-                                <input type="text" id="icon_url" name="icon_url" placeholder="Leave blank to use default icon" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            </div>
-                            <div class="text-center text-slate-500 text-sm">OR</div>
-                            <div>
-                                <label for="icon_upload" class="block text-sm font-medium text-slate-400 mb-1">Upload Icon</label>
-                                <input type="file" id="icon_upload" name="icon_upload" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600/20 file:text-cyan-300 hover:file:bg-cyan-600/40">
-                                <div id="icon_upload_loader" class="hidden mt-2"><div class="loader inline-block w-4 h-4"></div><span class="ml-2 text-sm">Uploading...</span></div>
-                                <p class="text-xs text-slate-500 mt-1">Upload requires the item to be saved first.</p>
-                            </div>
-                            <div id="icon_preview_wrapper" class="hidden mt-2 text-center">
-                                <img id="icon_preview" src="" alt="Icon Preview" class="max-w-full h-16 mx-auto bg-slate-700 p-1 rounded">
-                            </div>
-                        </div>
-                    </fieldset>
-                    <div id="pingIntervalWrapper">
-                        <label for="pingInterval" class="block text-sm font-medium text-slate-400 mb-1">Ping Interval (seconds)</label>
-                        <input type="number" id="pingInterval" name="ping_interval" placeholder="e.g., 60 (optional)" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                    </div>
-                    <fieldset id="thresholdsWrapper" class="border border-slate-600 rounded-lg p-4">
-                        <legend class="text-sm font-medium text-slate-400 px-2">Status Thresholds (optional)</legend>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="warning_latency_threshold" class="block text-xs text-slate-400 mb-1">Warn Latency (ms)</label>
-                                <input type="number" id="warning_latency_threshold" name="warning_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            </div>
-                            <div>
-                                <label for="warning_packetloss_threshold" class="block text-xs text-slate-400 mb-1">Warn Packet Loss (%)</label>
-                                <input type="number" id="warning_packetloss_threshold" name="warning_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            </div>
-                            <div>
-                                <label for="critical_latency_threshold" class="block text-xs text-slate-400 mb-1">Critical Latency (ms)</label>
-                                <input type="number" id="critical_latency_threshold" name="critical_latency_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            </div>
-                            <div>
-                                <label for="critical_packetloss_threshold" class="block text-xs text-slate-400 mb-1">Critical Packet Loss (%)</label>
-                                <input type="number" id="critical_packetloss_threshold" name="critical_packetloss_threshold" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
-                            </div>
-                        </div>
-                    </fieldset>
-                    <div>
-                        <label id="iconSizeLabel" for="iconSize" class="block text-sm font-medium text-slate-400 mb-1">Icon Size</label>
-                        <input type="number" id="iconSize" name="icon_size" placeholder="e.g., 50" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                    </div>
-                    <div>
-                        <label id="nameTextSizeLabel" for="nameTextSize" class="block text-sm font-medium text-slate-400 mb-1">Name Text Size</label>
-                        <input type="number" id="nameTextSize" name="name_text_size" placeholder="e.g., 14" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                    </div>
-                    <div>
-                        <label for="showLivePing" class="flex items-center text-sm font-medium text-slate-400">
-                            <input type="checkbox" id="showLivePing" name="show_live_ping" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
-                            <span class="ml-2">Show live ping status on map</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-4 mt-6">
-                    <button type="button" id="cancelBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
-                    <button type="submit" id="saveBtn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- The old deviceModal HTML is removed as it's replaced by React components -->
 
     <div id="edgeModal" class="modal-backdrop hidden">
         <div class="modal-panel bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
@@ -192,7 +80,13 @@ include 'header.php';
             <form id="edgeForm">
                 <input type="hidden" id="edgeId">
                 <select id="connectionType" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500">
-                    <option value="cat5">CAT5 Cable</option><option value="fiber">Fiber Optic</option><option value="wifi">WiFi</option><option value="radio">Radio</option>
+                    <option value="" disabled selected>Select a connection type</option>
+                    <option value="cat5">CAT5 Cable</option>
+                    <option value="fiber">Fiber Optic</option>
+                    <option value="wifi">WiFi</option>
+                    <option value="radio">Radio</option>
+                    <option value="lan">LAN</option>
+                    <option value="logical-tunneling">Logical Tunneling</option>
                 </select>
                 <div class="flex justify-end gap-4 mt-6">
                     <button type="button" id="cancelEdgeBtn" class="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
@@ -214,7 +108,6 @@ include 'header.php';
                     <button type="submit" id="startScanBtn" class="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
                         <i class="fas fa-search mr-2"></i>Start Scan
                     </button>
-                </button>
                 </form>
             </div>
             <div id="scanResultWrapper" class="max-h-96 overflow-y-auto">
@@ -250,6 +143,28 @@ include 'header.php';
                         <label for="mapBgUpload" class="block text-sm font-medium text-slate-400 mb-1">Upload Background Image</label>
                         <input type="file" id="mapBgUpload" accept="image/*" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-600/20 file:text-cyan-300 hover:file:bg-cyan-600/40">
                         <div id="mapBgUploadLoader" class="hidden mt-2"><div class="loader inline-block w-4 h-4"></div><span class="ml-2 text-sm">Uploading...</span></div>
+                    </div>
+                </div>
+                <div class="border-t border-slate-700 pt-4 mt-4 space-y-3">
+                    <h3 class="text-lg font-semibold text-white">Public View Settings</h3>
+                    <div>
+                        <label for="publicViewToggle" class="flex items-center text-sm font-medium text-slate-400 cursor-pointer">
+                            <input type="checkbox" id="publicViewToggle" name="public_view_enabled" class="h-4 w-4 rounded border-slate-500 bg-slate-700 text-cyan-600 focus:ring-cyan-500">
+                            <span class="ml-2">Enable Public View</span>
+                        </label>
+                        <p class="text-xs text-slate-500 mt-1">Allow anyone with the link to view this map without logging in.</p>
+                    </div>
+                    <div id="publicViewLinkContainer" class="hidden space-y-2">
+                        <label class="block text-sm font-medium text-slate-400">Public Link:</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="publicViewLink" class="flex-grow bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm cursor-text" readonly>
+                            <button type="button" id="copyPublicLinkBtn" class="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm flex items-center">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                            <button type="button" id="openPublicLinkBtn" class="px-3 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-600 text-sm flex items-center">
+                                <i class="fas fa-external-link-alt mr-1"></i>Open
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mt-6">

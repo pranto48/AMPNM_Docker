@@ -25,7 +25,17 @@ async function createMapSelector(containerId, onChangeCallback) {
             selector.addEventListener('change', () => onChangeCallback(selector.value));
             return selector;
         } else {
-            container.innerHTML = `<a href="map.php" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Create a Map</a>`;
+            container.innerHTML = `<a href="map.php" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 ${window.userRole !== 'admin' ? 'opacity-50 cursor-not-allowed' : ''}">Create a Map</a>`;
+            // Disable the link if not admin
+            if (window.userRole !== 'admin') {
+                const createMapLink = container.querySelector('a');
+                if (createMapLink) {
+                    createMapLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        window.notyf.error('You do not have permission to create maps.');
+                    });
+                }
+            }
             return null;
         }
     } catch (error) {

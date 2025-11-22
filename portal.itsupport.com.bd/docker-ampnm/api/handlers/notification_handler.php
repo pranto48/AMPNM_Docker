@@ -1,17 +1,6 @@
 <?php
 // This file is included by api.php and assumes $pdo, $action, and $input are available.
 $current_user_id = $_SESSION['user_id'];
-$current_user_role = $_SESSION['role'] ?? 'viewer';
-
-// Deny write operations for viewer role (defense-in-depth; also enforced in api.php)
-$viewerDeniedActions = [
-    'save_smtp_settings', 'save_device_subscription', 'delete_device_subscription'
-];
-if ($current_user_role === 'viewer' && in_array($action, $viewerDeniedActions, true)) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Forbidden: Viewer role cannot modify notification settings or subscriptions.']);
-    exit;
-}
 
 switch ($action) {
     case 'get_smtp_settings':

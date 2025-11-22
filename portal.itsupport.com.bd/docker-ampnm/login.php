@@ -24,8 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Password is correct, start session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
-            // Set role from DB; if missing, default admin by username or viewer otherwise
-            $_SESSION['role'] = $user['role'] ?? (($username === 'admin') ? 'admin' : 'viewer');
+            $_SESSION['user_role'] = $user['role']; // Store user role in session
             header('Location: index.php');
             exit;
         } else {
@@ -44,14 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="bg-slate-900 flex items-center justify-center min-h-screen">
+<body class="animated-gradient-background flex items-center justify-center min-h-screen">
     <div class="w-full max-w-md">
         <div class="text-center mb-8">
             <i class="fas fa-shield-halved text-cyan-400 text-6xl"></i>
             <h1 class="text-3xl font-bold text-white mt-4">AMPNM</h1>
-            <p class="text-slate-400">Please sign in to continue</p>
+            <p class="text-slate-200">Please sign in to continue</p>
         </div>
-        <form method="POST" action="login.php" class="bg-slate-800/50 border border-slate-700 rounded-lg shadow-xl p-8 space-y-6">
+        <form method="POST" action="login.php" class="bg-slate-800/70 border border-slate-700 rounded-lg shadow-xl p-8 space-y-6 backdrop-blur-sm">
             <?php if ($error_message): ?>
                 <div class="bg-red-500/20 border border-red-500/30 text-red-300 text-sm rounded-lg p-3 text-center">
                     <?= htmlspecialchars($error_message) ?>
@@ -60,13 +59,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div>
                 <label for="username" class="block text-sm font-medium text-slate-300 mb-2">Username</label>
                 <input type="text" name="username" id="username" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                       class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
                        placeholder="admin">
             </div>
             <div>
                 <label for="password" class="block text-sm font-medium text-slate-300 mb-2">Password</label>
                 <input type="password" name="password" id="password" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                       class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white"
                        placeholder="password">
             </div>
             <button type="submit"

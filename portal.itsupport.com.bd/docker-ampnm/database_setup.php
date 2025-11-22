@@ -50,23 +50,26 @@ try {
         `id` INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         `username` VARCHAR(50) NOT NULL UNIQUE,
         `password` VARCHAR(255) NOT NULL,
-        `role` VARCHAR(20) NOT NULL DEFAULT 'viewer',
+        `role` ENUM('admin', 'viewer') DEFAULT 'admin', /* NEW: Add role column */
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    
-    // Add role column if missing (for upgrades)
-    try {
-        $pdo->exec("ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `role` VARCHAR(20) NOT NULL DEFAULT 'viewer' AFTER `password`");
-    } catch (Exception $e) {
-        // Ignore if not supported (older MySQL); attempt safe check
-        try {
-            $colCheck = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'role'")->fetch();
-            if (!$colCheck) {
-                $pdo->exec("ALTER TABLE `users` ADD COLUMN `role` VARCHAR(20) NOT NULL DEFAULT 'viewer' AFTER `password`");
-            }
-        } catch (Exception $ignored) { /* no-op */ }
+    message("Table 'users' checked/created successfully.");
+
+    // Migration: Add role column if it doesn't exist
+    function columnExists($pdo, $db, $table, $column) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+        $stmt->execute([$db, $table, $column]);
+        return $stmt->fetchColumn() > 0;
     }
-    message("Table 'users' checked/created successfully (with role column).");
+
+    if (!columnExists($pdo, $dbname, 'users', 'role')) {
+        $pdo->exec("ALTER TABLE `users` ADD COLUMN `role` ENUM('admin', 'viewer') DEFAULT 'admin' AFTER `password`;");
+        message("Migrated 'users' table: added 'role' column.");
+        // Set existing users to 'admin' role
+        $pdo->exec("UPDATE `users` SET `role` = 'admin' WHERE `role` IS NULL;");
+        message("Migrated existing users to 'admin' role.");
+    }
+
 
     // Step 2: Ensure admin user exists and set password from environment variable
     $admin_user = 'admin';
@@ -96,8 +99,6 @@ try {
             $updateStmt->execute([$new_hash, $admin_id]);
             message("Updated admin password from environment variable.");
         }
-        // Ensure admin has admin role
-        $pdo->prepare("UPDATE `users` SET role = 'admin' WHERE id = ?")->execute([$admin_id]);
     }
 
     // Step 3: Create the rest of the tables
@@ -123,6 +124,7 @@ try {
             `background_color` VARCHAR(20) NULL,
             `background_image_url` VARCHAR(255) NULL,
             `is_default` BOOLEAN DEFAULT FALSE,
+            `public_view_enabled` BOOLEAN DEFAULT FALSE, /* NEW COLUMN */
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
@@ -233,12 +235,8 @@ try {
     }
 
     // Step 4: Schema migration section to handle upgrades
-    function columnExists($pdo, $db, $table, $column) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?");
-        $stmt->execute([$db, $table, $column]);
-        return $stmt->fetchColumn() > 0;
-    }
-
+    // columnExists function is defined above
+    
     if (!columnExists($pdo, $dbname, 'maps', 'user_id')) {
         $pdo->exec("ALTER TABLE `maps` ADD COLUMN `user_id` INT(6) UNSIGNED;");
         $updateStmt = $pdo->prepare("UPDATE `maps` SET user_id = ?");
@@ -282,6 +280,11 @@ try {
     if (!columnExists($pdo, $dbname, 'devices', 'description')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `description` TEXT NULL AFTER `type`;");
         message("Upgraded 'devices' table: added 'description' column.");
+    }
+    // NEW MIGRATION: Add public_view_enabled to maps table
+    if (!columnExists($pdo, $dbname, 'maps', 'public_view_enabled')) {
+        $pdo->exec("ALTER TABLE `maps` ADD COLUMN `public_view_enabled` BOOLEAN DEFAULT FALSE AFTER `is_default`;");
+        message("Migrated `maps` table: added `public_view_enabled` column.");
     }
 
 

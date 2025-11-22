@@ -1,6 +1,7 @@
 <?php
 // This file is included by api.php and assumes $pdo is available.
 $current_user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'] ?? 'viewer'; // Get current user's role
 
 if ($action === 'get_status_logs') {
     $map_id = $_GET['map_id'] ?? null;
@@ -42,10 +43,15 @@ if ($action === 'get_status_logs') {
             SUM(CASE WHEN l.status = 'offline' THEN 1 ELSE 0 END) as offline_count
         FROM device_status_logs l
         JOIN devices d ON l.device_id = d.id
-        WHERE d.user_id = ? AND d.map_id = ? AND l.created_at >= NOW() - $interval
+        WHERE d.map_id = ? AND l.created_at >= NOW() - $interval
     ";
     
-    $params = [$dateFormat, $current_user_id, $map_id];
+    $params = [$dateFormat, $map_id];
+
+    if ($user_role !== 'viewer') { // Only filter by user_id if not a viewer
+        $sql .= " AND d.user_id = ?";
+        $params[] = $current_user_id;
+    }
 
     if ($device_id) {
         $sql .= " AND l.device_id = ?";

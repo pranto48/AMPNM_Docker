@@ -201,3 +201,32 @@ function checkHttpConnectivity($host) {
         'error' => $error
     ];
 }
+
+/**
+ * Generates a Font Awesome icon as an SVG data URL.
+ * This version assumes Font Awesome CSS is already loaded in the browser.
+ *
+ * @param string $iconCode The Font Awesome Unicode character (e.g., '\uf233' for server).
+ * @param int $size The desired size of the icon in pixels.
+ * @param string $color The color of the icon (e.g., '#ffffff').
+ * @return string The SVG data URL.
+ */
+function generateFaSvgDataUrl(string $iconCode, int $size, string $color): string {
+    // Ensure the icon code is properly escaped for XML
+    $escapedIconCode = htmlspecialchars($iconCode);
+
+    // Font Awesome 6 Free Solid font family
+    $fontFamily = 'Font Awesome 6 Free';
+    $fontWeight = '900'; // Solid icons
+
+    // Create SVG content, assuming the font is already loaded by the browser's CSS
+    $svg = <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" width="{$size}" height="{$size}" viewBox="0 0 {$size} {$size}">
+    <text x="50%" y="50%" style="font-family: '{$fontFamily}'; font-weight: {$fontWeight}; font-size: {$size}px; fill: {$color}; text-anchor: middle; dominant-baseline: central;">{$escapedIconCode}</text>
+</svg>
+SVG;
+
+    // Encode SVG for data URL
+    $encodedSvg = rawurlencode($svg);
+    return "data:image/svg+xml;charset=utf-8,{$encodedSvg}";
+}

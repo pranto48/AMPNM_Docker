@@ -11,7 +11,7 @@ function initDashboard() {
     const offlineCountEl = document.getElementById('offlineCount');
     const recentActivityListEl = document.getElementById('recentActivityList');
     const noRecentActivityMessage = document.getElementById('noRecentActivityMessage');
-    const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
+    // const manageDevicesLink = document.getElementById('manageDevicesLink'); // This element is not in index.php anymore, but keeping for consistency if it's added back.
     let statusChart = null;
 
     const pingForm = document.getElementById('pingForm');
@@ -45,11 +45,14 @@ function initDashboard() {
         try {
             const data = await api.get('get_dashboard_data', { map_id: mapId });
             
-            totalDevicesText.querySelector('span:first-child').textContent = data.stats.total;
-            onlineCountEl.textContent = data.stats.online;
-            warningCountEl.textContent = data.stats.warning;
-            criticalCountEl.textContent = data.stats.critical;
-            offlineCountEl.textContent = data.stats.offline;
+            // Update total devices text with global count
+            totalDevicesText.querySelector('span:first-child').textContent = data.global_total_devices;
+
+            // Use map_stats for the breakdown and chart
+            onlineCountEl.textContent = data.map_stats.online;
+            warningCountEl.textContent = data.map_stats.warning;
+            criticalCountEl.textContent = data.map_stats.critical;
+            offlineCountEl.textContent = data.map_stats.offline;
 
             if (statusChart) {
                 statusChart.destroy();
@@ -57,7 +60,7 @@ function initDashboard() {
             const chartData = {
                 labels: ['Online', 'Warning', 'Critical', 'Offline'],
                 datasets: [{
-                    data: [data.stats.online, data.stats.warning, data.stats.critical, data.stats.offline],
+                    data: [data.map_stats.online, data.map_stats.warning, data.map_stats.critical, data.map_stats.offline],
                     backgroundColor: ['#22c55e', '#f59e0b', '#ef4444', '#64748b'],
                     borderColor: '#1e293b',
                     borderWidth: 4,
@@ -106,24 +109,32 @@ function initDashboard() {
         }
     });
 
-    pingForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const host = pingHostInput.value.trim();
-        if (!host) return;
-
-        pingButton.disabled = true;
-        pingButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Pinging...';
-        pingResultContainer.classList.remove('hidden');
-        pingResultPre.textContent = `Pinging ${host}...`;
-
-        try {
-            const result = await api.post('manual_ping', { host });
-            pingResultPre.textContent = result.output || `Error: ${result.error || 'Unknown error'}`;
-        } catch (error) {
-            pingResultPre.textContent = `Failed to perform ping. Check API connection.`;
-        } finally {
-            pingButton.disabled = false;
-            pingButton.innerHTML = '<i class="fas fa-bolt mr-2"></i>Ping';
+    // Disable ping form for viewer role
+    if (window.userRole === 'viewer') {
+        if (pingForm) {
+            pingForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
+            pingForm.insertAdjacentHTML('afterend', '<p class="text-red-400 text-sm mt-2">You do not have permission to perform ping tests.</p>');
         }
-    });
+    } else {
+        pingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const host = pingHostInput.value.trim();
+            if (!host) return;
+
+            pingButton.disabled = true;
+            pingButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Pinging...';
+            pingResultContainer.classList.remove('hidden');
+            pingResultPre.textContent = `Pinging ${host}...`;
+
+            try {
+                const result = await api.post('manual_ping', { host });
+                pingResultPre.textContent = result.output || `Error: ${result.error || 'Unknown error'}`;
+            } catch (error) {
+                pingResultPre.textContent = `Failed to perform ping. Check API connection.`;
+            } finally {
+                pingButton.disabled = false;
+                pingButton.innerHTML = '<i class="fas fa-bolt mr-2"></i>Ping';
+            }
+        });
+    }
 }

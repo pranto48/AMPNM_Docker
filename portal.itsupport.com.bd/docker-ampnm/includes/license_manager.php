@@ -3,6 +3,7 @@
 
 // Define how often to re-verify the license with the portal (in seconds)
 define('LICENSE_VERIFICATION_INTERVAL', 300); // 5 minutes
+define('LICENSE_GRACE_PERIOD_DAYS', 7); // 7 days grace period after expiry
 
 // --- Encryption/Decryption Configuration ---
 // NOTE: This key MUST match the key used in the portal's verify_license.php
@@ -49,13 +50,14 @@ function generateUuid() {
  * Caches results in session.
  */
 function verifyLicenseWithPortal() {
-    if (!isset($_SESSION['user_id'])) {
-        $_SESSION['license_status'] = 'unverified_login_required';
-        $_SESSION['license_message'] = 'Please log in to verify your license.';
-        $_SESSION['license_max_devices'] = 0;
-        $_SESSION['license_expires_at'] = null;
-        return;
-    }
+    // Initialize session variables if they don't exist
+    if (!isset($_SESSION['license_status_code'])) $_SESSION['license_status_code'] = 'unknown';
+    if (!isset($_SESSION['license_message'])) $_SESSION['license_message'] = 'License status unknown.';
+    if (!isset($_SESSION['license_max_devices'])) $_SESSION['license_max_devices'] = 0;
+    if (!isset($_SESSION['license_expires_at'])) $_SESSION['license_expires_at'] = null;
+    if (!isset($_SESSION['current_device_count'])) $_SESSION['current_device_count'] = 0;
+    if (!isset($_SESSION['license_grace_period_end'])) $_SESSION['license_grace_period_end'] = null;
+
 
     if (isset($_SESSION['license_last_verified']) && (time() - $_SESSION['license_last_verified'] < LICENSE_VERIFICATION_INTERVAL)) {
         return; // Use cached data
@@ -63,21 +65,35 @@ function verifyLicenseWithPortal() {
 
     $app_license_key = getAppSetting('app_license_key');
     $installation_id = getAppSetting('installation_id');
-    $user_id = $_SESSION['user_id'];
+    $user_id = $_SESSION['user_id'] ?? 'anonymous'; // Use 'anonymous' if not logged in for initial checks
 
-    if (empty($app_license_key) || empty($installation_id)) {
-        $_SESSION['license_status'] = 'unconfigured';
-        $_SESSION['license_message'] = 'License key or installation ID is missing/unconfigured.';
+    if (empty($app_license_key)) {
+        $_SESSION['license_status_code'] = 'unconfigured';
+        $_SESSION['license_message'] = 'Application license key is missing.';
+        $_SESSION['license_max_devices'] = 0;
+        $_SESSION['license_expires_at'] = null;
+        $_SESSION['license_last_verified'] = time();
+        return;
+    }
+    if (empty($installation_id)) {
+        $_SESSION['license_status_code'] = 'unconfigured'; // Or a more specific 'installation_id_missing'
+        $_SESSION['license_message'] = 'Application installation ID is missing. Please re-run database setup.';
         $_SESSION['license_max_devices'] = 0;
         $_SESSION['license_expires_at'] = null;
         $_SESSION['license_last_verified'] = time();
         return;
     }
 
-    $pdo = getDbConnection();
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM `devices` WHERE user_id = ?");
-    $stmt->execute([$user_id]);
-    $current_device_count = $stmt->fetchColumn();
+    // Get current device count for the logged-in user
+    $current_device_count = 0;
+    if (isset($_SESSION['user_id'])) {
+        $pdo = getDbConnection();
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM `devices` WHERE user_id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $current_device_count = $stmt->fetchColumn();
+    }
+    $_SESSION['current_device_count'] = $current_device_count;
+
 
     $post_data = [
         'app_license_key' => $app_license_key,
@@ -111,7 +127,7 @@ function verifyLicenseWithPortal() {
         $error = error_get_last();
         $error_message = $error['message'] ?? 'Unknown connection error.';
         error_log("LICENSE_ERROR: License server unreachable via file_get_contents. Error: {$error_message}");
-        $_SESSION['license_status'] = 'error';
+        $_SESSION['license_status_code'] = 'portal_unreachable';
         $_SESSION['license_message'] = "Could not connect to license server. Network/DNS error: {$error_message}.";
         $_SESSION['license_max_devices'] = 0;
         $_SESSION['license_expires_at'] = null;
@@ -123,7 +139,7 @@ function verifyLicenseWithPortal() {
 
     if ($result === false) {
         error_log("LICENSE_ERROR: Failed to decrypt or parse license response.");
-        $_SESSION['license_status'] = 'error';
+        $_SESSION['license_status_code'] = 'error';
         $_SESSION['license_message'] = 'Failed to decrypt license response. Key mismatch or corrupted data.';
         $_SESSION['license_max_devices'] = 0;
         $_SESSION['license_expires_at'] = null;
@@ -131,19 +147,31 @@ function verifyLicenseWithPortal() {
         return;
     }
 
-    if ($result['success']) {
-        $_SESSION['license_status'] = 'active';
-        $_SESSION['license_message'] = $result['message'] ?? 'License is active.';
-        $_SESSION['license_max_devices'] = $result['max_devices'] ?? 1;
-        $_SESSION['license_expires_at'] = $result['expires_at'] ?? null;
-        error_log("LICENSE_INFO: License verification successful. Status: active, Max Devices: {$result['max_devices']}.");
+    // Update session with actual license data
+    $_SESSION['license_status_code'] = $result['actual_status'] ?? 'invalid';
+    $_SESSION['license_message'] = $result['message'] ?? 'License is invalid.';
+    $_SESSION['license_max_devices'] = $result['max_devices'] ?? 0;
+    $_SESSION['license_expires_at'] = $result['expires_at'] ?? null;
+
+    // Handle grace period for expired licenses
+    if ($_SESSION['license_status_code'] === 'expired' && $_SESSION['license_expires_at']) {
+        $expiry_timestamp = strtotime($_SESSION['license_expires_at']);
+        $grace_period_end = $expiry_timestamp + (LICENSE_GRACE_PERIOD_DAYS * 24 * 60 * 60);
+        $_SESSION['license_grace_period_end'] = $grace_period_end;
+
+        if (time() < $grace_period_end) {
+            $_SESSION['license_status_code'] = 'grace_period';
+            $_SESSION['license_message'] = 'Your license has expired. You are in a grace period until ' . date('Y-m-d H:i', $grace_period_end) . '. Please renew your license.';
+        } else {
+            // Grace period over, mark as disabled
+            $_SESSION['license_status_code'] = 'disabled';
+            $_SESSION['license_message'] = 'Your license has expired and the grace period has ended. The application is now disabled.';
+        }
     } else {
-        $_SESSION['license_status'] = $result['actual_status'] ?? 'invalid';
-        $_SESSION['license_message'] = $result['message'] ?? 'License is invalid.';
-        $_SESSION['license_max_devices'] = 0;
-        $_SESSION['license_expires_at'] = null;
-        error_log("LICENSE_ERROR: License verification failed. Status: {$_SESSION['license_status']}. Message: {$_SESSION['license_message']}");
+        $_SESSION['license_grace_period_end'] = null; // Clear grace period if not expired
     }
+
+    error_log("LICENSE_INFO: License verification completed. Status: {$_SESSION['license_status_code']}. Message: {$_SESSION['license_message']}. Max Devices: {$_SESSION['license_max_devices']}. Expires: {$_SESSION['license_expires_at']}");
     $_SESSION['license_last_verified'] = time();
 }
 
@@ -161,17 +189,9 @@ if (empty($installation_id)) {
 // 2. Check if license key is configured
 $app_license_key = getAppSetting('app_license_key');
 
-// If license key is not set, redirect to setup page
-if (empty($app_license_key)) {
-    // Only redirect if not already on the setup page to prevent infinite loops
-    if (basename($_SERVER['PHP_SELF']) !== 'license_setup.php') {
-        header('Location: license_setup.php');
-        exit;
-    }
-} else {
-    // If license key is set, verify it (only if user is logged in)
-    verifyLicenseWithPortal();
-}
+// If license key is not set, verifyLicenseWithPortal will set status to 'unconfigured'
+// If license key is set, verify it
+verifyLicenseWithPortal();
 
 // Store current device count in session for easy access
 if (isset($_SESSION['user_id'])) {

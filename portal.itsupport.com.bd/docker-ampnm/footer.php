@@ -38,6 +38,11 @@
             ]
         });
 
+        // Expose user role globally for client-side checks
+        window.userRole = '<?php echo $_SESSION['user_role'] ?? 'viewer'; ?>';
+        window.currentLoggedInUserId = '<?php echo $_SESSION['user_id'] ?? ''; ?>';
+        window.currentLoggedInUsername = '<?php echo $_SESSION['username'] ?? ''; ?>';
+
         const page = '<?php echo basename($_SERVER['PHP_SELF']); ?>';
         
         // Set active nav link
@@ -48,6 +53,43 @@
                 link.classList.add('bg-slate-700', 'text-white');
             }
         });
+
+        // Mobile menu toggle logic
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const closeMobileMenuButton = document.getElementById('close-mobile-menu-button');
+        const mainNavWrapper = document.getElementById('main-nav-wrapper');
+        const mainNav = document.getElementById('main-nav'); // Get the actual nav links container
+
+        mobileMenuButton.addEventListener('click', () => {
+            mainNavWrapper.classList.remove('-translate-x-full');
+            mainNavWrapper.classList.add('translate-x-0');
+            // Add overlay to body
+            document.body.classList.add('overflow-hidden'); // Prevent scrolling
+            const overlay = document.createElement('div');
+            overlay.id = 'mobile-menu-overlay';
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden';
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', closeMobileMenu);
+        });
+
+        closeMobileMenuButton.addEventListener('click', closeMobileMenu);
+
+        // Also close menu if a nav link is clicked
+        mainNav.addEventListener('click', (e) => {
+            if (e.target.closest('.nav-link')) {
+                closeMobileMenu();
+            }
+        });
+
+        function closeMobileMenu() {
+            mainNavWrapper.classList.add('-translate-x-full');
+            mainNavWrapper.classList.remove('translate-x-0');
+            document.body.classList.remove('overflow-hidden');
+            const overlay = document.getElementById('mobile-menu-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
 
         // Initialize page-specific JS
         if (page === 'index.php') {

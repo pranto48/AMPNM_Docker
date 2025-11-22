@@ -6,34 +6,44 @@ MapApp.deviceManager = {
         if (!node || node.deviceData.type === 'box') return;
         
         const oldStatus = node.deviceData.status;
+        // Temporarily set status to 'unknown' (blue) while pinging
         MapApp.state.nodes.update({ id: deviceId, icon: { ...node.icon, color: '#06b6d4' } });
-        const result = await MapApp.api.post('check_device', { id: deviceId });
-        const newStatus = result.status;
+        
+        try {
+            const result = await MapApp.api.post('check_device', { id: deviceId });
+            const newStatus = result.status;
 
-        if (newStatus !== oldStatus) {
-            if (newStatus === 'warning') {
-                SoundManager.play('warning');
-            } else if (newStatus === 'critical') {
-                SoundManager.play('critical');
-            } else if (newStatus === 'offline') {
-                SoundManager.play('offline');
-            } else if (newStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
-                SoundManager.play('online');
+            if (newStatus !== oldStatus) {
+                if (newStatus === 'warning') {
+                    SoundManager.play('warning');
+                } else if (newStatus === 'critical') {
+                    SoundManager.play('critical');
+                } else if (newStatus === 'offline') {
+                    SoundManager.play('offline');
+                } else if (newStatus === 'online' && (oldStatus === 'offline' || oldStatus === 'critical' || oldStatus === 'warning')) {
+                    SoundManager.play('online');
+                }
+
+                if (newStatus === 'critical' || newStatus === 'offline') {
+                    window.notyf.error({ message: `Device '${node.deviceData.name}' is now ${newStatus}.`, duration: 5000, dismissible: true });
+                } else if (newStatus === 'online' && (oldStatus === 'critical' || oldStatus === 'offline')) {
+                    window.notyf.success({ message: `Device '${node.deviceData.name}' is back online.`, duration: 5000 });
+                }
             }
 
-            if (newStatus === 'critical' || newStatus === 'offline') {
-                window.notyf.error({ message: `Device '${node.deviceData.name}' is now ${newStatus}.`, duration: 5000, dismissible: true });
-            } else if (newStatus === 'online' && (oldStatus === 'critical' || oldStatus === 'offline')) {
-                window.notyf.success({ message: `Device '${node.deviceData.name}' is back online.`, duration: 5000 });
+            const updatedDeviceData = { ...node.deviceData, status: newStatus, last_avg_time: result.last_avg_time, last_ttl: result.last_ttl, last_ping_output: result.last_ping_output };
+            let label = updatedDeviceData.name;
+            if (updatedDeviceData.show_live_ping && updatedDeviceData.status === 'online' && updatedDeviceData.last_avg_time !== null) {
+                label += `\n${updatedDeviceData.last_avg_time}ms | TTL:${updatedDeviceData.last_ttl || 'N/A'}`;
             }
+            
+            MapApp.state.nodes.update({ id: deviceId, deviceData: updatedDeviceData, icon: { ...node.icon, color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown }, title: MapApp.utils.buildNodeTitle(updatedDeviceData), label: label });
+        } catch (error) {
+            console.error("Failed to ping device:", error);
+            window.notyf.error(error.message || "Failed to ping device.");
+            // Revert to old status or mark as unknown if ping fails
+            MapApp.state.nodes.update({ id: deviceId, icon: { ...node.icon, color: MapApp.config.statusColorMap[oldStatus] || MapApp.config.statusColorMap.unknown } });
         }
-
-        const updatedDeviceData = { ...node.deviceData, status: newStatus, last_avg_time: result.last_avg_time, last_ttl: result.last_ttl, last_ping_output: result.last_ping_output };
-        let label = updatedDeviceData.name;
-        if (updatedDeviceData.show_live_ping && updatedDeviceData.status === 'online' && updatedDeviceData.last_avg_time !== null) {
-            label += `\n${updatedDeviceData.last_avg_time}ms | TTL:${updatedDeviceData.last_ttl || 'N/A'}`;
-        }
-        MapApp.state.nodes.update({ id: deviceId, deviceData: updatedDeviceData, icon: { ...node.icon, color: MapApp.config.statusColorMap[newStatus] || MapApp.config.statusColorMap.unknown }, title: MapApp.utils.buildNodeTitle(updatedDeviceData), label: label });
     },
 
     performBulkRefresh: async () => {
@@ -42,8 +52,14 @@ MapApp.deviceManager = {
         
         try {
             const result = await MapApp.api.post('ping_all_devices', { map_id: MapApp.state.currentMapId });
-            if (!result.success || !result.updated_devices) {
-                throw new Error('Invalid response from server during bulk refresh.');
+            
+            if (!result.success) { // Check result.success explicitly
+                console.error("Bulk refresh API returned failure:", result); // Added detailed log
+                throw new Error(result.message || 'Failed to refresh device statuses due to an unknown server issue.');
+            }
+            if (!result.updated_devices) { // Still check for updated_devices array
+                console.error("Bulk refresh API returned no updated_devices:", result); // Added detailed log
+                throw new Error('Invalid response from server during bulk refresh: missing device data.');
             }
 
             let statusChanges = 0;
@@ -68,6 +84,7 @@ MapApp.deviceManager = {
                     } else if (device.status === 'online' && (device.old_status === 'critical' || device.old_status === 'offline')) {
                         window.notyf.success({ message: `Device '${device.name}' is back online.`, duration: 5000 });
                     } else {
+                        // Show info toast for all status changes for all roles
                         window.notyf.open({ type: 'info', message: `Device '${device.name}' changed status to ${device.status}.`, duration: 5000 });
                     }
                 }
@@ -91,7 +108,8 @@ MapApp.deviceManager = {
                 MapApp.state.nodes.update(nodeUpdates);
             }
 
-            if (statusChanges === 0 && result.updated_devices.length > 0) {
+            // Only show "All device statuses are stable" message for admin, not for viewers
+            if (statusChanges === 0 && result.updated_devices.length > 0 && window.userRole === 'admin') {
                 window.notyf.success({ message: 'All device statuses are stable.', duration: 2000 });
             }
 
@@ -99,7 +117,7 @@ MapApp.deviceManager = {
 
         } catch (error) {
             console.error("An error occurred during the bulk refresh process:", error);
-            window.notyf.error("Failed to refresh device statuses.");
+            window.notyf.error(error.message || "Failed to refresh device statuses.");
             return 0;
         } finally {
             icon.classList.remove('fa-spin');
@@ -109,6 +127,7 @@ MapApp.deviceManager = {
     setupAutoPing: (devices) => {
         Object.values(MapApp.state.pingIntervals).forEach(clearInterval);
         MapApp.state.pingIntervals = {};
+        // Enable auto-ping functionality for all roles
         devices.forEach(device => {
             if (device.ping_interval > 0 && device.ip) {
                 MapApp.state.pingIntervals[device.id] = setInterval(() => MapApp.deviceManager.pingSingleDevice(device.id), device.ping_interval * 1000);

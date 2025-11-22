@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +16,16 @@ import {
   getDevices, 
   NetworkDevice, 
   updateDeviceStatusByIp, 
-  subscribeToDeviceChanges 
 } from "@/services/networkDeviceService";
 import { performServerPing } from "@/services/pingService";
-import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// Declare userRole globally
+declare global {
+  interface Window {
+    userRole: string;
+  }
+}
 
 const Index = () => {
   const [networkStatus, setNetworkStatus] = useState<boolean>(true);
@@ -28,11 +33,40 @@ const Index = () => {
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentMapId, setCurrentMapId] = useState<string | null>(null); // State to hold current map ID
+
+  const userRole = window.userRole || 'viewer';
+  const isAdmin = userRole === 'admin';
 
   const fetchDevices = useCallback(async () => {
     try {
       const dbDevices = await getDevices();
-      setDevices(dbDevices as NetworkDevice[]);
+      // Map PHP API response to NetworkDevice interface
+      const mappedDevices: NetworkDevice[] = dbDevices.map(d => ({
+        id: d.id,
+        name: d.name,
+        ip_address: d.ip, // PHP uses 'ip'
+        position_x: d.x, // PHP uses 'x'
+        position_y: d.y, // PHP uses 'y'
+        icon: d.type, // PHP uses 'type' for icon
+        status: d.status || 'unknown',
+        ping_interval: d.ping_interval,
+        icon_size: d.icon_size,
+        name_text_size: d.name_text_size,
+        last_ping: d.last_seen, // PHP uses 'last_seen'
+        last_ping_result: d.status === 'online', // Derive from status
+        check_port: d.check_port,
+        description: d.description,
+        warning_latency_threshold: d.warning_latency_threshold,
+        warning_packetloss_threshold: d.warning_packetloss_threshold,
+        critical_latency_threshold: d.critical_latency_threshold,
+        critical_packetloss_threshold: d.critical_packetloss_threshold,
+        show_live_ping: d.show_live_ping,
+        map_id: d.map_id,
+      }));
+      setDevices(mappedDevices);
+      // Set the current map ID from the first device, or null if no devices
+      setCurrentMapId(mappedDevices.length > 0 ? mappedDevices[0].map_id || null : null);
     } catch (error) {
       showError("Failed to load devices from database.");
     } finally {
@@ -42,50 +76,43 @@ const Index = () => {
 
   useEffect(() => {
     fetchDevices();
-
-    // Subscribe to real-time device changes
-    const channel = subscribeToDeviceChanges((payload) => {
-      console.log('Device change received:', payload);
-      fetchDevices();
-    });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [fetchDevices]);
 
   // Auto-ping devices based on their ping interval
   useEffect(() => {
     const intervals: NodeJS.Timeout[] = [];
     
-    devices.forEach((device) => {
-      if (device.ping_interval && device.ping_interval > 0 && device.ip_address) {
-        const intervalId = setInterval(async () => {
-          try {
-            console.log(`Auto-pinging ${device.ip_address}`);
-            const result = await performServerPing(device.ip_address, 1);
-            const newStatus = result.success ? 'online' : 'offline';
-            
-            // Update device status in database
-            await updateDeviceStatusByIp(device.ip_address, newStatus);
-            
-            console.log(`Ping result for ${device.ip_address}: ${newStatus}`);
-          } catch (error) {
-            console.error(`Auto-ping failed for ${device.ip_address}:`, error);
-            // Update status to offline on error
-            await updateDeviceStatusByIp(device.ip_address, 'offline');
-          }
-        }, device.ping_interval * 1000);
-        
-        intervals.push(intervalId);
-      }
-    });
+    // Only admins can have auto-ping functionality
+    if (isAdmin) {
+      devices.forEach((device) => {
+        if (device.ping_interval && device.ping_interval > 0 && device.ip_address) {
+          const intervalId = setInterval(async () => {
+            try {
+              console.log(`Auto-pinging ${device.ip_address}`);
+              const result = await performServerPing(device.ip_address, 1);
+              const newStatus = result.success ? 'online' : 'offline';
+              
+              // Update device status in database
+              await updateDeviceStatusByIp(device.ip_address, newStatus);
+              
+              console.log(`Ping result for ${device.ip_address}: ${newStatus}`);
+            } catch (error) {
+              console.error(`Auto-ping failed for ${device.ip_address}:`, error);
+              // Update status to offline on error
+              await updateDeviceStatusByIp(device.ip_address, 'offline');
+            }
+          }, device.ping_interval * 1000);
+          
+          intervals.push(intervalId);
+        }
+      });
+    }
 
     // Cleanup intervals on component unmount or devices change
     return () => {
       intervals.forEach(clearInterval);
     };
-  }, [devices]);
+  }, [devices, isAdmin]);
 
   const checkNetworkStatus = useCallback(async () => {
     try {
@@ -98,6 +125,10 @@ const Index = () => {
   }, []);
 
   const handleCheckAllDevices = async () => {
+    if (!isAdmin) {
+      showError('You do not have permission to check all devices.');
+      return;
+    }
     setIsCheckingDevices(true);
     const toastId = showLoading(`Pinging ${devices.length} devices...`);
     try {
@@ -266,7 +297,7 @@ const Index = () => {
                 </Button>
                 <Button 
                   onClick={handleCheckAllDevices} 
-                  disabled={isCheckingDevices || isLoading}
+                  disabled={isCheckingDevices || isLoading || !isAdmin}
                   variant="outline"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${isCheckingDevices ? 'animate-spin' : ''}`} />
@@ -338,11 +369,11 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="ping">
-            <PingTest />
+            {isAdmin ? <PingTest /> : <p className="text-red-400 text-center py-8">You do not have permission to perform browser ping tests.</p>}
           </TabsContent>
           
           <TabsContent value="server-ping">
-            <ServerPingTest />
+            {isAdmin ? <ServerPingTest /> : <p className="text-red-400 text-center py-8">You do not have permission to perform server ping tests.</p>}
           </TabsContent>
           
           <TabsContent value="status">
@@ -350,7 +381,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="scanner">
-            <NetworkScanner />
+            {isAdmin ? <NetworkScanner /> : <p className="text-red-400 text-center py-8">You do not have permission to scan the network.</p>}
           </TabsContent>
           
           <TabsContent value="history">
