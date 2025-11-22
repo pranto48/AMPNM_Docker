@@ -105,7 +105,7 @@ const NetworkMap = ({ devices: initialDevices, onMapUpdate, isPublicView = false
         }));
       } else {
         // For authenticated views, fetch all devices and filter by map_id
-        const allDevices = await fetch(`http://localhost:2266/api.php?action=get_devices&map_id=${currentMapId}`).then(res => res.json());
+        const allDevices = await fetch(`${apiBase}?action=get_devices&map_id=${currentMapId}`).then(res => res.json());
         updatedDevices = (allDevices.devices || []).map((d: any) => ({
           id: d.id,
           name: d.name,

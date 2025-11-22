@@ -70,8 +70,6 @@ admin_header("Admin Login");
 
                     <button type="submit" class="btn-admin-primary w-full flex justify-center items-center">
                         <i class="fas fa-sign-in-alt mr-2"></i>Enter Admin Panel
-                    <button type="submit" class="btn-admin-primary w-full flex justify-center items-center">
-                        <i class="fas fa-sign-in-alt mr-2"></i>Login
                     </button>
                 </form>
             </div>
@@ -101,15 +99,6 @@ admin_header("Admin Login");
                 <div class="admin-ribbon">
                     <i class="fas fa-lock mr-2"></i> Backend endpoints are isolated; use admin credentials only.
                 </div>
-        <div class="admin-card p-10 tilt-card">
-            <div class="tilt-inner space-y-4">
-                <h2 class="text-2xl font-semibold text-white">Operations at a glance</h2>
-                <p class="text-gray-300">Modern gradients, glowing accents, and mobile-first grids make the admin panel feel cohesive with the public portal.</p>
-                <ul class="text-gray-200 space-y-3 list-disc list-inside">
-                    <li>Consistent neon-accent colors for quick scanning.</li>
-                    <li>Blurred glass blocks to highlight key widgets.</li>
-                    <li>Responsive two-column layout for tablets and phones.</li>
-                </ul>
             </div>
         </div>
     </div>
