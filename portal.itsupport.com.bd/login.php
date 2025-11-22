@@ -41,6 +41,47 @@ portal_header("Login - IT Support BD Portal");
 
             <?php if ($error_message): ?>
                 <div class="alert-glass-error mb-2">
+<?php
+require_once 'includes/functions.php';
+
+// Redirect if already logged in
+if (isCustomerLoggedIn()) {
+    redirectToDashboard();
+}
+
+$error_message = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if (empty($email) || empty($password)) {
+        $error_message = 'Email and password are required.';
+    } else {
+        if (authenticateCustomer($email, $password)) {
+            redirectToDashboard();
+        } else {
+            $error_message = 'Invalid email or password.';
+        }
+    }
+}
+
+portal_header("Login - IT Support BD Portal");
+?>
+
+<div class="min-h-screen grid grid-cols-1 lg:grid-cols-2 gap-6 py-12 px-4 sm:px-6 lg:px-8 relative">
+    <div class="animated-grid"></div>
+    <div class="glass-card p-10 space-y-6 form-fade-in tilt-card">
+        <div class="tilt-inner">
+            <div class="flex items-center justify-between mb-4">
+                <span class="accent-badge"><i class="fas fa-lock"></i>Secure Access</span>
+                <a href="registration.php" class="text-sm text-blue-200 hover:underline">Need an account?</a>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+            <p class="text-gray-300">Sign in to monitor your network licenses, devices, and support tickets.</p>
+
+            <?php if ($error_message): ?>
+                <div class="alert-glass-error mb-4">
                     <?= htmlspecialchars($error_message) ?>
                 </div>
             <?php endif; ?>
