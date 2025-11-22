@@ -135,6 +135,7 @@ try {
             `user_id` INT(6) UNSIGNED NOT NULL,
             `ip` VARCHAR(15) NULL,
             `check_port` INT(5) NULL,
+            `monitor_method` ENUM('ping','port') DEFAULT 'ping',
             `name` VARCHAR(100) NOT NULL,
             `status` ENUM('online', 'offline', 'unknown', 'warning', 'critical') DEFAULT 'unknown',
             `last_seen` TIMESTAMP NULL,
@@ -264,6 +265,10 @@ try {
     if (!columnExists($pdo, $dbname, 'devices', 'check_port')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `check_port` INT(5) NULL AFTER `ip`;");
         message("Upgraded 'devices' table: added 'check_port' column.");
+    }
+    if (!columnExists($pdo, $dbname, 'devices', 'monitor_method')) {
+        $pdo->exec("ALTER TABLE `devices` ADD COLUMN `monitor_method` ENUM('ping','port') DEFAULT 'ping' AFTER `check_port`;");
+        message("Upgraded 'devices' table: added 'monitor_method' column.");
     }
     if (!columnExists($pdo, $dbname, 'devices', 'icon_url')) {
         $pdo->exec("ALTER TABLE `devices` ADD COLUMN `icon_url` VARCHAR(255) NULL AFTER `name_text_size`;");
