@@ -8,6 +8,16 @@ A PHP-first scaffold of the AMPNM app for deployments outside Docker. Drop this 
 3. Visit `/script-ampnm/` to load the starter UI and test the manual ping endpoint at `/api/ping.php`.
 4. Move your map images and sound assets into `assets/` (binary assets are not tracked in git).
 
+## Included pages
+- **Dashboard & Overview**: landing plus dashboard summary cards for uptime, alerts, and incident timelines.
+- **Devices**: add/edit form with monitor method (ping vs port), interval, and a copy action to duplicate devices (e.g., `Firewall_copy`).
+- **Map**: shareable topology placeholder pointing at future `/api/map` data and public-map URLs.
+- **Monitoring graphs**: chart placeholders for latency and port availability plus an uptime leaderboard.
+- **Connectivity**: manual ICMP tester wired to `api/ping.php` and guidance for port probes.
+- **Logs**: status history table ready to bind to your `status_logs`/`history` data.
+- **Users**: create/reset flows and role options so admin/client management mirrors the Docker portal.
+- **License**: key entry + fingerprint summary aligned with the hardened license manager.
+
 ## Extending
 - Implement device, topology, and auth endpoints inside `api/` following the structure in `docker-ampnm/api`.
 - Add shared helpers to `includes/` and share config through `config.php`.

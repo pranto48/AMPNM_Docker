@@ -1,82 +1,70 @@
-<?php require_once __DIR__ . '/includes/bootstrap.php'; ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($config['app_name'] ?? 'AMPNM PHP'); ?></title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
-        header { background: #0ea5e9; padding: 16px 24px; color: #0b1724; font-weight: bold; }
-        main { padding: 24px; max-width: 1100px; margin: 0 auto; }
-        .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); }
-        .grid { display: grid; gap: 16px; }
-        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-        label { display: block; margin-bottom: 8px; font-weight: 600; }
-        input[type="text"] { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e2e8f0; }
-        button { padding: 10px 16px; border: none; border-radius: 8px; background: #0ea5e9; color: #0b1724; font-weight: 700; cursor: pointer; }
-        pre { background: #0b1220; padding: 12px; border-radius: 8px; border: 1px solid #1f2937; overflow-x: auto; }
-        a { color: #7dd3fc; }
-    </style>
-</head>
-<body>
-<header>
-    <div style="display:flex; justify-content: space-between; align-items: center;">
-        <span>AMPNM PHP (XAMPP ready)</span>
-        <span>Base URL: <?php echo htmlspecialchars($baseUrl); ?></span>
-    </div>
-</header>
-<main>
-    <div class="grid grid-2">
-        <section class="card">
-            <h2>Manual Ping Test</h2>
-            <p>Use this endpoint-ready form to verify ICMP connectivity without Docker. The API is available at <code><?php echo htmlspecialchars($baseUrl); ?>/api/ping.php</code>.</p>
-            <form id="pingForm">
-                <label for="host">Hostname or IP</label>
-                <input type="text" id="host" name="host" value="8.8.8.8" placeholder="192.168.0.1">
-                <div style="margin-top: 12px; display:flex; gap: 12px; align-items:center;">
-                    <button type="submit">Run ping</button>
-                    <span id="pingStatus"></span>
-                </div>
-            </form>
-            <div id="pingOutput" style="margin-top: 12px; display:none;">
-                <pre id="pingPre"></pre>
-            </div>
-        </section>
-
-        <section class="card">
-            <h2>Deployment notes</h2>
-            <ul>
-                <li>Copy this folder to your XAMPP <code>htdocs</code> directory (e.g., <code>C:/xampp/htdocs/script-ampnm</code>).</li>
-                <li>Duplicate <code>config.sample.php</code> to <code>config.php</code> and adjust DB + SMTP credentials.</li>
-                <li>Place your license, map images, and notification sounds under <code>assets/</code> as needed.</li>
-                <li>Use Apache with PHP 8.1+; the scripts avoid Docker-only dependencies.</li>
-            </ul>
-            <p style="margin-top: 12px;">This scaffold mirrors the Docker-AMPNM features (map view, device monitoring, email alerts) while remaining portable for shared hosting.</p>
-        </section>
-    </div>
-
-    <section class="card" style="margin-top: 16px;">
-        <h2>Roadmap hooks</h2>
-        <p>Extend this starter by wiring routes to your MySQL database and SMTP provider. Recommended entry points:</p>
-        <ul>
-            <li><strong>Devices &amp; topology:</strong> build controllers in <code>/api</code> that mirror <code>docker-ampnm/api</code> handlers.</li>
-            <li><strong>Authentication:</strong> reuse your portal session logic or add a lightweight JWT middleware.</li>
-            <li><strong>Email:</strong> connect SMTP settings from <code>config.php</code> to send password resets and product updates.</li>
-        </ul>
+<?php
+require_once __DIR__ . '/includes/layout.php';
+renderPageStart('Portal Overview', 'dashboard');
+?>
+<div class="grid two">
+    <section class="hero card">
+        <p class="badge">Standalone PHP build</p>
+        <h2>AMPNM without Docker</h2>
+        <p>Deploy this script to XAMPP, LAMP, or shared hosting and keep the familiar AMPNM workflows—maps, monitoring graphs, device onboarding, licensing, and user management.</p>
+        <div class="chip-row" style="margin-top:12px;">
+            <span class="chip">Map + Topology</span>
+            <span class="chip">Device health</span>
+            <span class="chip">Ping / Port monitors</span>
+            <span class="chip">Email alerts</span>
+            <span class="chip">License enforcement</span>
+        </div>
     </section>
-</main>
+    <section class="card">
+        <h2>Quick start</h2>
+        <ol style="color: var(--muted); padding-left: 18px; margin-top: 0;">
+            <li>Copy this folder to <code>htdocs/script-ampnm</code> on your XAMPP host.</li>
+            <li>Duplicate <code>config.sample.php</code> to <code>config.php</code> and set DB + SMTP.</li>
+            <li>Wire the API endpoints in <code>/api</code> to your MySQL tables (devices, maps, logs).</li>
+            <li>Browse each page from the sidebar to configure devices, users, licensing, and alerts.</li>
+        </ol>
+        <div class="chip-row">
+            <span class="chip">Base URL: <?php echo htmlspecialchars($baseUrl); ?></span>
+            <span class="chip">Ping API: <?php echo htmlspecialchars(rtrim($baseUrl, '/')); ?>/api/ping.php</span>
+        </div>
+    </section>
+</div>
+
+<div class="grid two" style="margin-top:16px;">
+    <section class="card">
+        <h2>Manual Ping Test</h2>
+        <p class="muted">Validate connectivity without Docker. Results flow through <code>api/ping.php</code>.</p>
+        <form id="pingForm" class="grid two">
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="label" for="host">Hostname or IP</label>
+                <input class="input" type="text" id="host" name="host" value="8.8.8.8" placeholder="192.168.0.1">
+            </div>
+            <button class="btn" type="submit">Run ping</button>
+            <div id="pingStatus" class="pill" style="display:none;"></div>
+        </form>
+        <pre id="pingOutput" class="canvas-shell" style="margin-top:12px; white-space: pre-wrap;"></pre>
+    </section>
+    <section class="card">
+        <h2>Deployment checklist</h2>
+        <div class="timeline">
+            <div class="timeline-item">Import your schema (devices, notifications, maps, history) into MySQL.</div>
+            <div class="timeline-item">Point cron/queue workers to your pollers for uptime and port checks.</div>
+            <div class="timeline-item">Configure SMTP for alerts and client emails from <strong>License</strong> &amp; <strong>Users</strong> pages.</div>
+            <div class="timeline-item">Update <code>assets/sounds</code> with your notification tones (no binaries committed).</div>
+        </div>
+    </section>
+</div>
 <script>
 const form = document.getElementById('pingForm');
 const statusEl = document.getElementById('pingStatus');
-const outputWrap = document.getElementById('pingOutput');
-const pre = document.getElementById('pingPre');
+const outputEl = document.getElementById('pingOutput');
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    statusEl.style.display = 'inline-flex';
     statusEl.textContent = 'Running...';
-    outputWrap.style.display = 'none';
-    pre.textContent = '';
+    statusEl.style.color = '#cbd5e1';
+    outputEl.textContent = '';
 
     const host = document.getElementById('host').value;
     try {
