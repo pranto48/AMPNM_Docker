@@ -73,19 +73,23 @@ form.addEventListener('submit', async (event) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ host })
         });
+
         const data = await response.json();
         if (data.error) {
             statusEl.textContent = data.error;
             statusEl.style.color = '#fca5a5';
             return;
         }
+
         statusEl.textContent = data.success ? 'Host reachable' : 'Host unreachable';
-        statusEl.style.color = data.success ? '#22c55e' : '#fca5a5';
-        outputEl.textContent = data.output || 'No output captured.';
+        statusEl.style.color = data.success ? '#bbf7d0' : '#fca5a5';
+        pre.textContent = data.output || 'No output captured.';
+        outputWrap.style.display = 'block';
     } catch (error) {
         statusEl.textContent = 'Request failed: ' + error.message;
         statusEl.style.color = '#fca5a5';
     }
 });
 </script>
-<?php renderPageEnd(); ?>
+</body>
+</html>
