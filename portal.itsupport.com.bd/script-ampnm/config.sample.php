@@ -19,8 +19,4 @@ return [
         'from_email' => 'no-reply@example.com',
         'from_name' => 'AMPNM Alerts',
     ],
-    'license' => [
-        'status' => 'missing',
-    ],
-    'setup_complete' => false,
 ];

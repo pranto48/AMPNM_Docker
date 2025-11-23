@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/includes/auth.php';
-ampnm_require_auth();
 require_once __DIR__ . '/includes/layout.php';
 renderPageStart('Devices', 'devices');
 ?>

@@ -119,29 +119,6 @@ body {
 .label { font-weight: 700; margin-bottom: 6px; display: block; }
 .form-group { margin-bottom: 12px; }
 
-.setup-shell {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.12), transparent 32%),
-              radial-gradient(circle at 80% 10%, rgba(168,85,247,0.12), transparent 28%),
-              var(--bg);
-}
-
-.setup-card {
-  width: min(720px, 92vw);
-  background: var(--card);
-  border: 1px solid #1f2937;
-  border-radius: 16px;
-  padding: 22px;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.35);
-}
-
-.alert { padding: 10px 12px; border-radius: 10px; margin: 12px 0; }
-.alert-error { background: rgba(248,113,113,0.12); color: #fecdd3; border: 1px solid rgba(248,113,113,0.4); }
-.alert-success { background: rgba(52,211,153,0.12); color: #bbf7d0; border: 1px solid rgba(52,211,153,0.35); }
-
 .hero { background: linear-gradient(130deg, rgba(34,211,238,0.12), rgba(168,85,247,0.12)); border: 1px solid #1f2937; padding: 20px; border-radius: 16px; }
 .hero h2 { margin: 0 0 8px 0; }
 .hero p { margin: 0; }

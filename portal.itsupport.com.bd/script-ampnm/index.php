@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/includes/auth.php';
-ampnm_require_auth();
 require_once __DIR__ . '/includes/layout.php';
 renderPageStart('Portal Overview', 'dashboard');
 ?>
@@ -21,12 +19,13 @@ renderPageStart('Portal Overview', 'dashboard');
         <h2>Quick start</h2>
         <ol style="color: var(--muted); padding-left: 18px; margin-top: 0;">
             <li>Copy this folder to <code>htdocs/script-ampnm</code> on your XAMPP host.</li>
-            <li>Browse to this URL to run the installer, set DB/admin, then activate your license.</li>
-            <li>Use the sidebar to configure devices, maps, logs, and alerts.</li>
+            <li>Duplicate <code>config.sample.php</code> to <code>config.php</code> and set DB + SMTP.</li>
+            <li>Wire the API endpoints in <code>/api</code> to your MySQL tables (devices, maps, logs).</li>
+            <li>Browse each page from the sidebar to configure devices, users, licensing, and alerts.</li>
         </ol>
         <div class="chip-row">
-            <span class="chip">Base URL: <?php echo htmlspecialchars(ampnm_base_url()); ?></span>
-            <span class="chip">Ping API: <?php echo htmlspecialchars(rtrim(ampnm_base_url(), '/')); ?>/api/ping.php</span>
+            <span class="chip">Base URL: <?php echo htmlspecialchars($baseUrl); ?></span>
+            <span class="chip">Ping API: <?php echo htmlspecialchars(rtrim($baseUrl, '/')); ?>/api/ping.php</span>
         </div>
     </section>
 </div>
@@ -69,24 +68,28 @@ form.addEventListener('submit', async (event) => {
 
     const host = document.getElementById('host').value;
     try {
-        const response = await fetch('<?php echo htmlspecialchars(ampnm_base_url()); ?>/api/ping.php', {
+        const response = await fetch('<?php echo htmlspecialchars($baseUrl); ?>/api/ping.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ host })
         });
+
         const data = await response.json();
         if (data.error) {
             statusEl.textContent = data.error;
             statusEl.style.color = '#fca5a5';
             return;
         }
+
         statusEl.textContent = data.success ? 'Host reachable' : 'Host unreachable';
-        statusEl.style.color = data.success ? '#22c55e' : '#fca5a5';
-        outputEl.textContent = data.output || 'No output captured.';
+        statusEl.style.color = data.success ? '#bbf7d0' : '#fca5a5';
+        pre.textContent = data.output || 'No output captured.';
+        outputWrap.style.display = 'block';
     } catch (error) {
         statusEl.textContent = 'Request failed: ' + error.message;
         statusEl.style.color = '#fca5a5';
     }
 });
 </script>
-<?php renderPageEnd(); ?>
+</body>
+</html>
