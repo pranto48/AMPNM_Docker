@@ -44,7 +44,17 @@ function executePing($host, $count = 4, $timeoutSeconds = 1) {
     $isWindows = stripos(PHP_OS, 'WIN') === 0;
     $binaryLookup = $isWindows ? 'where ping' : 'command -v ping';
     $resolvedBinary = trim((string) @shell_exec($binaryLookup));
-    $pingBinary = $resolvedBinary !== '' ? $resolvedBinary : 'ping';
+
+    if ($resolvedBinary === '') {
+        return [
+            'output' => 'Ping executable not found on this server. Please install ping and allow the web user to execute it.',
+            'return_code' => 127,
+            'success' => false,
+            'error' => 'ping binary missing'
+        ];
+    }
+
+    $pingBinary = $resolvedBinary;
 
     // Prefer IPv6 ping when a colon is present in the host on Unix systems
     $ipv6Requested = strpos($host, ':') !== false;
@@ -72,6 +82,16 @@ function executePing($host, $count = 4, $timeoutSeconds = 1) {
     }
 
     $success = ($return_code === 0 && !$hasFailureMarker);
+
+    if (!$success && empty($output)) {
+        return [
+            'output' => 'Ping failed to return output. Ensure the web user can execute ping and the host is reachable.',
+            'return_code' => $return_code,
+            'success' => false,
+            'command' => $command,
+            'error' => 'ping returned no output'
+        ];
+    }
 
     return [
         'output' => $output,

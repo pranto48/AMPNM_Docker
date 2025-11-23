@@ -7,17 +7,21 @@ switch ($action) {
         if ($user_role !== 'admin') { http_response_code(403); echo json_encode(['error' => 'Forbidden: Only admin can perform manual pings.']); exit; }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $host = $input['host'] ?? '';
-            $count = $input['count'] ?? 4; // Use count from input, default to 4
+            $count = isset($input['count']) ? max(1, min(10, (int)$input['count'])) : 4; // Clamp count for safety
+            $timeoutSeconds = isset($input['timeout']) ? max(1, min(10, (int)$input['timeout'])) : 1;
             if (empty($host)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Host is required']);
                 exit;
             }
-            $result = executePing($host, $count);
+            $result = executePing($host, $count, $timeoutSeconds);
             if (!$result['success'] && isset($result['error'])) {
                 http_response_code(502);
             }
-            savePingResult($pdo, $host, $result);
+            // Persist only when we have an output payload to avoid empty DB rows during validation failures
+            if (!empty($result['output'])) {
+                savePingResult($pdo, $host, $result);
+            }
             echo json_encode($result);
         }
         break;

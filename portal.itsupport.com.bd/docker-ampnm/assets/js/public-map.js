@@ -110,7 +110,8 @@ function renderMap({ map, devices, edges }) {
         canvas.style.background = map.background_color;
     }
     if (map?.background_image_url) {
-        canvas.style.backgroundImage = `url(${map.background_image_url})`;
+        const normalizedBackground = normalizeIconUrl(map.background_image_url);
+        canvas.style.backgroundImage = `url(${normalizedBackground})`;
         canvas.style.backgroundSize = "cover";
         canvas.style.backgroundPosition = "center";
     }

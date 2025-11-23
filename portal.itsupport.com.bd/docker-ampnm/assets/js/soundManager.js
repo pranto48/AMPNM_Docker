@@ -4,10 +4,10 @@ const SoundManager = {
 
     init() {
         this.sounds = {
-            online: new Audio('../script-ampnm/assets/sounds/online.mp3'),
-            warning: new Audio('../script-ampnm/assets/sounds/warning.mp3'),
-            critical: new Audio('../script-ampnm/assets/sounds/critical.mp3'),
-            offline: new Audio('../script-ampnm/assets/sounds/offline.mp3')
+            online: new Audio('/script-ampnm/assets/sounds/online.mp3'),
+            warning: new Audio('/script-ampnm/assets/sounds/warning.mp3'),
+            critical: new Audio('/script-ampnm/assets/sounds/critical.mp3'),
+            offline: new Audio('/script-ampnm/assets/sounds/offline.mp3')
         };
 
         Object.values(this.sounds).forEach(sound => {
