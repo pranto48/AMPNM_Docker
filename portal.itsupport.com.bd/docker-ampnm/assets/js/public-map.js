@@ -7,6 +7,7 @@ const metaSummary = document.getElementById("metaSummary");
 const mapTitle = document.getElementById("mapTitle");
 const mapSubtitle = document.getElementById("mapSubtitle");
 const copyLinkBtn = document.getElementById("copyLinkBtn");
+const STATUS_COLORS = { good: "#22c55e", warning: "#f59e0b", error: "#f87171" };
 
 function showError(message, detail = "") {
     loader.hidden = true;
@@ -20,8 +21,15 @@ function showError(message, detail = "") {
         </div>
     `;
     statusMessage.querySelector(".text").textContent = "Load failed";
-    statusMessage.querySelector(".dot").style.background = "#f87171";
+    statusMessage.querySelector(".dot").style.background = STATUS_COLORS.error;
     statusMessage.querySelector(".dot").classList.remove("pulse");
+}
+
+function normalizeIconUrl(iconUrl) {
+    if (!iconUrl) return null;
+    if (iconUrl.startsWith("http://") || iconUrl.startsWith("https://")) return iconUrl;
+    const trimmed = iconUrl.startsWith("/") ? iconUrl : `/${iconUrl}`;
+    return `${window.location.origin}${trimmed}`;
 }
 
 function buildTitle(device) {
@@ -38,6 +46,7 @@ function renderMap({ map, devices, edges }) {
     loader.hidden = true;
     statusMessage.querySelector(".text").textContent = "Live view ready";
     statusMessage.querySelector(".dot").classList.add("pulse");
+    statusMessage.querySelector(".dot").style.background = STATUS_COLORS.good;
 
     mapTitle.textContent = map?.name || "Shared network map";
     mapSubtitle.textContent = map?.public_view_enabled ? "Public viewing enabled" : "Read-only preview";
@@ -49,12 +58,13 @@ function renderMap({ map, devices, edges }) {
             offline: "#ef4444",
             warning: "#f59e0b",
         };
+        const normalizedIcon = normalizeIconUrl(device.icon_url);
         return {
             id: device.id,
             label: device.name || device.ip || `Device ${device.id}`,
             title: buildTitle(device),
-            shape: device.icon_url ? "image" : "dot",
-            image: device.icon_url || undefined,
+            shape: normalizedIcon ? "image" : "dot",
+            image: normalizedIcon || undefined,
             size: device.icon_size ? Number(device.icon_size) / 1.5 : 18,
             x: device.x ?? undefined,
             y: device.y ?? undefined,
@@ -126,7 +136,10 @@ async function loadMap() {
     });
 
     try {
-        const response = await fetch(`/api.php?action=get_public_map_data&map_id=${mapId}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const response = await fetch(`/api.php?action=get_public_map_data&map_id=${mapId}`, { signal: controller.signal });
+        clearTimeout(timeout);
         if (!response.ok) {
             const detail = await response.text();
             showError("The map could not be loaded.", detail);
@@ -137,9 +150,21 @@ async function loadMap() {
             showError("No map data returned", "Ensure public view is enabled for this map.");
             return;
         }
+        if (!Array.isArray(payload.devices) || !Array.isArray(payload.edges)) {
+            showError("Map data incomplete", "Devices or edges are missing from the response.");
+            return;
+        }
+        if (payload.devices.length === 0 && payload.edges.length === 0) {
+            statusMessage.querySelector(".dot").style.background = STATUS_COLORS.warning;
+            statusMessage.querySelector(".text").textContent = "No devices on this map";
+        }
         renderMap(payload);
     } catch (error) {
-        showError("Unexpected error", error.message);
+        if (error.name === 'AbortError') {
+            showError("Timed out", "The map server took too long to respond. Try reloading.");
+        } else {
+            showError("Unexpected error", error.message);
+        }
     }
 }
 

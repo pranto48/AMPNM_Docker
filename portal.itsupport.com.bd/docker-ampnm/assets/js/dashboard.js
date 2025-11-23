@@ -128,7 +128,13 @@ function initDashboard() {
 
             try {
                 const result = await api.post('manual_ping', { host });
-                pingResultPre.textContent = result.output || `Error: ${result.error || 'Unknown error'}`;
+                if (result.error && !result.output) {
+                    pingResultPre.textContent = `Error: ${result.error}`;
+                } else if (result.success === false) {
+                    pingResultPre.textContent = result.output || 'Ping failed.';
+                } else {
+                    pingResultPre.textContent = result.output || 'Ping completed with no output.';
+                }
             } catch (error) {
                 pingResultPre.textContent = `Failed to perform ping. Check API connection.`;
             } finally {

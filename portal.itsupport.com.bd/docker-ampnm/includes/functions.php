@@ -24,40 +24,61 @@ function checkPortStatus($host, $port, $timeout = 1) {
     }
 }
 
-// Function to execute ping command more efficiently
-function executePing($host, $count = 4) {
-    // Basic validation and sanitization for the host
-    if (empty($host) || !preg_match('/^[a-zA-Z0-9\.\-]+$/', $host)) {
-        return ['output' => 'Invalid host provided.', 'return_code' => -1, 'success' => false];
+// Function to execute ping command more reliably across platforms
+function executePing($host, $count = 4, $timeoutSeconds = 1) {
+    $host = trim($host);
+    $count = max(1, (int) $count);
+    $timeoutSeconds = max(1, (int) $timeoutSeconds);
+
+    if (
+        $host === '' ||
+        (!filter_var($host, FILTER_VALIDATE_IP) && !preg_match('/^[a-zA-Z0-9.-]+$/', $host))
+    ) {
+        return ['output' => 'Invalid host provided.', 'return_code' => -1, 'success' => false, 'error' => 'Invalid host provided.'];
     }
-    
-    // Escape the host to prevent command injection
+
+    if (!function_exists('exec')) {
+        return ['output' => 'The PHP exec() function is disabled on this server.', 'return_code' => -1, 'success' => false, 'error' => 'exec disabled'];
+    }
+
+    $isWindows = stripos(PHP_OS, 'WIN') === 0;
+    $binaryLookup = $isWindows ? 'where ping' : 'command -v ping';
+    $resolvedBinary = trim((string) @shell_exec($binaryLookup));
+    $pingBinary = $resolvedBinary !== '' ? $resolvedBinary : 'ping';
+
+    // Prefer IPv6 ping when a colon is present in the host on Unix systems
+    $ipv6Requested = strpos($host, ':') !== false;
+    $ipv6Flag = (!$isWindows && $ipv6Requested) ? ' -6' : '';
+
     $escaped_host = escapeshellarg($host);
-    
-    // Determine the correct ping command based on the OS, with timeouts
-    if (stristr(PHP_OS, 'WIN')) {
-        // Windows: -n for count, -w for timeout in ms
-        $command = "ping -n $count -w 1000 $escaped_host";
+    if ($isWindows) {
+        $command = sprintf('%s -n %d -w %d %s', $pingBinary, $count, $timeoutSeconds * 1000, $escaped_host);
     } else {
-        // Linux/Mac: -c for count, -W for timeout in seconds
-        $command = "ping -c $count -W 1 $escaped_host";
+        $command = sprintf('%s%s -c %d -W %d %s', $pingBinary, $ipv6Flag, $count, $timeoutSeconds, $escaped_host);
     }
-    
+
     $output_array = [];
     $return_code = -1;
-    
-    // Use exec to get both output and return code in one call
     @exec($command . ' 2>&1', $output_array, $return_code);
-    
+
     $output = implode("\n", $output_array);
-    
-    // Determine success more reliably. Return code 0 is good, but we also check for 100% packet loss.
-    $success = ($return_code === 0 && strpos($output, '100% packet loss') === false && strpos($output, 'Lost = ' . $count) === false);
+    $failedResponses = ['100% packet loss', 'Destination host unreachable', 'Request timed out'];
+    $hasFailureMarker = false;
+    foreach ($failedResponses as $marker) {
+        if (stripos($output, $marker) !== false) {
+            $hasFailureMarker = true;
+            break;
+        }
+    }
+
+    $success = ($return_code === 0 && !$hasFailureMarker);
 
     return [
         'output' => $output,
         'return_code' => $return_code,
-        'success' => $success
+        'success' => $success,
+        'command' => $command,
+        'error' => $success ? null : ($output_array ? null : 'Ping command did not return output. Ensure ping is installed and permitted.')
     ];
 }
 
@@ -133,13 +154,14 @@ function pingDevice($ip) {
     $pingResult = executePing($ip, 1); // Ping once for speed
     $parsedResult = parsePingOutput($pingResult['output']);
     $alive = $pingResult['success'];
+    $errorMessage = $pingResult['error'] ?? (!$alive ? 'Host unreachable or timed out' : null);
 
     return [
         'ip' => $ip,
         'alive' => $alive,
         'time' => $alive ? $parsedResult['avg_time'] : null,
         'timestamp' => date('c'), // ISO 8601 format
-        'error' => !$alive ? 'Host unreachable or timed out' : null
+        'error' => $errorMessage
     ];
 }
 
