@@ -1,0 +1,1 @@
+json_encode(['error' = Your role does not permit this write action.']);
