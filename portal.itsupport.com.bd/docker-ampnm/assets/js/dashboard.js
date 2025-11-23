@@ -22,7 +22,29 @@ function initDashboard() {
 
     const api = {
         get: (action, params = {}) => fetch(`${API_URL}?action=${action}&${new URLSearchParams(params)}`).then(res => res.json()),
-        post: (action, body) => fetch(`${API_URL}?action=${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(res => res.json())
+        post: async (action, body) => {
+            const res = await fetch(`${API_URL}?action=${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const text = await res.text();
+            if (!res.ok) {
+                let detail = text;
+                try {
+                    const parsed = JSON.parse(text);
+                    detail = parsed.error || text;
+                } catch (_) {
+                    // fall back to plain text
+                }
+                throw new Error(detail || 'Request failed');
+            }
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                throw new Error('Unexpected response from server');
+            }
+        }
     };
 
     const statusColorMap = {
@@ -128,9 +150,15 @@ function initDashboard() {
 
             try {
                 const result = await api.post('manual_ping', { host });
-                pingResultPre.textContent = result.output || `Error: ${result.error || 'Unknown error'}`;
+                if (result.error && !result.output) {
+                    pingResultPre.textContent = `Error: ${result.error}`;
+                } else if (result.success === false) {
+                    pingResultPre.textContent = result.output || 'Ping failed.';
+                } else {
+                    pingResultPre.textContent = result.output || 'Ping completed with no output.';
+                }
             } catch (error) {
-                pingResultPre.textContent = `Failed to perform ping. Check API connection.`;
+                pingResultPre.textContent = `Failed to perform ping. ${error.message || 'Check API connection.'}`;
             } finally {
                 pingButton.disabled = false;
                 pingButton.innerHTML = '<i class="fas fa-bolt mr-2"></i>Ping';
