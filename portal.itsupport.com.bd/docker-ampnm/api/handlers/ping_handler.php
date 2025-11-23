@@ -14,6 +14,9 @@ switch ($action) {
                 exit;
             }
             $result = executePing($host, $count);
+            if (!$result['success'] && isset($result['error'])) {
+                http_response_code(502);
+            }
             savePingResult($pdo, $host, $result);
             echo json_encode($result);
         }
@@ -29,6 +32,9 @@ switch ($action) {
                 exit;
             }
             $result = pingDevice($ip);
+            if (!$result['alive'] && isset($result['error'])) {
+                http_response_code(502);
+            }
             echo json_encode($result);
         }
         break;

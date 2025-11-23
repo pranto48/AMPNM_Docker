@@ -26,13 +26,19 @@ function pingHost(string $host, int $count = 3, int $timeoutSeconds = 2): array
 {
     $safeHost = sanitizeHost($host);
 
+    if (!function_exists('exec')) {
+        throw new RuntimeException('exec() is disabled on this server. Enable it or run ping manually.');
+    }
+
     $isWindows = PHP_OS_FAMILY === 'Windows';
     $countFlag = $isWindows ? '-n' : '-c';
     $timeoutFlag = $isWindows ? '-w' : '-W';
     $timeout = $isWindows ? $timeoutSeconds * 1000 : $timeoutSeconds;
 
+    $ipv6Flag = (!$isWindows && str_contains($safeHost, ':')) ? '-6 ' : '';
     $command = sprintf(
-        'ping %s %d %s %d %s',
+        'ping %s%s %d %s %d %s',
+        $ipv6Flag,
         $countFlag,
         $count,
         $timeoutFlag,
